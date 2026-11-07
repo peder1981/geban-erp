@@ -1,0 +1,18 @@
+[Unit]
+Description=GEBAN Periférico Service (WebSocket + drivers)
+After=network.target postgresql.service
+Wants=geban.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/geban/periferico
+ExecStart=/usr/bin/python3 /opt/geban/periferico/periferico_service.py --config /opt/geban/periferico/config/perifericos.json --port 9100
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-periferico
+
+[Install]
+WantedBy=multi-user.target

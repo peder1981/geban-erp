@@ -1,0 +1,155 @@
+# GEBAN
+
+**ERP de gestão empresarial completo, com fiscal, financeiro, contábil, estoque e loja, para várias empresas em uma única instalação.**
+
+Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem seu próprio schema de dados. O acesso é controlado por usuário, empresa, filial e módulo, com regras claras e trilha de auditoria.
+
+![Seleção de filial](docs/img/02-selecao-filial.jpg)
+
+---
+
+## Por que o GEBAN
+
+- **Várias empresas, uma instalação.** Dados isolados por schema, um login, filiais e unidades organizadas.
+- **Fiscal de ponta a ponta.** NF-e, NFC-e, NFS-e no padrão nacional, CC-e, DANFE, EFD ICMS/IPI, recebimento de notas de fornecedores e IBS/CBS.
+- **Acesso que se controla.** Perfil por empresa, permissão por módulo, bloqueio e validade de usuário, troca obrigatória de senha, expiração e contas de serviço.
+- **Rotinas que rodam sozinhas.** Agendador por empresa, com histórico de cada execução.
+- **Operação segura.** Deploy com testes obrigatórios, backup antes de cada publicação e reversão automática se algo falhar.
+
+---
+
+## Módulos
+
+| Módulo | O que resolve |
+|--------|---------------|
+| **Núcleo** | Empresas, unidades, filiais, usuários, vínculos, permissões, ciclo de vida do usuário e agendamentos |
+| **Fiscal** | Documentos eletrônicos, produtos e NCM, apuração, EFD, DF-e de fornecedores, IBS/CBS e Lei 12.741 |
+| **Simples Nacional** | Apuração mensal, faixas, Fator R, DAS e vencimentos |
+| **Financeiro** | Títulos, baixas, fluxo de caixa, aging, boletos e CNAB, TEF |
+| **Contábil** | Plano de contas, lançamento padrão, razão, balancete e DRE |
+| **Estoque e compras** | Custo médio, kardex, lotes e séries, solicitação, pedido e recebimento |
+| **Faturamento e loja** | Pedidos, notas, devoluções, frente de loja com caixa, balança e promoções |
+| **Derrama** | Tributos com título no financeiro e retenções |
+
+---
+
+## Como funciona
+
+```mermaid
+flowchart LR
+    U[Usuario] --> L[Login]
+    L --> V{Vinculo com a empresa?}
+    V -- nao --> X[Acesso negado]
+    V -- sim --> F[Escolhe filial]
+    F --> P{Permissao no modulo?}
+    P -- nao --> X
+    P -- sim --> M[Modulo]
+    M --> D[(PostgreSQL<br/>schema da empresa)]
+```
+
+**Acessos em camadas.** A permissão só vale com vínculo com a empresa. Sem vínculo, nada se abre, mesmo que a permissão exista.
+
+```mermaid
+flowchart TB
+    S[Super] -->|tudo, em todas as empresas| E1[Empresa A]
+    S --> E2[Empresa B]
+    A[ADMIN da empresa A] -->|so' a empresa A| E1
+    C[Usuario comum] -->|modulos liberados| E1
+```
+
+---
+
+## Ciclo de vida do usuário
+
+| Ação | Quem pode | Efeito |
+|------|-----------|--------|
+| Bloquear / desbloquear | Super | Impede o login em todas as empresas |
+| Validade do acesso | Super | Acesso vence na data; vencido = bloqueado |
+| Eliminar acessos | Super ou ADMIN | Remove os vínculos; reversível |
+| Excluir | Super | Só para quem nunca acessou |
+| Trocar senha no próximo logon | Super ou ADMIN | Obriga a troca antes de entrar |
+| Conta de serviço | Super | Dispensa a troca periódica de senha |
+
+A conta super nunca é bloqueada, nunca vence e nunca perde acessos. Erros de login não revelam se a conta existe.
+
+---
+
+## Agendador de rotinas
+
+Cada empresa agenda as próprias rotinas. Um executor roda a cada minuto e dispara o que está devido.
+
+```mermaid
+flowchart LR
+    T[Timer a cada minuto] --> E[Executor]
+    E --> C{Empresa tem rotina devida?}
+    C -- nao --> Z[Fim]
+    C -- sim --> R[Executa a rotina]
+    R --> H[(Histórico)]
+```
+
+- **Horário e dia:** diário ou dia do mês (1 a 28).
+- **Atraso:** se o horário passou, roda na próxima passada, uma vez por dia.
+- **Rotinas disponíveis:** coleta de DF-e por NSU e apuração do Simples do mês anterior.
+- **Segurança:** só rotinas de uma lista fechada, e só o super ou o ADMIN da empresa agendam.
+
+![Menu da empresa](docs/img/03-menu-empresa-99.jpg)
+
+---
+
+## Fiscal
+
+![Módulo fiscal](docs/img/04-modulo-fiscal.jpg)
+
+Documentos emitidos, transmitidos, cancelados e inutilizados com a mesma regra de negócio. A emissão real depende de certificado digital A1 e da homologação na SEFAZ de cada UF.
+
+---
+
+## Requisitos
+
+- **advplc 4.6.1** ou mais novo.
+- **PostgreSQL**.
+- Certificado digital A1, para emissão real de documentos fiscais.
+
+## Começando
+
+```bash
+# verificar a sintaxe de um fonte
+advplc check src/GEBTUI.prw --include src
+
+# terminal (TUI)
+advplc serve src/GEBTUI.prw --port 8081
+
+# API e login web
+advplc run src/GEBWEB.prw
+```
+
+Configure a conexão com as variáveis `GEBAN_PG_HOST`, `GEBAN_PG_PORT`, `GEBAN_PG_USER`, `GEBAN_PG_PASSWORD` e `GEBAN_PG_DB`.
+
+Depois:
+
+1. Crie a empresa e a filial no **Núcleo**.
+2. Cadastre os usuários e vincule cada um às empresas e filiais.
+3. Libere os módulos em **Núcleo > Permissões**.
+4. Agende as rotinas recorrentes em **Núcleo > Agendamentos**.
+
+## Testes
+
+Cada teste em `tests/T_*.prw` cria um schema descartável e o remove ao final. Rode em um banco de teste dedicado, nunca no banco de produção.
+
+## Estado atual
+
+- **Emissão fiscal:** motor completo e testado contra emuladores de SEFAZ e Sefin. A homologação real em cada UF ainda precisa ser feita com certificado A1.
+- **EFD ICMS/IPI:** gerada e validada localmente. A validação no programa PVA da Receita ainda não foi feita.
+- **Agendador:** em produção, com as rotinas de DF-e e Simples.
+
+## Documentação
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [Documentação técnica](docs/01-documentacao-tecnica.md) | Arquitetura e módulos |
+| [Regras de negócio](docs/02-regras-negocio.md) | Regras de negócio e domínio |
+| [Especificação funcional](docs/03-especificacao-funcional.md) | Especificação funcional |
+| [Manual de utilização](docs/04-manual-utilizacao.md) | Passo a passo de uso |
+| [Referência técnica](docs/05-referencia-tecnica.md) | Rotas, tabelas e funções |
+| [Guia funcional](docs/06-guia-funcional.md) | Guia para o dia a dia |
+| [Changelog](CHANGELOG.md) | Histórico de mudanças |
