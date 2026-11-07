@@ -33,6 +33,15 @@ Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem
 
 ---
 
+## Telas
+
+Capturas da empresa de demonstração, com um usuário de acesso restrito, como o sistema realmente aparece.
+
+| | |
+|---|---|
+| ![Financeiro](docs/img/05-modulo-financeiro.jpg) **Financeiro**: contas, novos lançamentos e baixa de títulos | ![Estoque](docs/img/06-modulo-estoque.jpg) **Estoque**: saldos, vendas, venda fiado e juros |
+| ![Contábil](docs/img/07-modulo-contabil.jpg) **Contábil**: plano, lançamentos, balancete e DRE | ![Faturamento](docs/img/08-modulo-faturamento.jpg) **Faturamento**: clientes, pedidos, liberação, faturamento e devolução |
+
 ## Como funciona
 
 ```mermaid
