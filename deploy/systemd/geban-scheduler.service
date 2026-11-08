@@ -1,0 +1,15 @@
+[Unit]
+Description=GEBAN ERP - executor do agendador de rotinas (uma passada)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=geban
+Group=geban
+WorkingDirectory=/opt/geban
+EnvironmentFile=/etc/geban/geban.env
+ExecStart=/usr/local/bin/advplc run src/GEBSCHJOB.prw
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-scheduler

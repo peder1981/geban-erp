@@ -134,6 +134,12 @@ advplc run src/GEBWEB.prw
 
 Configure a conexão com as variáveis `GEBAN_PG_HOST`, `GEBAN_PG_PORT`, `GEBAN_PG_USER`, `GEBAN_PG_PASSWORD` e `GEBAN_PG_DB`.
 
+### Primeiro acesso
+
+Numa instalação nova (catálogo de usuários vazio), o primeiro boot cria automaticamente a conta administrativa global **`super`** com a senha **`Geban#2026`**. No primeiro login o sistema exige a troca da senha antes de liberar o acesso — a senha padrão não volta a valer. Para usar outra senha inicial, exporte `GEBAN_SUPER_SENHA` **antes** do primeiro boot.
+
+Com o `super` você cria a primeira empresa (o sistema pede código e nome na hora) e depois cadastra os usuários do dia a dia em **Núcleo**. Instalações existentes nunca têm a credencial redefinida por esse mecanismo.
+
 Depois:
 
 1. Crie a empresa e a filial no **Núcleo**.
@@ -162,3 +168,8 @@ Cada teste em `tests/T_*.prw` cria um schema descartável e o remove ao final. R
 | [Referência técnica](docs/05-referencia-tecnica.md) | Rotas, tabelas e funções |
 | [Guia funcional](docs/06-guia-funcional.md) | Guia para o dia a dia |
 | [Changelog](CHANGELOG.md) | Histórico de mudanças |
+
+## Licença
+
+[Apache License 2.0](LICENSE) — uso comercial livre, com atribuição.
+Copyright 2026 Peder Munksgaard.

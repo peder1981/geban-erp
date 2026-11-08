@@ -1,0 +1,20 @@
+[Unit]
+Description=GEBAN ERP - interface web (advplc serve GEBTUI)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=geban
+Group=geban
+WorkingDirectory=/opt/geban
+EnvironmentFile=/etc/geban/geban.env
+ExecStart=/usr/local/bin/advplc serve src/GEBTUI.prw --port 8081
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban
+
+[Install]
+WantedBy=multi-user.target

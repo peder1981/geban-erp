@@ -1,0 +1,10 @@
+[Unit]
+Description=Dispara o agendador de rotinas do GEBAN a cada minuto
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

@@ -95,6 +95,10 @@ User Function GEBTUILOGIN()
     Local nFil := 0
     Local cCod := ""
     Local cNome := ""
+    Local cStat := ""
+    Local cNova := ""
+    Local cConf := ""
+    Local aTroca := {}
     Do While nTent < 3 .And. !lOk
         cUsu := FWGetText("Usuario:", "")
         If Empty(cUsu)
@@ -104,8 +108,28 @@ User Function GEBTUILOGIN()
         If Empty(cSen)
             Return {}
         EndIf
-        If GEBSECLOGIN(AllTrim(cUsu), AllTrim(cSen), "tui") == "OK"
+        cStat := GEBSECLOGIN(AllTrim(cUsu), AllTrim(cSen), "tui")
+        If cStat == "OK"
             lOk := .T.
+        ElseIf cStat == "TROCA_OBRIGATORIA"
+            // Senha correta, troca pendente (ex.: primeiro acesso com a
+            // senha padrao do bootstrap): coleta a nova senha, grava via
+            // GEBTUITROCASENHA (que limpa SEC_FORCE) e tenta o login de
+            // novo. Nao conta como tentativa falha -- a senha estava certa.
+            cNova := FWGetText("Troca de senha obrigatoria. Nova senha:", "", .T.)
+            cConf := FWGetText("Confirme a nova senha:", "", .T.)
+            lOk := .F.
+            If !Empty(cNova) .And. cNova == cConf
+                aTroca := GEBTUITROCASENHA(AllTrim(cUsu), "", cNova, "", "")
+                If Len(aTroca) > 0 .And. aTroca[1]
+                    If GEBSECLOGIN(AllTrim(cUsu), cNova, "tui") == "OK"
+                        lOk := .T.
+                    EndIf
+                EndIf
+            EndIf
+            If !lOk
+                MsgStop("Troca de senha obrigatoria nao concluida. Tente novamente.", "GEBAN")
+            EndIf
         Else
             MsgStop("Credenciais invalidas.", "GEBAN")
         EndIf

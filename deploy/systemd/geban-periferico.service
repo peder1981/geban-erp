@@ -1,0 +1,19 @@
+[Unit]
+Description=GEBAN Periférico Service (WebSocket + drivers PDV)
+After=network.target
+
+[Service]
+Type=simple
+User=geban
+Group=geban
+SupplementaryGroups=dialout
+WorkingDirectory=/opt/geban/periferico
+ExecStart=/usr/bin/python3 /opt/geban/periferico/periferico_service.py --port 9100
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-periferico
+
+[Install]
+WantedBy=multi-user.target

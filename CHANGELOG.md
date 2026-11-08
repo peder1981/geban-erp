@@ -5,6 +5,9 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 
 ## [Não lançado]
 
+### Licença
+- Projeto licenciado sob **Apache License 2.0** (`LICENSE`).
+
 ### Acessos e segurança
 - **Permissão por empresa:** a permissão de módulo deixa de valer para todas as empresas. Cada linha de permissão tem a empresa (`*` = todas, legado preservado).
 - **Perfil por empresa:** o mesmo usuário pode ser ADMIN numa empresa e USUARIO em outra. O ADMIN só age sobre a própria empresa.
@@ -21,6 +24,7 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 - **Expiração de senha** de 90 dias, aplicada no login depois da senha correta. Senhas legadas sem data não expiram.
 - **Conta super** não é bloqueada, não vence, não é excluída e não perde acessos.
 - Login web e GUI deixam de criar vínculo ao entrar o super.
+- **Bootstrap do primeiro acesso:** instalação com catálogo vazio cria automaticamente a conta `super` (`GEBSECBOOT`, chamada por `GEBDBProvisionaCatalogo`) com senha padrão `Geban#2026` — customizável via `GEBAN_SUPER_SENHA` — e `SEC_FORCE='S'`: o primeiro login exige troca de senha. O login TUI conduz a troca na hora; a API web devolve `troca de senha obrigatoria`. Catálogo populado nunca é tocado.
 
 ### Agendador de rotinas
 - Agendamentos por empresa (`SCH_JOB`) e histórico de execuções (`SCH_LOG`).
@@ -55,6 +59,18 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 - DRE e balancete calculavam sobre competência vazia.
 - Conversão de dinheiro de REAL para NUMERIC pelo caminho que preserva os centavos.
 - Comentários que ainda citavam SQLite foram trocados por PostgreSQL.
+- `/pdv` deixou de depender do caminho fixo `/opt/geban/public`: agora
+  respeita `GEBAN_PUBLIC_DIR` e cai para `public/` relativo ao diretório
+  de trabalho (necessário para a instalação Windows all-in-one).
+
+### Empacotamento e instalação
+- `deploy/`: instalador do servidor Linux (modelo central + web) com
+  units systemd para interface, API, agendador e periférico.
+- `packaging/windows/`: pacote all-in-one para Windows — `geban-setup.exe`
+  (NSIS) com advplc.exe, launcher Go que sobe o PostgreSQL embarcado,
+  interface, API e agendador; instalação por usuário, sem administrador.
+- Agente de periféricos PDV para Windows documentado em
+  `packaging/windows/pdv/` (build via PyInstaller, no Windows).
 
 ## [v0.10]
 - Integração do PDV ao GEBWEB; correção do boot do gebweb em produção.

@@ -164,6 +164,7 @@ User Function GEBWEB_LOGINAPI(oReq)
     Local lRegTem := .F.
     Local cNome := ""
     Local lSuper := .F.
+    Local cStat := ""
 
     If oReq == Nil .Or. oReq:EMPRESA == Nil
         cEmp := ""
@@ -194,9 +195,10 @@ User Function GEBWEB_LOGINAPI(oReq)
         Return {"ok", .F., "erro", "credenciais invalidas"}
     EndIf
 
-    lOk := (GEBSECLOGIN(cUsu, cSen, "web") == "OK")
+    cStat := GEBSECLOGIN(cUsu, cSen, "web")
+    lOk := (cStat == "OK")
     If !lOk
-        ConOut("GEBWEB_LOGINAPI: GEBSECLOGIN recusou " + cUsu)
+        ConOut("GEBWEB_LOGINAPI: GEBSECLOGIN recusou " + cUsu + " (" + cStat + ")")
     EndIf
     lSuper := GEBSECISSUPER(cUsu)
 
@@ -303,6 +305,11 @@ User Function GEBWEB_LOGINAPI(oReq)
     EndIf
 
     If !lOk
+        // TROCA_OBRIGATORIA nao e' oraculo: a senha ja foi conferida --
+        // so' falta a troca (ex.: primeiro acesso do super bootstrap).
+        If cStat == "TROCA_OBRIGATORIA"
+            Return {"ok", .F., "erro", "troca de senha obrigatoria"}
+        EndIf
         Return {"ok", .F., "erro", "credenciais invalidas"}
     EndIf
 

@@ -3,3 +3,7 @@
 *.db-wal
 .worktrees/
 tests/.out/
+
+# artefatos de build do pacote Windows
+packaging/windows/dist/
+packaging/windows/launcher/geban-launcher.exe

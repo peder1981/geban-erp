@@ -114,6 +114,7 @@ User Function GEBDBProvisionaCatalogo()
     TCSqlExec("SET search_path TO public")
     lOk := (lOk .And. GENMIGCatalogo())
     lOk := (lOk .And. TCSecMIG())
+    lOk := (lOk .And. GEBSECBOOT())
     If lOk
         ConOut("GEBDBProvisionaCatalogo: OK")
     Else

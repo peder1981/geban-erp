@@ -1,0 +1,20 @@
+[Unit]
+Description=GEBAN ERP - API REST (advplc run GEBWEB)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=geban
+Group=geban
+WorkingDirectory=/opt/geban
+EnvironmentFile=/etc/geban/geban.env
+ExecStart=/usr/local/bin/advplc run src/GEBWEB.prw
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-web
+
+[Install]
+WantedBy=multi-user.target

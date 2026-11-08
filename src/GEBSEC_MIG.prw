@@ -125,3 +125,57 @@ User Function TCSecMIG()
         RestArea(aArea)
     EndIf
 Return lOk
+
+/*/{Protheus.doc} GEBSECBOOT
+    Bootstrap da conta administrativa global ("super") em instalacao
+    nova. So' age quando o catalogo (GE2) nao tem NENHUM usuario ativo:
+    cria "super" via GEBSECCRIAUSU() com a senha de GEBAN_SUPER_SENHA
+    (ou o padrao documentado) e marca SEC_FORCE='S' -- a senha padrao
+    vale apenas para o primeiro login, que exige troca imediata
+    (GEBSECLOGIN retorna "TROCA_OBRIGATORIA" ate a troca ser feita).
+    Catalogo ja populado: nao toca em nada -- nunca redefine credencial
+    de uma instalacao existente. Chamada por GEBDBProvisionaCatalogo()
+    (GEBDB_TENANT.prw) a cada boot; idempotente por construcao.
+    @type Funcao de provisionamento
+    @author Peder Munksgaard
+    @since 08/11/2026
+    @return .T. se ok ou nada a fazer, .F. se a criacao falhou
+/*/
+User Function GEBSECBOOT()
+    Local lOk := .T.
+    Local aChk := {}
+    Local cSenha := ""
+    Local xEnv := Nil
+    Local aArea := GetArea()
+
+    aChk := TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE D_E_L_E_T_ = ' ' LIMIT 1")
+    If Len(aChk) > 0
+        If Len(aArea) > 0
+            RestArea(aArea)
+        EndIf
+Return .T.
+    EndIf
+
+    // GetEnv devolve a STRING "Nil" quando a variavel nao existe (quirk
+    // do runtime) -- tratar como ausente, senao a senha viraria "Nil".
+    xEnv := GetEnv("GEBAN_SUPER_SENHA")
+    If ValType(xEnv) == "C" .And. !Empty(AllTrim(xEnv)) .And. Upper(AllTrim(xEnv)) != "NIL"
+        cSenha := AllTrim(xEnv)
+    Else
+        cSenha := "Geban#2026"
+    EndIf
+
+    lOk := GEBSECCRIAUSU("super", cSenha, {}, "Super Administrador", "ADMIN", .T.)
+    If lOk
+        lOk := TCSqlExec("UPDATE GE2_SEC SET SEC_FORCE = 'S' WHERE SEC_USUARIO = 'super' AND D_E_L_E_T_ = ' '")
+    EndIf
+    If lOk
+        ConOut("GEBSECBOOT: conta super criada (troca de senha obrigatoria no primeiro login)")
+    Else
+        ConOut("GEBSECBOOT: FAIL ao criar conta super")
+    EndIf
+
+    If Len(aArea) > 0
+        RestArea(aArea)
+    EndIf
+Return lOk
