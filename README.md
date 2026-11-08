@@ -35,12 +35,15 @@ Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem
 
 ## Telas
 
-Capturas da empresa de demonstração, com um usuário de acesso restrito, como o sistema realmente aparece.
+Capturas reais do sistema rodando (empresa de demonstração 99).
 
 | | |
 |---|---|
+| ![Login](docs/img/01-login.jpg) **Login**: instalação nova já traz a conta `super` — o primeiro acesso pede troca de senha | ![Troca obrigatória](docs/img/11-troca-senha.jpg) **Troca de senha obrigatória**: conduzida no próprio login |
+| ![Menu da empresa](docs/img/03-menu-empresa-99.jpg) **Menu da empresa** | ![Módulo fiscal](docs/img/04-modulo-fiscal.jpg) **Fiscal**: documentos emitidos, cancelados e inutilizados |
 | ![Financeiro](docs/img/05-modulo-financeiro.jpg) **Financeiro**: contas, novos lançamentos e baixa de títulos | ![Estoque](docs/img/06-modulo-estoque.jpg) **Estoque**: saldos, vendas, venda fiado e juros |
 | ![Contábil](docs/img/07-modulo-contabil.jpg) **Contábil**: plano, lançamentos, balancete e DRE | ![Faturamento](docs/img/08-modulo-faturamento.jpg) **Faturamento**: clientes, pedidos, liberação, faturamento e devolução |
+| ![Núcleo](docs/img/09-modulo-nucleo.jpg) **Núcleo**: empresas, unidades, filiais, usuários, permissões e agendamentos | ![Usuários](docs/img/10-nucleo-usuarios.jpg) **Usuários**: cadastro e vínculos por empresa |
 
 ## Como funciona
 
