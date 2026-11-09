@@ -51,10 +51,16 @@ mkdir -p "$WORK/pg-extract"
 unzip -q -o "$PG_ZIP" "pgsql/bin/*" "pgsql/lib/*" "pgsql/share/*" -d "$WORK/pg-extract"
 mkdir -p "$PAYLOAD/pg"
 cp -a "$WORK/pg-extract/pgsql/." "$PAYLOAD/pg/"
+# Os binários EDB exigem o VC++ Runtime, que NÃO vem no zip nem no
+# Windows limpo — sem estas DLLs initdb/pg_ctl falham com 0xc0000135.
+# Vendored em redist/vc (Microsoft Visual C++ 2015-2022 Redistributable,
+# redistribuição permitida pela licença da Microsoft).
+cp "$HERE/redist/vc/"*.dll "$PAYLOAD/pg/bin/"
 
 log "5/6 verificações do payload"
 for f in advplc.exe geban-launcher.exe src/GEBTUI.prw src/GEBWEB.prw src/GEBSCHJOB.prw \
-         public/pdv.html pg/bin/initdb.exe pg/bin/pg_ctl.exe pg/bin/psql.exe; do
+         public/pdv.html pg/bin/initdb.exe pg/bin/pg_ctl.exe pg/bin/psql.exe \
+         pg/bin/vcruntime140.dll pg/bin/msvcp140.dll pg/bin/vcruntime140_1.dll; do
     [ -f "$PAYLOAD/$f" ] || { echo "FALTA: $f"; exit 1; }
 done
 du -sh "$PAYLOAD"

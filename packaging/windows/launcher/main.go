@@ -115,7 +115,7 @@ func ensurePostgres(cfg *config) error {
 	}
 	pgData := filepath.Join(cfg.DataDir, "pg")
 	firstRun := false
-	if _, err := os.Stat(pgData); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(pgData, "PG_VERSION")); os.IsNotExist(err) {
 		firstRun = true
 	} else if err != nil {
 		return err
@@ -158,13 +158,24 @@ func ensurePostgres(cfg *config) error {
 		return nil
 	}
 	logf("iniciando postgres…")
-	out, err := runCmd(pgCtl,
+	// pg_ctl spawnam postgres.exe, que herda os handles de stdout/stderr.
+	// Com binário pipe (CombinedOutput) o Wait() nunca retornaria — o
+	// postgres segura o pipe aberto. Por isso a saída vai para arquivo.
+	ctlLog, err := os.OpenFile(filepath.Join(cfg.DataDir, "pg_ctl.log"),
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer ctlLog.Close()
+	cmd := exec.Command(pgCtl,
 		"-D", pgData,
 		"-l", filepath.Join(cfg.DataDir, "postgres.log"),
 		"-o", "-p "+pgPort+" -c listen_addresses=127.0.0.1",
 		"-w", "start")
-	if err != nil {
-		return fmt.Errorf("pg_ctl start: %v\n%s", err, out)
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNoWindow}
+	cmd.Stdout, cmd.Stderr = ctlLog, ctlLog
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("pg_ctl start: %v", err)
 	}
 	for i := 0; i < 30; i++ {
 		if pgReady() {
@@ -201,14 +212,16 @@ func provisionDB(cfg *config) error {
 		return fmt.Errorf("GEBAN_PG_PASS ausente em %s (rode initdb antes)", cfg.EnvFile)
 	}
 
+	// \gexec só funciona via stdin (em -c o psql manda tudo ao servidor).
 	sql := fmt.Sprintf(
-		"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='%s') THEN CREATE ROLE %s LOGIN PASSWORD '%s'; ELSE ALTER ROLE %s LOGIN PASSWORD '%s'; END IF; END $$;"+
-			"SELECT 'CREATE DATABASE %s OWNER %s' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='%s')\\gexec",
+		"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='%s') THEN CREATE ROLE %s LOGIN PASSWORD '%s'; ELSE ALTER ROLE %s LOGIN PASSWORD '%s'; END IF; END $$;\n"+
+			"SELECT 'CREATE DATABASE %s OWNER %s' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='%s')\\gexec\n",
 		pgUser, pgUser, appPass, pgUser, appPass, pgDB, pgUser, pgDB)
 
 	cmd := exec.Command(pgBin(cfg, "psql.exe"),
 		"-h", "127.0.0.1", "-p", pgPort, "-U", "postgres", "-d", "postgres",
-		"-v", "ON_ERROR_STOP=1", "-c", sql)
+		"-v", "ON_ERROR_STOP=1")
+	cmd.Stdin = strings.NewReader(sql)
 	cmd.Env = append(os.Environ(), "PGPASSWORD="+suPass, "PGCONNECT_TIMEOUT=10")
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNoWindow}
 	out, err := cmd.CombinedOutput()
@@ -235,6 +248,9 @@ func writeEnvFile(cfg *config, kv map[string]string) error {
 		"GEBAN_PG_USER":     pgUser,
 		"GEBAN_PG_PASSWORD": "",
 		"GEBAN_PG_PASS":     "",
+		// all-in-one: API só em localhost — sem prompt de firewall e sem
+		// expor o ERP na rede da loja.
+		"GEBAN_WEB_HOST": "127.0.0.1",
 	}
 	for _, ln := range readEnvFile(cfg.EnvFile) {
 		if k, v, ok := strings.Cut(ln, "="); ok {

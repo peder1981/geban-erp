@@ -130,8 +130,15 @@ User Function GEBWEB(nPorta)
     // Interface PDV
     oSrv:AddRoute("GET", "/pdv", "U_GEBPDVHTML")
     oSrv:AddRoute("GET", "/pdv/ws", "U_GEBPDVWS")
-    ConOut("GEBWEB: servindo em http://0.0.0.0:" + cValToChar(nPorta))
-    oSrv:Serve(nPorta)
+    // Bind configuravel: all-in-one (Windows) usa 127.0.0.1 para nao
+    // expor a API na rede nem disparar o firewall do Windows; servidor
+    // central mantem 0.0.0.0 via default ou GEBAN_WEB_HOST.
+    cHost := GetEnv("GEBAN_WEB_HOST")
+    If ValType(cHost) != "C" .Or. Empty(cHost) .Or. cHost == "Nil"
+        cHost := "0.0.0.0"
+    EndIf
+    ConOut("GEBWEB: servindo em http://" + cHost + ":" + cValToChar(nPorta))
+    oSrv:Serve(cHost + ":" + cValToChar(nPorta))
 Return .T.
 
 /*/{Protheus.doc} GEBWEB_LOGINAPI
