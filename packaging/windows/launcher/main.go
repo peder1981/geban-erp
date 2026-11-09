@@ -262,7 +262,7 @@ func writeEnvFile(cfg *config, kv map[string]string) error {
 	}
 	var b strings.Builder
 	for _, k := range []string{"GEBAN_PG_HOST", "GEBAN_PG_PORT", "GEBAN_PG_DB",
-		"GEBAN_PG_USER", "GEBAN_PG_PASSWORD", "GEBAN_PG_PASS"} {
+		"GEBAN_PG_USER", "GEBAN_PG_PASSWORD", "GEBAN_PG_PASS", "GEBAN_WEB_HOST"} {
 		fmt.Fprintf(&b, "%s=%s\n", k, vals[k])
 	}
 	return os.WriteFile(cfg.EnvFile, []byte(b.String()), 0600)

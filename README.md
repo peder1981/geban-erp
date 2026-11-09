@@ -143,6 +143,18 @@ Numa instalação nova (catálogo de usuários vazio), o primeiro boot cria auto
 
 Com o `super` você cria a primeira empresa (o sistema pede código e nome na hora) e depois cadastra os usuários do dia a dia em **Núcleo**. Instalações existentes nunca têm a credencial redefinida por esse mecanismo.
 
+### Validação no Windows (all-in-one)
+
+O pacote `packaging/windows/dist/geban-setup.exe` foi instalado e exercitado de ponta a ponta numa máquina **Windows 10 limpa** (sem ferramentas de desenvolvimento, sem VC++ Redistributable prévio):
+
+- Instalação por usuário em `%LOCALAPPDATA%\GEBAN`, sem exigir administrador; desinstalador, atalhos e inicialização com o Windows funcionando.
+- PostgreSQL embarcado inicializado no primeiro boot (`initdb`), escutando só em `127.0.0.1:5432`; UI em `127.0.0.1:8081` e API em `127.0.0.1:8090` — sem alerta do Firewall e sem exposição na rede local.
+- Login completo na interface web do Windows: `super` → troca de senha obrigatória → criação da primeira empresa → menu principal com todos os módulos.
+
+| Login | Troca de senha obrigatória | Primeira empresa | Menu |
+|---|---|---|---|
+| ![Login Windows](docs/img/12-windows-login.jpg) | ![Troca de senha Windows](docs/img/13-windows-troca-senha.jpg) | ![Primeira empresa Windows](docs/img/14-windows-primeira-empresa.jpg) | ![Menu Windows](docs/img/15-windows-menu.jpg) |
+
 Depois:
 
 1. Crie a empresa e a filial no **Núcleo**.

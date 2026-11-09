@@ -44,6 +44,11 @@ Section "GEBAN ERP" SecMain
 
     WriteRegStr HKCU "Software\GEBAN" "InstallDir" "$INSTDIR"
 
+    ; O desinstalador precisa ser gravado durante a instalação —
+    ; WriteUninstaller dentro da seção "Uninstall" só rodaria na hora
+    ; de desinstalar (tarde demais).
+    WriteUninstaller "$INSTDIR\uninstall.exe"
+
     ; Pergunta se quer iniciar agora
     MessageBox MB_YESNO|MB_ICONQUESTION \
         "GEBAN instalado em $INSTDIR.$\n\nDeseja iniciar agora?" IDYES StartNow IDNO Done
@@ -52,8 +57,12 @@ Section "GEBAN ERP" SecMain
     Done:
 SectionEnd
 
-Section "Desinstalar"
-    WriteUninstaller "$INSTDIR\uninstall.exe"
+; ATENÇÃO: o nome desta seção precisa ser "Uninstall" — o makensis só
+; reconhece a seção de desinstalação por esse nome exato. Qualquer outro
+; nome (ex.: "Desinstalar") vira uma segunda seção de INSTALAÇÃO e o
+; código de limpeza roda no fim do setup, apagando o que acabou de
+; instalar.
+Section "Uninstall"
     ; ATENÇÃO: a desinstalação apaga $INSTDIR\data (banco local) — o
     ; MUI_UNPAGE_CONFIRM acima é o aviso; não há como desfazer.
     ; Encerra o agendador antes de remover
