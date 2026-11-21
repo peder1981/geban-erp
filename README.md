@@ -154,11 +154,11 @@ O pacote `packaging/windows/dist/geban-setup.exe` foi instalado e exercitado de 
 - PostgreSQL embarcado inicializado no primeiro boot (`initdb`), escutando só em `127.0.0.1:5432`; UI em `127.0.0.1:8081` e API em `127.0.0.1:8090` — sem alerta do Firewall e sem exposição na rede local.
 - Login completo na interface web do Windows: `super` → troca de senha obrigatória → criação da primeira empresa → menu principal com todos os módulos.
 
-Telas da validação de 09/11/2026, feita com a interface anterior (menu em diálogo); a interface atual é a da seção **Telas**. A revalidação do pacote com a interface nova está pendente.
+Revalidado em 21/11/2026 com o AdvPP 4.8.5 e a interface PO-UI, numa instalação limpa: instalador em português do Brasil, primeiro boot, login, troca obrigatória, primeira empresa e Início. O agendador (`GEBSCHJOB`, a cada minuto) roda em segundo plano, sem abrir janela.
 
-| Login | Troca de senha obrigatória | Primeira empresa | Menu |
+| Login | Troca de senha obrigatória | Primeira empresa | Início |
 |---|---|---|---|
-| ![Login Windows](docs/img/12-windows-login.jpg) | ![Troca de senha Windows](docs/img/13-windows-troca-senha.jpg) | ![Primeira empresa Windows](docs/img/14-windows-primeira-empresa.jpg) | ![Menu Windows](docs/img/15-windows-menu.jpg) |
+| ![Login Windows](docs/img/12-windows-login.jpg) | ![Troca de senha Windows](docs/img/13-windows-troca-senha.jpg) | ![Primeira empresa Windows](docs/img/14-windows-primeira-empresa.jpg) | ![Início Windows](docs/img/15-windows-menu.jpg) |
 
 Depois:
 

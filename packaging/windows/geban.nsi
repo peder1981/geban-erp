@@ -23,7 +23,7 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "Portuguese"
+!insertmacro MUI_LANGUAGE "PortugueseBR"
 !insertmacro MUI_LANGUAGE "English"
 
 Section "GEBAN ERP" SecMain
@@ -51,7 +51,7 @@ Section "GEBAN ERP" SecMain
 
     ; Pergunta se quer iniciar agora
     MessageBox MB_YESNO|MB_ICONQUESTION \
-        "GEBAN instalado em $INSTDIR.$\n\nDeseja iniciar agora?" IDYES StartNow IDNO Done
+        "GEBAN instalado em $INSTDIR.$\n$\nDeseja iniciar agora?" IDYES StartNow IDNO Done
     StartNow:
         Exec '"$INSTDIR\geban-launcher.exe"'
     Done:

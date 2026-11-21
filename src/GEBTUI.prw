@@ -197,8 +197,11 @@ Static Function TUIEntraOk(oApp, cUsu)
             Return
         EndIf
         oPg := PoPage():New(oApp, "Primeira empresa")
+        TUIAjuda(oPg, "Instalacao nova", {{"Empresa", "cada empresa tem os dados separados (um schema proprio)"}, ;
+            {"Codigo", "letras, digitos e _ (ex.: 01)"}, ;
+            {"Depois", "no Nucleo: filiais, usuarios, vinculos e permissoes"}})
         oW := PoWidget():New(oPg, "Catalogo vazio: crie a primeira empresa")
-        oW:SetCols(4)
+        oW:SetCols(5)
         oCod := PoInput():New(oW, "Codigo (letras, digitos e _)")
         oNome := PoInput():New(oW, "Nome")
         oBtn := PoButton():New(oW, "Criar empresa")
@@ -215,8 +218,10 @@ Static Function TUIEntraOk(oApp, cUsu)
         aAdd(aOps, {AllTrim(aEmps[nI][1]) + " - " + AllTrim(aEmps[nI][2]), AllTrim(aEmps[nI][1])})
     Next nI
     oPg := PoPage():New(oApp, "Empresa")
+    TUIAjuda(oPg, "Empresas", {{"Acesso", "voce esta vinculado a " + cValToChar(Len(aEmps)) + " empresas"}, ;
+        {"Dados", "cada empresa tem os dados separados"}, {"Trocar depois", "Sair e entrar de novo"}})
     oW := PoWidget():New(oPg, "Escolha a empresa")
-    oW:SetCols(4)
+    oW:SetCols(5)
     oSel := PoSelect():New(oW, "Empresa", aOps, aOps[1][2])
     oBtn := PoButton():New(oW, "Continuar")
     oBtn:Set("kind", "primary")
@@ -258,8 +263,11 @@ Static Function TUIFilial(oApp, cUsu, cEmp)
         Return
     EndIf
     oPg := PoPage():New(oApp, "Filial")
+    TUIAjuda(oPg, "Filiais", {{"Matriz", "a empresa sem filial"}, ;
+        {"Dados", "as tabelas e os relatorios mostram os dados da filial escolhida"}, ;
+        {"Trocar depois", "Sair e entrar de novo"}})
     oW := PoWidget():New(oPg, "Escolha a filial")
-    oW:SetCols(4)
+    oW:SetCols(5)
     oSel := PoSelect():New(oW, "Filial", aFils, aFils[1][2])
     oBtn := PoButton():New(oW, "Entrar")
     oBtn:Set("kind", "primary")
@@ -616,8 +624,8 @@ Return { ;
     {"Fiscal", 0, 0, "Simples: feriado municipal/estadual", {{"Data do feriado (AAAAMMDD)", "C", ""}, {"Descricao", "C", ""}}, ;
         {|u, a| GEBSNFER(a[1], a[2])}, "BO", "", aApu}, ;
     {"Fiscal", 0, 0, "Simples: apurar mes (DAS)", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| TUISNApura(a[1])}, "BO", "", aApu}, ;
-    {"Fiscal", 0, 0, "Relatorio: extrato da apuracao do Simples", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| GEBSNEXTRATO(a[1])}, "REL", "GSN6", aApu}, ;
-    {"Fiscal", 0, 0, "Relatorio: acompanhamento anual do Simples", {{"Ano (AAAA)", "C", Left(DToS(Date()), 4)}}, {|u, a| GEBSNANUAL(a[1])}, "REL", "GSN6", aApu}, ;
+    {"Fiscal", 0, 0, "Relatorio: extrato da apuracao do Simples", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| GEBSNEXTRATO(a[1])}, "REL", "", aApu}, ;
+    {"Fiscal", 0, 0, "Relatorio: acompanhamento anual do Simples", {{"Ano (AAAA)", "C", Left(DToS(Date()), 4)}}, {|u, a| GEBSNANUAL(a[1])}, "REL", "", aApu}, ;
     {"Estoque", 0, 0, "Movimento com custo (entrada/saida)", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem", "C", "01"}, ;
         {"Tipo", {{"Entrada", "E"}, {"Saida", "S"}}, "E"}, {"Quantidade", "N", 0}, {"Custo unitario (entrada)", "N", 0}, {"Documento", "C", ""}, ;
         {"Data (AAAAMMDD)", "C", cHoje}, {"Lote/series separadas por ; (vazio se nao controla)", "C", ""}, {"Validade (AAAAMMDD)", "C", ""}, ;
@@ -1371,12 +1379,7 @@ Static Function TUIExecuta(oApp, aF, aCps, cUsu, bDepois, aIt)
         Return
     EndIf
     If aF[7] == "REL"
-        // aF[8] = tabela do resultado (padrao GBR1; o Simples Nacional usa GSN6)
-        If Empty(aF[8])
-            GEBTUIBRW("GBR1", aF[4])
-        Else
-            GEBTUIBRW(aF[8], aF[4])
-        EndIf
+        GEBTUIBRW("GBR1", aF[4])
         Return
     EndIf
     oApp:Notify(cMsg, "success")
@@ -1484,7 +1487,8 @@ Return "SALT" $ cCol .Or. "HASH" $ cCol .Or. "SENHA" $ cCol .Or. "TOKEN" $ cCol
 
 Static Function TUIRelatorio(oTab)
     Local aHit  := TCSqlQuery("SELECT GBR1_C1 AS C1, GBR1_C2 AS C2, GBR1_C3 AS C3, GBR1_C4 AS C4, GBR1_C5 AS C5, GBR1_C6 AS C6, GBR1_C7 AS C7, GBR1_C8 AS C8" + ;
-        " FROM GBR1 WHERE D_E_L_E_T_ = ' ' AND GBR1_FILIAL = " + GEBDBQuote(FWxFilial("GBR1")) + " ORDER BY GBR1_ORDEM") as Array
+        " FROM GBR1 WHERE D_E_L_E_T_ = ' ' AND GBR1_FILIAL = " + GEBDBQuote(FWxFilial("GBR1")) + ;
+        " AND GBR1_SESSAO = " + GEBDBQuote(BOSESSAO()) + " ORDER BY GBR1_ORDEM") as Array
     Local aCols := {} as Array
     Local aLin  := {} as Array
     Local aRow  := {} as Array
@@ -1547,6 +1551,7 @@ Return "R$ " + AllTrim(Transform(nVal, "@E 999,999,999,999.99"))
     @since 21/11/2026
 /*/
 Static Function TUIInicio(oApp, oPg, cEmp, cFil, cUsu, aAtalhos, aNav)
+    Local oSem := Nil
     Local oWs   := PoWidget():New(oPg, "Sessao")
     Local aKpi  := {} as Array
     Local oWg   := Nil
@@ -1569,15 +1574,24 @@ Static Function TUIInicio(oApp, oPg, cEmp, cFil, cUsu, aAtalhos, aNav)
     oWg := PoWidget():New(oPg, "Saldo por conta")
     oWg:SetCols(12)
     oCh := PoChart():New(oWg, "Saldo por conta", "bar")
+    oSem := PoInfo():New(oWg, "", "Nenhuma conta cadastrada. Crie em Financeiro > Nova conta.")
     If Len(aAtalhos) > 0
         PoDivider():New(oPg, "Acesso rapido")
         For nI := 1 To Len(aAtalhos)
             TUIAtalho(oApp, oPg, aAtalhos[nI], aNav)
         Next nI
     EndIf
-    TUIIndicadores(aKpi, oCh)
-    oPg:AddAction("Atualizar", {|| TUIIndicadores(aKpi, oCh)})
+    TUIIndicadores(aKpi, oCh, oSem)
+    oPg:AddAction("Atualizar", {|| TUIIndicadores(aKpi, oCh, oSem)})
 Return
+
+// Coluna explicativa (7 de 12) ao lado do formulario das paginas de entrada.
+Static Function TUIAjuda(oPg, cTitulo, aLinhas)
+    Local oW := PoWidget():New(oPg, cTitulo)
+
+    oW:SetCols(7)
+    aEval(aLinhas, {|x| PoInfo():New(oW, x[1], x[2])})
+Return oW
 
 Static Function TUIInfo(oPai, cRot, cVal, nCols)
     Local oI := PoInfo():New(oPai, cRot, cVal)
@@ -1607,7 +1621,7 @@ Return
     @author Peder Munksgaard
     @since 21/11/2026
 /*/
-Static Function TUIIndicadores(aKpi, oCh)
+Static Function TUIIndicadores(aKpi, oCh, oSem)
     Local aHit := {} as Array
     Local aCat := {} as Array
     Local aVal := {} as Array
@@ -1626,6 +1640,8 @@ Static Function TUIIndicadores(aKpi, oCh)
     EndIf
     oCh:SetCategories(aCat)
     oCh:SetSeries({{"Saldo", aVal}})
+    oCh:SetVisible(Len(aCat) > 0)
+    oSem:SetVisible(Len(aCat) == 0)
     If GEBDBTableExists("GFN3")
         aHit := TCSqlQuery("SELECT COUNT(*) AS Q, COALESCE(SUM(GFN3_SALDO), 0) AS T, COALESCE(SUM(CASE WHEN GFN3_VENC < " + GEBDBQuote(cHoje) + ;
             " THEN 1 ELSE 0 END), 0) AS V FROM GFN3 WHERE D_E_L_E_T_ = ' ' AND GFN3_SALDO > 0 AND GFN3_FILIAL = " + GEBDBQuote(FWxFilial("GFN3")))

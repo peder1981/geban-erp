@@ -1,7 +1,7 @@
 # 05 — Referência Técnica Completa do ERP GEBAN
 
 > **Autor:** Peder Munksgaard · **Data:** 26/09/2026 · **Idioma:** PT-BR
-> **Fontes primárias:** `src/*.prw` (83 arquivos, 589 `User Function` — todas catalogadas na seção 8,
+> **Fontes primárias:** `src/*.prw` (83 arquivos, 590 `User Function` — todas catalogadas na seção 8,
 > gerada por `scripts/doc-funcoes.py`), `docs/02-regras-negocio.md`, planos e ledgers em `documentacao interna`.
 > **Estado verificado (21/11/2026):** suíte completa **89/89 PASS** contra Postgres real sob o runtime
 > **AdvPP advplc v4.8.5**. Interface em componentes PO-UI (`src/GEBTUI.prw`), todas as operações
@@ -58,45 +58,134 @@ Function` (externa) vs `Static Function` (interna); sem `IIF()`, sem `Function` 
 SonarQube: CA4000/CA1002/CA1000/CA1004 e segurança CA2050–CA2052. Toda API externa deve
 ser validada antes do uso; toda geração fecha com gap analysis.
 
-## 4. Inventário de tabelas
+## 4. Inventário de tabelas (119 tabelas)
 
-| Tabela(s) | Módulo | Conteúdo (colunas-chave) |
-|---|---|---|
-| `GE1` | Núcleo (catálogo) | Empresas: `GE1_FILIAL`, `GE1_COD`, `GE1_NOME` |
-| `GE2` | Núcleo (catálogo) | Usuários: `GE2_FILIAL`, `GE2_COD`, `GE2_NOME`, `GE2_PERFIL` |
-| `GE2_SEC` | Segurança (catálogo) | Credenciais: `SEC_FILIAL`, `SEC_USUARIO`, `SEC_SALT`, `SEC_HASH`, `SEC_FAILCNT`, `SEC_LOCKED`, `SEC_LASTLOGIN`, `SEC_PWDLAST` |
-| `GE2_TOK` | Segurança (catálogo) | Sessões: `TOK_TOKEN`, `TOK_USUARIO`, `TOK_EMPRESA`, `TOK_FILIAL` |
-| `GE2_EMP` | Segurança (catálogo) | Vínculos: `GE2_EMP_FILIAL`, `GE2_EMP_USUARIO`, `GE2_EMP_EMPRESA` |
-| `GE3` | Núcleo | Trilha de auditoria (B.O.): usuário, evento, motivo |
-| `GE4` | Núcleo | Parâmetros/config: evento → modo do Mentor, flags (`PERMITE_DIRETA`, `EMISSAO`, `APURACAO`) |
-| `GE5` | Núcleo | Fila offline (`PENDENTE`) |
-| `GEH` / `GEI` / `GEI_AUDIT` | Expansão | Histórico de acesso / audit log processual |
-| `GEX` | Expansão | Sessão ativa (linha temporária) |
-| `GF1` | Fiscal | Produtos/serviços: `GF1_COD`, `GF1_NCM`, `GF1_DESC` |
-| `GF2` | Fiscal | Alíquotas com vigência por NCM |
-| `GF3` / `GF4` | Fiscal | Header da nota (`CHAVE`, `TIPO`, `STATUS`, `EMIS`, `BASE`, `IBS`, `CBS`) / itens |
-| `GF5` | Fiscal | Apuração por competência: `DEB`, `CRED`, `SALDO`, `REGIME` |
-| `GF6` | Fiscal | Créditos (`TRANSF`/`RESSARC`) |
-| `GD1` | Derrama | Guias: `VALOR`, `JUROS`, `MULTA`, `TOTAL`, `STATUS` (`ABERTA/PARCELADA/PROTESTADA`) |
-| `GD2` | Derrama | Parcelas (`PARC` 001–999) |
-| `GD3` | Derrama | Cobrança/protesto (`ACAO`, `DATA`, `STATUS`) |
-| `GV1` | Estoque | Saldos: `PROD`, `SALDO`, `MINIMO` (padrão 10) |
-| `GV2` | Venda | Vendas (`VENDIDA/BLOQUEADA/SEM_ESTOQUE`) |
-| `GV3` | Fiado | Caderninho: cliente, `VALOR`, `JUROS`, `MULTA`, `TOTAL`, `ABERTA` |
-| `GC1` | Contábil | Plano de contas |
-| `GC2` / `GC3` | Contábil | Lotes (`LOTE`, `ORIGEM`, `VALOR`, `COMP`, `TIPO AUTO/DIRETO`) / pernas `D` e `C` |
-| `GC4` | Contábil | Parâmetros evento → conta débito/crédito (+ `LANC_DIRETO`) |
-| `GFN1` | Financeiro | Contas (`CONTA`, `NOME`, `SALDO`) |
-| `GFN2` / `GFN3` | Financeiro | Receber / pagar (`DOC`, `VALOR`, `SALDO`, `VENC`, `ABERTO/RECEBIDA/PAGA`) |
-| `GFN4` | Financeiro | Movimentos de caixa |
-| `GCP1` | Compras | Fornecedores (`COD`, `NOME`, `CNPJ`) |
-| `GCP2` | Compras | Cotações (`FORN`, `PROD`, `PRECO`) |
-| `GCP3` / `GCP4` | Compras | Pedidos (`NUM`, `FORN`, `ABERTO/BLOQUEADO/RECEBIDO`) / itens |
-| `GCP5` | Compras | Entradas (`NF`, `PED`, `RECEBIDA`) |
-| `GEF1` | Filiais | Cadastro de filiais do tenant (`GEF1_COD`, `GEF1_NOME`) |
-| `GEU1` | Unidades | Unidades (`UU`) |
-| `SEC_PERM` | Segurança | RBAC (`PERFIL`, `MENU`, `ITEM`, `PERMITE`) |
-| `SEC_MON` / `SEC_ADMIN_SESSION` | Segurança | Monitor / sessões admin |
+Gerado por `scripts/doc-tabelas.py` a partir das definições nos fontes (`CREATE TABLE`,
+`BOTAB`, `SNTab` e `ALTER TABLE ... ADD COLUMN`). Toda tabela tem ainda `R_E_C_N_O_`
+(identidade) e `D_E_L_E_T_` (exclusão lógica). As do catálogo (`GE1`, `GE2*`, `SEC_*`)
+ficam no schema `public`; as demais, no schema de cada empresa.
+
+| Tabela | Módulo | Conteúdo | Colunas |
+|---|---|---|---|
+| `GBC1` | Backoffice | — | `GBC1_FILIAL`, `GBC1_CONTA`, `GBC1_BANCO`, `GBC1_AGENCIA`, `GBC1_AGDV`, `GBC1_CC`, `GBC1_CCDV`, `GBC1_CARTEIRA`, `GBC1_CODEMP`, `GBC1_BENEF`, `GBC1_CNPJ`, `GBC1_LAYOUT`, `GBC1_MODAL` |
+| `GBC2` | Backoffice | — | `GBC2_FILIAL`, `GBC2_DOC`, `GBC2_CONTA`, `GBC2_NN`, `GBC2_NNDV`, `GBC2_NNFULL`, `GBC2_VENC`, `GBC2_VALOR`, `GBC2_LINHA`, `GBC2_BARRAS`, `GBC2_STATUS`, `GBC2_REMESSA` |
+| `GBC3` | Backoffice | — | `GBC3_FILIAL`, `GBC3_CONTA`, `GBC3_FITID`, `GBC3_DATA`, `GBC3_VALOR`, `GBC3_MEMO`, `GBC3_STATUS`, `GBC3_MOVRN` |
+| `GBR1` | Backoffice | — | `GBR1_FILIAL`, `GBR1_ORDEM`, `GBR1_C1`, `GBR1_C2`, `GBR1_C3`, `GBR1_C4`, `GBR1_C5`, `GBR1_C6`, `GBR1_C7`, `GBR1_C8`, `GBR1_SESSAO` |
+| `GBS1` | Backoffice | — | `GBS1_FILIAL`, `GBS1_CHAVE`, `GBS1_ULT` |
+| `GC1` | Contábil | Plano de contas | `GC1_FILIAL`, `GC1_CONTA`, `GC1_NOME`, `GC1_TIPO` |
+| `GC2` | Contábil | Lotes (`LOTE`, `ORIGEM`, `VALOR`, `COMP`, `TIPO AUTO/DIRETO`) / pernas `D` e `C` | `GC2_FILIAL`, `GC2_LOTE`, `GC2_ORIGEM`, `GC2_VALOR`, `GC2_DATA`, `GC2_COMP`, `GC2_TIPO` |
+| `GC3` | Contábil | Lotes (`LOTE`, `ORIGEM`, `VALOR`, `COMP`, `TIPO AUTO/DIRETO`) / pernas `D` e `C` | `GC3_FILIAL`, `GC3_LOTE`, `GC3_DC`, `GC3_CONTA`, `GC3_VALOR` |
+| `GC4` | Contábil | Parâmetros evento → conta débito/crédito (+ `LANC_DIRETO`) | `GC4_FILIAL`, `GC4_EVENTO`, `GC4_CTADEB`, `GC4_CTACRED`, `GC4_PERM` |
+| `GCC1` | Backoffice | — | `GCC1_FILIAL`, `GCC1_COD`, `GCC1_DESC`, `GCC1_BLOQ` |
+| `GCC2` | Backoffice | — | `GCC2_FILIAL`, `GCC2_COD`, `GCC2_CC`, `GCC2_PCT` |
+| `GCP1` | Compras | Fornecedores (`COD`, `NOME`, `CNPJ`) | `GCP1_FILIAL`, `GCP1_COD`, `GCP1_NOME`, `GCP1_CNPJ` |
+| `GCP2` | Compras | Cotações (`FORN`, `PROD`, `PRECO`) | `GCP2_FILIAL`, `GCP2_FORN`, `GCP2_PROD`, `GCP2_PRECO` |
+| `GCP3` | Compras | Pedidos (`NUM`, `FORN`, `ABERTO/BLOQUEADO/RECEBIDO`) / itens | `GCP3_FILIAL`, `GCP3_NUM`, `GCP3_FORN`, `GCP3_STATUS` |
+| `GCP4` | Compras | Pedidos (`NUM`, `FORN`, `ABERTO/BLOQUEADO/RECEBIDO`) / itens | `GCP4_FILIAL`, `GCP4_PED`, `GCP4_PROD`, `GCP4_QTD`, `GCP4_PRECO` |
+| `GCP5` | Compras | Entradas (`NF`, `PED`, `RECEBIDA`) | `GCP5_FILIAL`, `GCP5_NF`, `GCP5_PED`, `GCP5_STATUS` |
+| `GCQ1` | Backoffice | — | `GCQ1_FILIAL`, `GCQ1_NUM`, `GCQ1_PROD`, `GCQ1_QTD`, `GCQ1_NECESS`, `GCQ1_SOLIC`, `GCQ1_STATUS`, `GCQ1_PED` |
+| `GCQ2` | Backoffice | — | `GCQ2_FILIAL`, `GCQ2_PED`, `GCQ2_COND`, `GCQ2_LOCAL`, `GCQ2_EMISSAO`, `GCQ2_TOTAL`, `GCQ2_LIB`, `GCQ2_APROV` |
+| `GCQ3` | Backoffice | — | `GCQ3_FILIAL`, `GCQ3_PED`, `GCQ3_PROD`, `GCQ3_QTDREC` |
+| `GCQ4` | Backoffice | — | `GCQ4_FILIAL`, `GCQ4_NF`, `GCQ4_FORN`, `GCQ4_PED`, `GCQ4_DATA`, `GCQ4_VALMERC`, `GCQ4_FRETE`, `GCQ4_TOTAL` |
+| `GCQ5` | Backoffice | — | `GCQ5_FILIAL`, `GCQ5_NF`, `GCQ5_PROD`, `GCQ5_QTD`, `GCQ5_PRECO`, `GCQ5_FRETE`, `GCQ5_CUSTO`, `GCQ5_VALOR` |
+| `GCQ6` | Backoffice | — | `GCQ6_FILIAL`, `GCQ6_DEV`, `GCQ6_NF`, `GCQ6_FORN`, `GCQ6_PROD`, `GCQ6_QTD`, `GCQ6_VALOR`, `GCQ6_DATA` |
+| `GCQ7` | Backoffice | — | `GCQ7_FILIAL`, `GCQ7_NF`, `GCQ7_FORN`, `GCQ7_PROD`, `GCQ7_DATA`, `GCQ7_BASE`, `GCQ7_IBS`, `GCQ7_CBS` |
+| `GCX1` | Backoffice | — | `GCX1_FILIAL`, `GCX1_LOTE`, `GCX1_CC` |
+| `GD1` | Derrama | Guias | `GD1_FILIAL`, `GD1_GUIA`, `GD1_COMP`, `GD1_VALOR`, `GD1_JUROS`, `GD1_MULTA`, `GD1_TOTAL`, `GD1_STATUS` |
+| `GD2` | Derrama | Parcelas (`PARC` 001–999) | `GD2_FILIAL`, `GD2_GUIA`, `GD2_PARC`, `GD2_VALOR`, `GD2_STATUS` |
+| `GD3` | Derrama | Cobrança/protesto (`ACAO`, `DATA`, `STATUS`) | `GD3_FILIAL`, `GD3_GUIA`, `GD3_ACAO`, `GD3_DATA`, `GD3_STATUS` |
+| `GD4` | Backoffice | — | `GD4_FILIAL`, `GD4_GUIA`, `GD4_TIPO`, `GD4_COMP`, `GD4_VENC`, `GD4_CTACTB`, `GD4_CREDOR` |
+| `GDF1` | Dfe | — | `GDF1_FILIAL`, `GDF1_CNPJ`, `GDF1_IE`, `GDF1_IM`, `GDF1_CNAE`, `GDF1_RAZAO`, `GDF1_FANTASIA`, `GDF1_CRT`, `GDF1_LGR`, `GDF1_NRO`, `GDF1_CPL`, `GDF1_BAIRRO`, `GDF1_CMUN`, `GDF1_XMUN`, `GDF1_UF`, `GDF1_CEP`, `GDF1_FONE`, `GDF1_EMAIL` |
+| `GDF2` | Dfe | — | `GDF2_FILIAL`, `GDF2_CNPJ`, `GDF2_TITULAR`, `GDF2_VALIDADE`, `GDF2_CERT`, `GDF2_KEY`, `GDF2_INSTALADO` |
+| `GDF4` | Dfe | — | `GDF4_FILIAL`, `GDF4_PROD`, `GDF4_UNID`, `GDF4_GTIN`, `GDF4_CFOP`, `GDF4_CSOSN`, `GDF4_CST`, `GDF4_PICMS`, `GDF4_CEST`, `GDF4_ORIG`, `GDF4_PISCST`, `GDF4_COFCST`, `GDF4_PPIS`, `GDF4_PCOF` |
+| `GDF5` | Dfe | — | `GDF5_FILIAL`, `GDF5_CHAVE`, `GDF5_MOD`, `GDF5_SERIE`, `GDF5_NNF`, `GDF5_TPEMIS`, `GDF5_TPAMB`, `GDF5_STATUS`, `GDF5_CSTAT`, `GDF5_MOTIVO`, `GDF5_PROT`, `GDF5_DHEMI`, `GDF5_DHAUT`, `GDF5_ORIGEM`, `GDF5_DOC`, `GDF5_VNF`, `GDF5_XML`, `GDF5_QR`, `GDF5_URLCH`, `GDF5_DEST`, `GDF5_CHORIG`, `GDF5_DATA`, `GDF5_XMLORIG` |
+| `GDF6` | Dfe | — | `GDF6_FILIAL`, `GDF6_CHAVE`, `GDF6_TIPO`, `GDF6_SEQ`, `GDF6_CSTAT`, `GDF6_MOTIVO`, `GDF6_PROT`, `GDF6_DH`, `GDF6_JUST`, `GDF6_XML`, `GDF6_MOD`, `GDF6_SERIE`, `GDF6_NINI`, `GDF6_NFIM` |
+| `GDF7` | Dfe | — | `GDF7_FILIAL`, `GDF7_TIPO`, `GDF7_COD`, `GDF7_DOC`, `GDF7_IE`, `GDF7_INDIE`, `GDF7_NOME`, `GDF7_LGR`, `GDF7_NRO`, `GDF7_CPL`, `GDF7_BAIRRO`, `GDF7_CMUN`, `GDF7_XMUN`, `GDF7_UF`, `GDF7_CEP`, `GDF7_FONE`, `GDF7_EMAIL` |
+| `GDF8` | Dfe | — | `GDF8_FILIAL`, `GDF8_TIPO`, `GDF8_DOC`, `GDF8_PART`, `GDF8_CHAVE` |
+| `GDFA` | Dfe | — | `GDFA_FILIAL`, `GDFA_PROD`, `GDFA_PREDBC`, `GDFA_MVA`, `GDFA_PICMSST`, `GDFA_PREDBCST` |
+| `GDFB` | Dfe | — | `GDFB_FILIAL`, `GDFB_UF`, `GDFB_NCM`, `GDFB_EX`, `GDFB_NACF`, `GDFB_IMPF`, `GDFB_EST`, `GDFB_MUN`, `GDFB_INI`, `GDFB_FIM`, `GDFB_VERSAO`, `GDFB_FONTE` |
+| `GDFC` | Dfe | — | `GDFC_FILIAL`, `GDFC_COD`, `GDFC_DESC`, `GDFC_CTRIBNAC`, `GDFC_CTRIBMUN`, `GDFC_CNBS`, `GDFC_PALIQ` |
+| `GDFE` | Dfe | — | `GDFE_FILIAL`, `GDFE_CHAVE`, `GDFE_NSU`, `GDFE_CNPJ`, `GDFE_NOME`, `GDFE_IE`, `GDFE_DHEMI`, `GDFE_VNF`, `GDFE_SIT`, `GDFE_MANIF`, `GDFE_XML`, `GDFE_IMPORT` |
+| `GDFF` | Dfe | — | `GDFF_FILIAL`, `GDFF_FORN`, `GDFF_CPROD`, `GDFF_PROD`, `GDFF_FATOR` |
+| `GDFG` | Dfe | — | `GDFG_FILIAL`, `GDFG_COMP`, `GDFG_FIN`, `GDFG_SLDCRED`, `GDFG_RECOLHER`, `GDFG_LINHAS`, `GDFG_DATA`, `GDFG_ARQ` |
+| `GE1` | Núcleo (catálogo) | Empresas | `GE1_FILIAL`, `GE1_COD`, `GE1_NOME` |
+| `GE2` | Núcleo (catálogo) | Usuários | `GE2_BLOQ`, `GE2_VALID`, `GE2_FILIAL`, `GE2_COD`, `GE2_NOME`, `GE2_PERFIL` |
+| `GE2_EMP` | Segurança (catálogo) | Vínculos | `GE2_EMP_FILIAL`, `GE2_EMP_USUARIO`, `GE2_EMP_EMPRESA`, `GE2_EMP_PERFIL` |
+| `GE2_SEC` | Segurança (catálogo) | Credenciais | `SEC_FILIAL`, `SEC_USUARIO`, `SEC_SALT`, `SEC_HASH`, `SEC_FAILCNT`, `SEC_LOCKED`, `SEC_LASTLOGIN`, `SEC_PWDLAST`, `SEC_IGNEXP`, `SEC_FORCE` |
+| `GE2_TOK` | Segurança (catálogo) | Sessões | `TOK_TOKEN`, `TOK_USUARIO`, `TOK_EMPRESA`, `TOK_FILIAL`, `TOK_IP`, `TOK_CREATED`, `TOK_EXPIRES` |
+| `GE3` | Núcleo | Trilha de auditoria (B.O.) | `GE3_FILIAL`, `GE3_COD`, `GE3_USUAR`, `GE3_EVENT`, `GE3_MOTIV`, `GE3_DATA` |
+| `GE4` | Núcleo | Parâmetros/config | `GE4_FILIAL`, `GE4_EVENTO`, `GE4_MODO` |
+| `GE5` | Núcleo | Fila offline (`PENDENTE`) | `GE5_FILIAL`, `GE5_CHAVE`, `GE5_PAYLD`, `GE5_STATUS` |
+| `GEF1` | Filiais | Cadastro de filiais do tenant (`GEF1_COD`, `GEF1_NOME`) | `GEF1_FILIAL`, `GEF1_COD`, `GEF1_NOME`, `GEF1_UNI` |
+| `GEH` | Expansão | Histórico de acesso / audit log processual | `GEH_DATA`, `GEH_HORA`, `GEH_USUARIO`, `GEH_EMPRESA`, `GEH_FUNCAO`, `GEH_IP` |
+| `GEI` | Expansão | Histórico de acesso / audit log processual | `GEI_ORIGEM`, `GEI_TABELA`, `GEI_REGISTRO`, `GEI_ACAO`, `GEI_HORA` |
+| `GEI_AUDIT` | Expansão | Histórico de acesso / audit log processual |  |
+| `GEP_PERIFERICOS` | Loja | — | `GEP_FILIAL`, `GEP_TIPO`, `GEP_DRIVER`, `GEP_CONFIG`, `GEP_NOME`, `GEP_ATIVO`, `GEP_ULTIMO_TESTE`, `GEP_STATUS`, `GEP_DTALT`, `GEP_USALT` |
+| `GES1` | Backoffice | — | `GES1_FILIAL`, `GES1_PROD`, `GES1_LOCAL`, `GES1_QTD`, `GES1_CM`, `GES1_VALOR` |
+| `GES2` | Backoffice | — | `GES2_FILIAL`, `GES2_DATA`, `GES2_PROD`, `GES2_LOCAL`, `GES2_TIPO`, `GES2_ORIGEM`, `GES2_DOC`, `GES2_QTD`, `GES2_CUSTO`, `GES2_VALOR`, `GES2_SLDQTD`, `GES2_SLDVAL`, `GES2_CM` |
+| `GES3` | Backoffice | — | `GES3_FILIAL`, `GES3_PROD`, `GES3_RASTRO`, `GES3_ENDER` |
+| `GES4` | Backoffice | — | `GES4_FILIAL`, `GES4_PROD`, `GES4_LOCAL`, `GES4_LOTE`, `GES4_VALID`, `GES4_ENDER`, `GES4_QTD` |
+| `GES5` | Backoffice | — | `GES5_FILIAL`, `GES5_LOCAL`, `GES5_ENDER`, `GES5_DESC` |
+| `GES6` | Backoffice | — | `GES6_FILIAL`, `GES6_DATA`, `GES6_DOC`, `GES6_REF`, `GES6_PROD`, `GES6_LOCAL`, `GES6_TIPO`, `GES6_LOTE`, `GES6_VALID`, `GES6_ENDER`, `GES6_QTD` |
+| `GES7` | Backoffice | — | `GES7_FILIAL`, `GES7_COMP`, `GES7_PROD`, `GES7_LOCAL`, `GES7_QTD`, `GES7_VALOR`, `GES7_CM` |
+| `GEU1` | Unidades | Unidades (`UU`) | `GEU1_FILIAL`, `GEU1_COD`, `GEU1_NOME` |
+| `GEX` | Expansão | Sessão ativa (linha temporária) | `GEX_EMPRESA`, `GEX_FILIAL`, `GEX_USUARIO` |
+| `GE_REST_RL` | Rest_Web | — | `RL_KEY`, `RL_CNT`, `RL_MIN` |
+| `GF1` | Fiscal | Produtos/serviços | `GF1_FILIAL`, `GF1_COD`, `GF1_NCM`, `GF1_DESC` |
+| `GF2` | Fiscal | Alíquotas com vigência por NCM | `GF2_FILIAL`, `GF2_NCM`, `GF2_IBS`, `GF2_CBS`, `GF2_INI`, `GF2_FIM` |
+| `GF3` | Fiscal | Header da nota (`CHAVE`, `TIPO`, `STATUS`, `EMIS`, `BASE`, `IBS`, `CBS`) / itens | `GF3_FILIAL`, `GF3_CHAVE`, `GF3_TIPO`, `GF3_STATUS`, `GF3_BASE`, `GF3_IBS`, `GF3_CBS`, `GF3_EMIS` |
+| `GF4` | Fiscal | Header da nota (`CHAVE`, `TIPO`, `STATUS`, `EMIS`, `BASE`, `IBS`, `CBS`) / itens | `GF4_FILIAL`, `GF4_CHAVE`, `GF4_ITEM`, `GF4_PROD`, `GF4_QTD`, `GF4_PRECO`, `GF4_BASE`, `GF4_IBS`, `GF4_CBS` |
+| `GF5` | Fiscal | Apuração por competência | `GF5_FILIAL`, `GF5_COMP`, `GF5_DEB`, `GF5_CRED`, `GF5_SALDO`, `GF5_REGIME` |
+| `GF6` | Fiscal | Créditos (`TRANSF`/`RESSARC`) | `GF6_FILIAL`, `GF6_COMP`, `GF6_ORIG`, `GF6_VALOR`, `GF6_TIPO` |
+| `GFN1` | Financeiro | Contas (`CONTA`, `NOME`, `SALDO`) | `GFN1_FILIAL`, `GFN1_CONTA`, `GFN1_NOME`, `GFN1_SALDO` |
+| `GFN2` | Financeiro | Receber / pagar (`DOC`, `VALOR`, `SALDO`, `VENC`, `ABERTO/RECEBIDA/PAGA`) | `GFN2_FILIAL`, `GFN2_DOC`, `GFN2_CLI`, `GFN2_VALOR`, `GFN2_SALDO`, `GFN2_VENC`, `GFN2_STATUS` |
+| `GFN3` | Financeiro | Receber / pagar (`DOC`, `VALOR`, `SALDO`, `VENC`, `ABERTO/RECEBIDA/PAGA`) | `GFN3_FILIAL`, `GFN3_DOC`, `GFN3_FORN`, `GFN3_VALOR`, `GFN3_SALDO`, `GFN3_VENC`, `GFN3_STATUS` |
+| `GFN4` | Financeiro | Movimentos de caixa | `GFN4_FILIAL`, `GFN4_CONTA`, `GFN4_TIPO`, `GFN4_VALOR`, `GFN4_DATA` |
+| `GFT1` | Backoffice | — | `GFT1_FILIAL`, `GFT1_COD`, `GFT1_NOME`, `GFT1_DOC`, `GFT1_UF`, `GFT1_LIMITE`, `GFT1_COND`, `GFT1_TABELA` |
+| `GFT2` | Backoffice | — | `GFT2_FILIAL`, `GFT2_TAB`, `GFT2_PROD`, `GFT2_PRECO` |
+| `GFT3` | Backoffice | — | `GFT3_FILIAL`, `GFT3_NUM`, `GFT3_CLI`, `GFT3_COND`, `GFT3_EMISSAO`, `GFT3_LOCAL`, `GFT3_DESC`, `GFT3_STATUS`, `GFT3_MOTIVO`, `GFT3_CC` |
+| `GFT4` | Backoffice | — | `GFT4_FILIAL`, `GFT4_NUM`, `GFT4_PROD`, `GFT4_QTD`, `GFT4_PRECO`, `GFT4_QTDFAT` |
+| `GFT5` | Backoffice | — | `GFT5_FILIAL`, `GFT5_NOTA`, `GFT5_PED`, `GFT5_CLI`, `GFT5_DATA`, `GFT5_TOTAL`, `GFT5_CUSTO`, `GFT5_IBS`, `GFT5_CBS` |
+| `GFT6` | Backoffice | — | `GFT6_FILIAL`, `GFT6_NOTA`, `GFT6_PROD`, `GFT6_QTD`, `GFT6_PRECO`, `GFT6_VALOR`, `GFT6_CUSTO`, `GFT6_QTDDEV` |
+| `GFT7` | Backoffice | — | `GFT7_FILIAL`, `GFT7_DEV`, `GFT7_NOTA`, `GFT7_PROD`, `GFT7_QTD`, `GFT7_VALOR`, `GFT7_CUSTO`, `GFT7_DATA` |
+| `GFX1` | Backoffice | — | `GFX1_FILIAL`, `GFX1_COD`, `GFX1_DESC`, `GFX1_DIAS` |
+| `GFX2` | Backoffice | — | `GFX2_FILIAL`, `GFX2_TIPO`, `GFX2_DOC`, `GFX2_ORIGDOC`, `GFX2_PARC`, `GFX2_PARCEIRO`, `GFX2_EMISSAO`, `GFX2_ORIGEM`, `GFX2_VLORIG`, `GFX2_CTACTB` |
+| `GFX3` | Backoffice | — | `GFX3_FILIAL`, `GFX3_TIPO`, `GFX3_DOC`, `GFX3_DATA`, `GFX3_PRINC`, `GFX3_JUROS`, `GFX3_MULTA`, `GFX3_DESC`, `GFX3_TOTAL`, `GFX3_CONTA` |
+| `GFX4` | Backoffice | — | `GFX4_FILIAL`, `GFX4_CONTA`, `GFX4_DATA`, `GFX4_DC`, `GFX4_VALOR`, `GFX4_HIST`, `GFX4_DOC` |
+| `GLJ1` | Loja | — | `GLJ1_FILIAL`, `GLJ1_COD`, `GLJ1_NOME`, `GLJ1_CONTA`, `GLJ1_LOCAL`, `GLJ1_CC` |
+| `GLJ2` | Loja | — | `GLJ2_FILIAL`, `GLJ2_SESSAO`, `GLJ2_CAIXA`, `GLJ2_OPER`, `GLJ2_ABERT`, `GLJ2_HORA`, `GLJ2_FUNDO`, `GLJ2_STATUS`, `GLJ2_FECH`, `GLJ2_CONTADO`, `GLJ2_ESPERADO`, `GLJ2_DIFER` |
+| `GLJ3` | Loja | — | `GLJ3_FILIAL`, `GLJ3_CUPOM`, `GLJ3_SESSAO`, `GLJ3_CLI`, `GLJ3_DATA`, `GLJ3_BRUTO`, `GLJ3_DESC`, `GLJ3_TOTAL`, `GLJ3_CUSTO`, `GLJ3_STATUS`, `GLJ3_NOTA` |
+| `GLJ4` | Loja | — | `GLJ4_FILIAL`, `GLJ4_CUPOM`, `GLJ4_PROD`, `GLJ4_QTD`, `GLJ4_PRECO`, `GLJ4_VALOR`, `GLJ4_CUSTO` |
+| `GLJ5` | Loja | — | `GLJ5_FILIAL`, `GLJ5_CUPOM`, `GLJ5_FORMA`, `GLJ5_VALOR`, `GLJ5_TROCO`, `GLJ5_TAXA`, `GLJ5_DOC`, `GLJ5_PARC`, `GLJ5_TEF` |
+| `GLJ6` | Loja | — | `GLJ6_FILIAL`, `GLJ6_SESSAO`, `GLJ6_TIPO`, `GLJ6_VALOR`, `GLJ6_MOTIVO`, `GLJ6_DATA` |
+| `GLJ7` | Loja | — | `GLJ7_FILIAL`, `GLJ7_ID`, `GLJ7_REF`, `GLJ7_FORMA`, `GLJ7_VALOR`, `GLJ7_PARC`, `GLJ7_NSU`, `GLJ7_AUT`, `GLJ7_BAND`, `GLJ7_STATUS`, `GLJ7_PROV`, `GLJ7_MSG`, `GLJ7_DATA`, `GLJ7_HORA`, `GLJ7_EXTID` |
+| `GLJ8` | Loja | — | `GLJ8_FILIAL`, `GLJ8_COD`, `GLJ8_PROD`, `GLJ8_FATOR` |
+| `GLJ9` | Loja | — | `GLJ9_FILIAL`, `GLJ9_COD`, `GLJ9_PROD`, `GLJ9_TIPO`, `GLJ9_QTDMIN`, `GLJ9_VALOR`, `GLJ9_INI`, `GLJ9_FIM` |
+| `GLJA` | Loja | — | `GLJA_FILIAL`, `GLJA_CUPOM`, `GLJA_PROD`, `GLJA_PROMO`, `GLJA_DESC` |
+| `GLJB` | Loja | — | `GLJB_FILIAL`, `GLJB_CUPOM`, `GLJB_VEND`, `GLJB_CPF`, `GLJB_ORC`, `GLJB_AUTOR`, `GLJB_HORA` |
+| `GLJC` | Loja | — | `GLJC_FILIAL`, `GLJC_COD`, `GLJC_NOME`, `GLJC_COMIS` |
+| `GLJD` | Loja | — | `GLJD_FILIAL`, `GLJD_ORC`, `GLJD_CLI`, `GLJD_VEND`, `GLJD_DATA`, `GLJD_VALID`, `GLJD_DESC`, `GLJD_TOTAL`, `GLJD_STATUS`, `GLJD_CUPOM` |
+| `GLJE` | Loja | — | `GLJE_FILIAL`, `GLJE_ORC`, `GLJE_PROD`, `GLJE_QTD`, `GLJE_PRECO` |
+| `GLJF` | Loja | — | `GLJF_FILIAL`, `GLJF_VALE`, `GLJF_CLI`, `GLJF_VALOR`, `GLJF_SALDO`, `GLJF_DATA`, `GLJF_ORIGEM`, `GLJF_STATUS` |
+| `GLJH` | Loja | — | `GLJH_FILIAL`, `GLJH_DEV`, `GLJH_CUPOM`, `GLJH_SESSAO`, `GLJH_PROD`, `GLJH_QTD`, `GLJH_VALOR`, `GLJH_CUSTO`, `GLJH_DATA`, `GLJH_MODO`, `GLJH_VALE` |
+| `GRT1` | Fiscal | — | `GRT1_FILIAL`, `GRT1_COD`, `GRT1_TRIB`, `GRT1_ALIQ`, `GRT1_DESC` |
+| `GRT2` | Fiscal | — | `GRT2_FILIAL`, `GRT2_DOC`, `GRT2_FORN`, `GRT2_COD`, `GRT2_TRIB`, `GRT2_BASE`, `GRT2_ALIQ`, `GRT2_VALOR`, `GRT2_DATA`, `GRT2_COMP`, `GRT2_GUIA` |
+| `GSN1` | Fiscal | — | `GSN1_FILIAL`, `GSN1_COMP`, `GSN1_ATIV`, `GSN1_FOLHA`, `GSN1_REC` |
+| `GSN2` | Fiscal | — | `GSN2_FILIAL`, `GSN2_COMP`, `GSN2_ANEXO`, `GSN2_RBT12`, `GSN2_RBTEXP`, `GSN2_RBA`, `GSN2_FOL12`, `GSN2_FATORR`, `GSN2_FAIXA`, `GSN2_ALIQEF`, `GSN2_RECMES`, `GSN2_DAS`, `GSN2_FORA`, `GSN2_VENC`, `GSN2_ALERTA` |
+| `GSN3` | Fiscal | — | `GSN3_FILIAL`, `GSN3_COD`, `GSN3_DESC`, `GSN3_ANEXO` |
+| `GSN4` | Fiscal | — | `GSN4_FILIAL`, `GSN4_COMP`, `GSN4_ATIV`, `GSN4_ANEXO`, `GSN4_TIPO`, `GSN4_REC`, `GSN4_ALIQEF`, `GSN4_IRPJ`, `GSN4_CSLL`, `GSN4_COFINS`, `GSN4_PIS`, `GSN4_CPP`, `GSN4_ICMS`, `GSN4_ISS`, `GSN4_IPI`, `GSN4_DAS`, `GSN4_FORA` |
+| `GSN5` | Fiscal | — | `GSN5_FILIAL`, `GSN5_DATA`, `GSN5_DESC` |
+| `GSN7` | Fiscal | — | `GSN7_FILIAL`, `GSN7_PROD`, `GSN7_ATIV`, `GSN7_ST`, `GSN7_MONO` |
+| `GSN8` | Fiscal | — | `GSN8_FILIAL`, `GSN8_CHAVE`, `GSN8_EXP` |
+| `GV1` | Estoque | Saldos | `GV1_FILIAL`, `GV1_PROD`, `GV1_SALDO`, `GV1_MIN` |
+| `GV2` | Venda | Vendas (`VENDIDA/BLOQUEADA/SEM_ESTOQUE`) | `GV2_FILIAL`, `GV2_VENDA`, `GV2_PROD`, `GV2_QTD`, `GV2_STATUS` |
+| `GV3` | Fiado | Caderninho | `GV3_FILIAL`, `GV3_CLI`, `GV3_VALOR`, `GV3_JUROS`, `GV3_MULTA`, `GV3_TOTAL`, `GV3_STATUS` |
+| `GXX1` | Backoffice | — | `GXX1_FILIAL`, `GXX1_A` |
+| `SCH_JOB` | Nucleo | — | `SCH_FILIAL`, `SCH_ROTINA`, `SCH_HORA`, `SCH_DIA`, `SCH_ATIVO`, `SCH_ULTEXEC`, `SCH_STATUS`, `SCH_MSG` |
+| `SCH_LOG` | Nucleo | — | `SCH_LFILIAL`, `SCH_LROTINA`, `SCH_LDATA`, `SCH_LHORA`, `SCH_LSTATUS`, `SCH_LMSG` |
+| `SEC_ADMIN_SESSION` | Segurança | Monitor / sessões admin | `SEC_AST_TOKEN`, `SEC_AST_USUARIO`, `SEC_AST_EMPRESA`, `SEC_AST_FILIAL`, `SEC_AST_IP`, `SEC_AST_LOGINEM`, `SEC_AST_ULTIMAACAO`, `SEC_AST_ROTINA`, `SEC_AST_MEMORIA` |
+| `SEC_MON` | Segurança | Monitor / sessões admin |  |
+| `SEC_PERM` | Segurança | RBAC (`PERFIL`, `MENU`, `ITEM`, `PERMITE`) | `SEC_PERM_FILIAL`, `SEC_PERM_PERFIL`, `SEC_PERM_MENU`, `SEC_PERM_ITEM`, `SEC_PERM_EMPRESA`, `SEC_PERM_PERMITE` |
 
 ## 5. Infra de dados e segurança (funções-base)
 
@@ -206,7 +295,7 @@ Compras, Núcleo, Sair. Submenus:
 - **Fiscal** ganhou **+ Nova aliquota (NCM)** (`GEBRESTALISC`: IBS/CBS em %, vigência AAAAMMDD sem sobreposição) — sem alíquota a NCM tributa a zero.
 - Browses `FWMBrowse`: as grades do catálogo (GE1, GEU1, GEF1, GE2) são **somente leitura** (`SetMenuDef("")`, AdvPP 4.4.0-geban); as demais seguem editáveis.
 
-## 8. Referência completa de funções por arquivo (589 funções)
+## 8. Referência completa de funções por arquivo (590 funções)
 
 Gerada por `scripts/doc-funcoes.py` a partir dos fontes: assinatura exata da
 declaração e propósito da primeira linha do `Protheus.doc` (ou do comentário
@@ -720,7 +809,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBBOROTA` | `GEBBOROTA(cRota, cMetodo)` | Rota {metodo, rota, menu, item, descricao}; {} se nao existe. |
 | `GEBBOEXEC` | `GEBBOEXEC(cMetodo, cRota, o, cUsu)` | Executa a rota do backoffice. |
 
-**`src/GEBBOLIB.prw`** — 24 funções
+**`src/GEBBOLIB.prw`** — 25 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
@@ -747,7 +836,8 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `BOCOMPOK` | `BOCOMPOK(cComp)` | Competencia AAAAMM valida? |
 | `BOFIMMES` | `BOFIMMES(cComp)` | Ultimo dia da competencia (AAAAMMDD). |
 | `BOSEQ` | `BOSEQ(cChave, nTam)` | Proximo numero da chave (GBS1). |
-| `BOREL` | `BOREL(aLinhas)` | Regrava a grade de relatorio da tela (GBR1). |
+| `BOSESSAO` | `BOSESSAO()` | Identificador da sessao (cada janela do navegador e' uma VM, com seus Static): "S" + AAAAMMDD + HHMMSS + aleatorio. |
+| `BOREL` | `BOREL(aLinhas)` | Regrava a grade de relatorio da sessao (GBR1). |
 
 **`src/GEBCPX.prw`** — 10 funções
 

@@ -245,7 +245,7 @@ User Function T_GEBSN()
         lOk := Chk(lOk, "extrato linhas", Len(aR[3][2]) == 5)
         lOk := Chk(lOk, "extrato tributos", Round(SomaPares(aR[3][3]), 2) == 2539.75)
     EndIf
-    lOk := Chk(lOk, "grade extrato", Len(TCSqlQuery("SELECT GSN6_ORDEM FROM GSN6")) > 10)
+    lOk := Chk(lOk, "grade extrato", Len(TCSqlQuery("SELECT GBR1_ORDEM FROM GBR1 WHERE GBR1_SESSAO = " + GEBDBQuote(BOSESSAO()))) > 10)
     aR := GEBSNANUAL("2026")
     lOk := Chk(lOk, "anual ok", aR[1])
     If aR[1]

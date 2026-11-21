@@ -134,6 +134,17 @@ User Function T_GEBTUI_OPS()
     lOk := Chk(lOk, "dfe json sem CONT_UF", !("CONT_UF" $ aR[2]))
     lOk := Chk(lOk, "menor preco sem cotacao recusado", !TUIMenorPreco("PRODUTO_SEM_COTACAO")[1])
 
+    // Grade de relatorio por sessao: outra janela de hoje fica intacta, sobra de dia anterior sai
+    BOMIG()
+    TCSqlExec("INSERT INTO GBR1 (D_E_L_E_T_, GBR1_FILIAL, GBR1_SESSAO, GBR1_ORDEM, GBR1_C1, GBR1_C2, GBR1_C3, GBR1_C4, GBR1_C5, GBR1_C6, GBR1_C7, GBR1_C8) " + ;
+        "VALUES (' ', " + GEBDBQuote(FWxFilial("GBR1")) + ", " + GEBDBQuote("S" + DToS(Date()) + "OUTRA") + ", 1, 'outra', '', '', '', '', '', '', ''), " + ;
+        "(' ', " + GEBDBQuote(FWxFilial("GBR1")) + ", 'S20000101VELHA', 1, 'velha', '', '', '', '', '', '', '')")
+    BOREL({{"Cab"}, {"minha"}})
+    lOk := Chk(lOk, "relatorio de outra sessao intacto", Len(TCSqlQuery("SELECT 1 AS X FROM GBR1 WHERE GBR1_C1 = 'outra'")) == 1)
+    lOk := Chk(lOk, "sobra de dia anterior apagada", Len(TCSqlQuery("SELECT 1 AS X FROM GBR1 WHERE GBR1_C1 = 'velha'")) == 0)
+    lOk := Chk(lOk, "sessao ve so' o seu relatorio", Len(TCSqlQuery("SELECT 1 AS X FROM GBR1 WHERE GBR1_SESSAO = " + GEBDBQuote(BOSESSAO()))) == 2)
+    lOk := Chk(lOk, "sessao com data de hoje", Left(BOSESSAO(), 9) == "S" + DToS(Date()))
+
     // Grade nunca mostra credencial
     lOk := Chk(lOk, "sigilo GE2 SEC_SALT", TUISigilo("GE2", "SEC_SALT"))
     lOk := Chk(lOk, "sigilo GE2_SEC SEC_HASH", TUISigilo("GE2_SEC", "SEC_HASH"))

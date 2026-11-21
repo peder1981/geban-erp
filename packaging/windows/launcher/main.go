@@ -323,8 +323,16 @@ func ensureScheduler(cfg *config) error {
 	if err := os.WriteFile(cmdFile, []byte(body), 0644); err != nil {
 		return err
 	}
+	// A tarefa roda a cada minuto na sessao do usuario: chamar o .cmd direto
+	// abriria um console na frente dele toda vez. O .vbs o executa oculto
+	// (janela estilo 0) e espera terminar.
+	vbsFile := filepath.Join(cfg.Dir, "geban-scheduler.vbs")
+	vbs := "CreateObject(\"WScript.Shell\").Run \"\"\"\" & \"" + cmdFile + "\" & \"\"\"\", 0, True\r\n"
+	if err := os.WriteFile(vbsFile, []byte(vbs), 0644); err != nil {
+		return err
+	}
 	out, err := exec.Command("schtasks", "/Create", "/TN", "GEBAN Scheduler",
-		"/SC", "MINUTE", "/MO", "1", "/TR", "\""+cmdFile+"\"",
+		"/SC", "MINUTE", "/MO", "1", "/TR", "wscript.exe //B //Nologo \""+vbsFile+"\"",
 		"/F", "/RL", "LIMITED").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("schtasks: %v — %s", err, out)

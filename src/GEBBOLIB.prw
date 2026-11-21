@@ -2,6 +2,9 @@
 #include "GEBDB_CORE.prw"
 #include "GENUC_MIG.prw"
 
+// Sessao da grade de relatorio (BOSESSAO): uma por VM/janela.
+Static cBOSes := ""
+
 /*/{Protheus.doc} GEBBOLIB
     Utilitarios comuns dos modulos do backoffice (estoque/custos,
     financeiro, contabil, compras, faturamento, frente de loja).
@@ -22,6 +25,8 @@ User Function BOMIG()
     lOk := lOk .And. BOTAB("GBR1", "GBR1_ORDEM INTEGER NOT NULL, GBR1_C1 TEXT NOT NULL, GBR1_C2 TEXT NOT NULL, " + ;
         "GBR1_C3 TEXT NOT NULL, GBR1_C4 TEXT NOT NULL, GBR1_C5 TEXT NOT NULL, GBR1_C6 TEXT NOT NULL, " + ;
         "GBR1_C7 TEXT NOT NULL, GBR1_C8 TEXT NOT NULL", "GBR1_ORDEM")
+    // grade por sessao (janela): relatorios simultaneos nao se sobrepoem
+    lOk := lOk .And. TCSqlExec("ALTER TABLE GBR1 ADD COLUMN IF NOT EXISTS GBR1_SESSAO TEXT NOT NULL DEFAULT ' '")
 Return lOk
 
 // BOTAB("GXX1", "GXX1_A TEXT NOT NULL, ...", "GXX1_A") -> cria se faltar + indice (filial, cIdx).
@@ -208,26 +213,44 @@ User Function BOSEQ(cChave, nTam)
     aHit := TCSqlQuery("SELECT GBS1_ULT AS N FROM GBS1" + cW)
 Return StrZero(BOVAL(aHit[1]:N), nTam)
 
+/*/{Protheus.doc} BOSESSAO
+    Identificador da sessao (cada janela do navegador e' uma VM, com seus
+    Static): "S" + AAAAMMDD + HHMMSS + aleatorio. Comeca pela data para a
+    limpeza das grades de dias anteriores.
+    @type Funcao utilitaria
+    @author Peder Munksgaard
+    @since 21/11/2026
+    @return Character identificador da sessao
+/*/
+User Function BOSESSAO()
+    If Empty(cBOSes)
+        cBOSes := "S" + DToS(Date()) + StrTran(Time(), ":", "") + StrZero(Randomize(1, 999999), 6)
+    EndIf
+Return cBOSes
+
 /*/{Protheus.doc} BOREL
-    Regrava a grade de relatorio da tela (GBR1). aLinhas: arrays de ate 8
+    Regrava a grade de relatorio da sessao (GBR1). aLinhas: arrays de ate 8
     colunas (numeros viram texto com 2 casas). A primeira linha e' o
-    cabecalho.
+    cabecalho. Cada sessao tem a sua grade (BOSESSAO), entao relatorios
+    gerados ao mesmo tempo nao se sobrepoem; as grades de dias anteriores
+    sao apagadas de passagem.
     @type Funcao utilitaria
     @author Peder Munksgaard
     @since 18/10/2026
 /*/
-// ponytail: uma grade por empresa; dois usuarios gerando relatorio ao mesmo tempo veem o ultimo
 User Function BOREL(aLinhas)
     Local cFil := FWxFilial("GBR1")
+    Local cSes := BOSESSAO() as Character
     Local cSql := ""
     Local nI := 0
     Local nJ := 0
     Local xV := Nil
     BOMIG()
-    TCSqlExec("DELETE FROM GBR1 WHERE GBR1_FILIAL = " + GEBDBQuote(cFil))
+    TCSqlExec("DELETE FROM GBR1 WHERE GBR1_FILIAL = " + GEBDBQuote(cFil) + " AND (GBR1_SESSAO = " + GEBDBQuote(cSes) + ;
+        " OR GBR1_SESSAO < " + GEBDBQuote("S" + DToS(Date())) + ")")
     For nI := 1 To Len(aLinhas)
-        cSql := "INSERT INTO GBR1 (D_E_L_E_T_, GBR1_FILIAL, GBR1_ORDEM, GBR1_C1, GBR1_C2, GBR1_C3, GBR1_C4, GBR1_C5, GBR1_C6, GBR1_C7, GBR1_C8) VALUES (' ', " + ;
-            GEBDBQuote(cFil) + ", " + BONUM(nI, 0)
+        cSql := "INSERT INTO GBR1 (D_E_L_E_T_, GBR1_FILIAL, GBR1_SESSAO, GBR1_ORDEM, GBR1_C1, GBR1_C2, GBR1_C3, GBR1_C4, GBR1_C5, GBR1_C6, GBR1_C7, GBR1_C8) VALUES (' ', " + ;
+            GEBDBQuote(cFil) + ", " + GEBDBQuote(cSes) + ", " + BONUM(nI, 0)
         For nJ := 1 To 8
             xV := ""
             If nJ <= Len(aLinhas[nI])

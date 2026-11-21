@@ -148,7 +148,7 @@ Regras da LC 123/2006, na redação da LC 155/2016. As faixas e os percentuais d
 **Relatórios**
 - **Extrato da apuração** (`GEBSNEXTRATO`): resumo (RBT12, exportação, receita do ano, folha, Fator R, faixa, alíquota, DAS, ICMS/ISS por fora, vencimento, situação da guia, alertas), uma linha por atividade/tipo com cada tributo, e o total por tributo.
 - **Acompanhamento anual** (`GEBSNANUAL`): mês a mês (receita, RBT12, alíquota, DAS, guia), totais do ano e quanto do sublimite e do limite já foi consumido.
-- Na tela, os dois aparecem em grade (`GSN6`, regerada a cada pedido). Na API, saem em JSON.
+- Na tela, os dois aparecem na página Resultado (grade de relatório da sessão). Na API, saem em JSON.
 
 **Fora do escopo:**
 - ISS retido na fonte;
@@ -505,8 +505,9 @@ A interface roda no navegador (`advplc serve src/GEBTUI.prw`, porta 8081). Regra
 6. **Dados exibidos:** as tabelas ignoram registros excluídos (`D_E_L_E_T_`), filtram a filial da
    sessão (exceto empresas e usuários, que são do catálogo), mostram até 500 linhas e nunca exibem
    colunas de credencial (salt, hash, senha, token).
-7. **Relatórios:** vão para a grade `GBR1` da filial e abrem na página Resultado. Limitação
-   conhecida: dois usuários da mesma filial gerando relatório ao mesmo tempo veem o último gerado.
+7. **Relatórios:** vão para a grade `GBR1` da sessão (cada janela do navegador tem a sua) e abrem
+   na página Resultado; relatórios gerados ao mesmo tempo não se misturam. As grades de dias
+   anteriores são apagadas automaticamente.
 8. **Frente de loja:** venda, sangria, suprimento e cancelamento só com o caixa aberto; o cupom com
    devolução não se cancela (usa-se a devolução); desconto acima de `LOJ_DESC_MAX` exige usuário e
    senha de um supervisor com a permissão de liberar desconto.

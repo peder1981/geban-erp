@@ -28,8 +28,8 @@
       Sexta-feira Santa, Corpus Christi e GSN5) passam para o dia util seguinte.
     Tabelas (schema da empresa): GSN1 folha/receita externa, GSN2 apuracao,
     GSN3 atividades, GSN4 apuracao por atividade/tributo, GSN5 feriados,
-    GSN6 relatorio para a tela, GSN7 marcas do produto, GSN8 notas de
-    exportacao. Criadas sob demanda.
+    GSN7 marcas do produto, GSN8 notas de exportacao. Criadas sob demanda.
+    Os relatorios vao para a grade de relatorio da sessao (BOREL/GBR1).
     @type Modulo fiscal
     @author Peder Munksgaard
     @since 18/10/2026
@@ -54,8 +54,6 @@ User Function GEBSNMIG()
         "GSN4_ICMS NUMERIC(18,2) NOT NULL, GSN4_ISS NUMERIC(18,2) NOT NULL, GSN4_IPI NUMERIC(18,2) NOT NULL, " + ;
         "GSN4_DAS NUMERIC(18,2) NOT NULL, GSN4_FORA NUMERIC(18,2) NOT NULL)", "GSN4_COMP")
     lOk := lOk .And. SNTab("GSN5", cId + "GSN5_FILIAL TEXT NOT NULL, GSN5_DATA TEXT NOT NULL, GSN5_DESC TEXT NOT NULL)", "GSN5_DATA")
-    lOk := lOk .And. SNTab("GSN6", cId + "GSN6_FILIAL TEXT NOT NULL, GSN6_ORDEM INTEGER NOT NULL, " + ;
-        "GSN6_ITEM TEXT NOT NULL, GSN6_VALOR TEXT NOT NULL)", "GSN6_ORDEM")
     // Marcas do Simples ficam em tabelas proprias: ALTER TABLE em GF1/GF3 quebra
     // os planos ja preparados nas conexoes abertas ("cached plan must not change result type").
     lOk := lOk .And. SNTab("GSN7", cId + "GSN7_FILIAL TEXT NOT NULL, GSN7_PROD TEXT NOT NULL, GSN7_ATIV TEXT NOT NULL, " + ;
@@ -605,7 +603,7 @@ Return cData
 /*/{Protheus.doc} GEBSNEXTRATO
     Relatorio: extrato da apuracao de uma competencia (resumo, receita por
     atividade/tipo com a reparticao por tributo, totais por tributo e
-    situacao da guia). Tambem preenche GSN6 para a grade da tela.
+    situacao da guia). Tambem preenche a grade de relatorio da sessao.
     @type Relatorio
     @author Peder Munksgaard
     @since 18/10/2026
@@ -658,7 +656,7 @@ User Function GEBSNEXTRATO(cComp)
         Next nT
     Next nI
 
-    // Grade da tela (GSN6): resumo, uma linha por atividade/tipo, tributos.
+    // Grade da tela (relatorio da sessao): resumo, uma linha por atividade/tipo, tributos.
     For nI := 1 To Len(aRes)
         aAdd(aRel, {aRes[nI][1], SNTxt(aRes[nI][2])})
     Next nI
@@ -675,7 +673,7 @@ Return {.T., "extrato", {aRes, aLin, aTrib}}
 /*/{Protheus.doc} GEBSNANUAL
     Relatorio: acompanhamento do ano-calendario (mes a mes: receita, RBT12,
     aliquota, DAS, guia; receita acumulada contra o sublimite de 3.600.000
-    e o limite de 4.800.000). Tambem preenche GSN6 para a grade da tela.
+    e o limite de 4.800.000). Tambem preenche a grade de relatorio da sessao.
     @type Relatorio
     @author Peder Munksgaard
     @since 18/10/2026
@@ -1086,17 +1084,12 @@ Static Function SNSitTit(cComp)
     EndIf
 Return "aberto " + SNNum(SNVal(aHit[1]:SAL), 2)
 
-// Regrava a grade do relatorio da tela (GSN6).
-// ponytail: uma grade por empresa; dois usuarios gerando ao mesmo tempo veem o ultimo
+// Grade do relatorio da tela: a da sessao (BOREL), com cabecalho Item/Valor.
 Static Function SNGrvRel(aRel)
-    Local cFil := FWxFilial("GSN6")
-    Local nI := 0
-    TCSqlExec("DELETE FROM GSN6 WHERE GSN6_FILIAL = " + GEBDBQuote(cFil))
-    For nI := 1 To Len(aRel)
-        TCSqlExec("INSERT INTO GSN6 (D_E_L_E_T_, GSN6_FILIAL, GSN6_ORDEM, GSN6_ITEM, GSN6_VALOR) VALUES (' ', " + ;
-            GEBDBQuote(cFil) + ", " + SNNum(nI, 0) + ", " + GEBDBQuote(aRel[nI][1]) + ", " + GEBDBQuote(aRel[nI][2]) + ")")
-    Next nI
-Return .T.
+    Local aLin := {{"Item", "Valor"}} as Array
+
+    aEval(aRel, {|x| aAdd(aLin, {x[1], x[2]})})
+Return BOREL(aLin)
 
 // Guias da competencia na Derrama (DAS, ICMS e ISS fora do DAS), com titulo no
 // financeiro e provisao contabil pela diferenca. Devolve o alerta (guia

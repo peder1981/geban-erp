@@ -10,6 +10,10 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 - **Cancelar cupom** volta à frente de loja (aba Caixa); **Cotação de fornecedor** e **Menor preço cotado** ganham formulário em Compras.
 - Tabelas da interface nunca mostram colunas de credencial; login e troca de senha em duas colunas; grade de itens com números no formato brasileiro.
 - Documentação técnica e manual atualizados para a interface nova; telas novas no README.
+- **Relatórios por sessão:** cada janela do navegador tem a sua grade de relatório; dois usuários gerando relatório ao mesmo tempo não se misturam (o Simples Nacional passou a usar a mesma grade).
+- Páginas de empresa, filial e primeira empresa em duas colunas; aviso no Início quando não há contas.
+- Inventário de tabelas e de funções da referência técnica gerados a partir dos fontes (`scripts/doc-tabelas.py`, `scripts/doc-funcoes.py`).
+- **Pacote Windows** revalidado em Windows 10 limpo: instalador em português do Brasil, mensagem final corrigida e agendador rodando sem abrir janela.
 - **Todas as operações viram formulários de tela única** nos módulos (abas por grupo: Operações, Banco, NF-e, Simples Nacional, Documentos eletrônicos, Relatórios); operações com vários itens têm grade para incluir e remover itens. Saem as telas de perguntas em sequência.
 - **Frente de loja (PDV):** venda numa tela só (carrinho, preço e promoção resolvidos, vários pagamentos com troco, CPF na nota, vendedor e supervisor), caixa, orçamentos, consultas, devolução com os dados do consumidor da NFC-e, cadastros, relatórios e TEF/NFC-e.
 - **Início** com indicadores e gráfico; **Rastreabilidade** em árvore.
