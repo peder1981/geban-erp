@@ -500,6 +500,8 @@ Static Function TUIPdvCaixa(oApp, oPai, aSt, cUsu, bRef)
             {|u, a| TUIPdvSessaoOk(aSt, {|| GEBLOJSAN(aSt[1], "SANGRIA", a[1], a[2], a[3])})}, "BO", "", {"LOJA", "CAIXA"}}, ;
         {"Frente de loja", 0, 0, "Suprimento", {{"Valor", "N", 0}, {"Motivo", "C", ""}, {"Conta de origem (vazio = cofre)", "C", ""}}, ;
             {|u, a| TUIPdvSessaoOk(aSt, {|| GEBLOJSAN(aSt[1], "SUPRIMENTO", a[1], a[2], a[3])})}, "BO", "", {"LOJA", "CAIXA"}}, ;
+        {"Frente de loja", 0, 0, "Cancelar cupom", {{"Cupom", "C", ""}, {"Motivo", "C", ""}}, ;
+            {|u, a| GEBLOJCAN(a[1], a[2])}, "BO", "", {"LOJA", "CAIXA"}}, ;
         {"Frente de loja", 0, 0, "Fechar caixa", {{"Dinheiro contado na gaveta", "N", 0}}, ;
             {|u, a| TUIPdvFecha(aSt, a)}, "BO", "", {"LOJA", "CAIXA"}}, ;
         {"Frente de loja", 0, 0, "Relatorio: resumo do caixa", {{"Sessao (vazio = a aberta)", "C", ""}}, ;

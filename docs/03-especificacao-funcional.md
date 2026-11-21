@@ -2,7 +2,14 @@
 
 > **Data:** 23/09/2026 · **Idioma:** PT-BR · **Autor:** Peder Munksgaard
 > **Base real:** `src/*.prw` (38 fontes) + `documentacao interna` + `documentacao interna`
-> **Banco:** SQLite `geban.db` · **Entrada:** `GEBAN()` (`src/GEBAN.prw`) · **Include único:** `totvs.ch`
+> **Atualização 21/11/2026:** este é o documento de especificação original. Desde então: o banco é
+> **Postgres** multi-empresa (um schema por empresa); a entrada é `advplc serve src/GEBTUI.prw`
+> (interface PO-UI, capítulo 9), mais a API REST (`src/GEBWEB.prw`) e o agendador
+> (`src/GEBSCHJOB.prw`); a interface antiga (`GEBAN.prw`, `GEBGUI_*`, `GEBEXP_WEB`) foi removida.
+> As regras de negócio descritas aqui continuam valendo; a referência de funções atual está em
+> `docs/05-referencia-tecnica.md` (seção 8).
+>
+> **Banco (original):** SQLite `geban.db` · **Include único:** `totvs.ch`
 > **Expansão:** `GEB_EXPANSAO` (multi-empresa + sessao + relatorios + trackers + web) + `GEB_GUI` (validadores + menu 9 opcoes + browses + config + main terminal).
 
 ## 0. Convenções válidas para todos os módulos
@@ -39,7 +46,7 @@
 
 ## 1. MÓDULO NUCLEO (GE1–GE5)
 
-**Fontes:** `src/GENUC_MIG.prw` (`GENMIG`, `GEBCFG`), `src/GEBAN.prw` (`GEBAN`, `MenuDef`),
+**Fontes:** `src/GENUC_MIG.prw` (`GENMIG`, `GEBCFG`), 
 `src/GENUC_CAD.prw` (`GEBAUD`, `GEBUSR`, `GEBCAD`), `src/GENUC_MNT.prw` (`GEBMNT`, `GEBFILA`, `CTBLAN`, `CTBGRV`)
 **Tabelas:** GE1 empresas (`FILIAL/COD/NOME`), GE2 usuários (`FILIAL/COD/NOME/PERFIL`),
 GE3 auditoria (`FILIAL/COD/USUAR/EVENT/MOTIV/DATA`), GE4 mentor (`FILIAL/EVENTO/MODO`),
@@ -49,7 +56,7 @@ GE5 fila (`FILIAL/CHAVE/PAYLD/STATUS`).
 
 | Ator | Papel |
 |------|-------|
-| Operador / Administrador | Roda `GEBAN()`, cadastra empresa/usuário, parametriza GE4 |
+| Operador / Administrador | Entra pela interface web, cadastra empresa/usuário (Núcleo), parametriza GE4 |
 | Jobs dos demais módulos | Consomem `GEBCFG`, `GEBMNT`, `GEBFILA`, `GEBAUD`, `CTBLAN` |
 | Caixa | Validado via `GEBUSR` (trava `PERMITE_DIRETA`) |
 
@@ -60,7 +67,7 @@ GE5 fila (`FILIAL/CHAVE/PAYLD/STATUS`).
 
 ### 1.3 Fluxo principal (numerado)
 
-1. Operador chama `GEBAN()` → `GENMIG()` cria GE1–GE5 + índices → log `GEBAN Nucleo online - Bananias`, retorna `.T.`
+1. Ao abrir a interface, `GEBDBProvisionaCatalogo()` → `GENMIG()` cria GE1–GE5 + índices → log `GEBAN Nucleo online - Bananias`, retorna `.T.`
    (falha em qualquer `CREATE` → log `GEBAN Nucleo FAIL - GENMIG falhou`, `.F.`).
 2. `MenuDef()` expõe Núcleo/Fiscal/Derrama/Estoque/Contábil (ações ainda stubs via `ConOut`).
 3. Cadastro/auditoria: `GEBAUD(cUsuario, cEvento, cMotivo)` grava GE3 (seção 0).
@@ -619,7 +626,6 @@ Total: **46 testes** (25 legados + 5 FIN + 5 COM + 6 EXPANSAO + 5 GUI).
 | Req (plano) | Funções (`src/`) | Testes (`tests/`) | Tabelas |
 |-------------|------------------|-------------------|---------|
 | NUCLEO T1: migração GE1–GE5 + `GEBCFG` | `GENMIG`, `GEBCFG` (`GENUC_MIG.prw`) | `T_GENUC_MIG.prw` | GE1–GE5 |
-| NUCLEO T2: entrada + MenuDef | `GEBAN`, `MenuDef` (`GEBAN.prw`) | `T_GEBAN_MENU.prw` | — (lê via `GENMIG`) |
 | NUCLEO T3: empresas/usuários/auditoria | `GEBAUD`, `GEBUSR`, `GEBCAD` (`GENUC_CAD.prw`) | `T_GENUC_CAD.prw` | GE1, GE2, GE3 |
 | NUCLEO T4: mentor + fila + CTB stub/real | `GEBMNT`, `GEBFILA`, `CTBLAN`, `CTBGRV` (`GENUC_MNT.prw`) | `T_GENUC_MNT.prw` | GE4, GE5, GC2–GC4 |
 | NUCLEO T5: massa 100 + serve | (todas acima) | `T_GEBAN_MASSA.prw` (100× `GEBAUD` + `GEBFILA` round-trip) | GE3, GE5 |
@@ -655,80 +661,64 @@ Total: **46 testes** (25 legados + 5 FIN + 5 COM + 6 EXPANSAO + 5 GUI).
 | COM T5: massa 50 pedidos round-trip | (todas compras) | `T_GEBCOM_MASSA.prw` (50× pedido 2×10 + entrada; 50 GCP3 `RECEBIDO` + 50 GCP5 + 50 GFN3) | GCP1–GCP5, GFN3, GV1 |
 | EXPANSAO T1: multi-empresa + GEH/GEI | `GEBEXPmig` (`GEBEXP_MIG.prw`) | `T_GeExp_MIG.prw` (verifica EMPRESA em 28 tabelas + GEH/GEI existentes) | GE1–GC4 + GEH + GEI |
 | EXPANSAO T2: contexto sessao | `GEBEXPCONTEXTO`, `GEBEXPIST`, `GEBEXPCONTEXT`, `GEBEXPCLEAR` (`GEBEXP_CTX.prw`) | `T_GeExp_CTX.prw` (sessao A valida, sessao B falha, clear encerra) | GE2, GEH, GEX |
-| EXPANSAO T3: web dashboard | `GEBEXP_WEB` (`GEBEXP_WEB.prw`) | `T_GeExp_WEB.prw` (8 asserts: context valido/invalido, dados empresa, resumo fin/fisc/mentor, GEBAN fluxo) | GE1, GE2, GEH, GEX, todas negocio |
 | EXPANSAO T4: relatorios nucleo | `GEBRELEMPRESAS`, `GEBRELUSUARIOS`, `GEBRELAUDITORIA`, `GEBRELMENTOR`, `GEBRELCADASTROS` (`GEBEXP_REL_NUC.prw`) | `T_GeExp_REL_NUC.prw` (5 asserts: cada funcao retorna array nao vazio com campos corretos) | GE1, GE2, GEH, GE4, GF1, GCP1, GV3, GFN1 |
 | EXPANSAO T5: relatorios negocio + trackers | `GEBRELFISCAL`, `GEBRELDERRAMA`, `GEBRELFIN`, `GEBRELSTOQUE`, `GEBRELCOMPRAS`, `GEBRELCONTABIL`, `GEBRELGERAL`, `GEBTRAKCOMPRA`, `GEBTRAKVENDA`, `GEBTRAKNOTAFISCAL`, `GEBTRAKDERRAMA` (`GEBEXP_REL_BIZ.prw` + `GEBEXP_TRAK.prw`) | `T_GeExp_REL_BIZ.prw` (11 asserts: cada relatorio retorna array com len correta + trackers rastreiam cadeia completa) | Todas negocio |
 | EXPANSAO T6: massa multi-empresa | (todas expansao) | `T_GeExp_MASSA.prw` (3 empresas isoladas; 20 NFs cada + 5 guias + 10 pedidos + 10 CTB; `GEBRELGERAL` confere; 5 trackers validados) | Todas |
-| GUI T1: validadores | 13 validadores (`GEBGUI_VLD.prw`) | `T_GEBGUI_VLD.prw` (migracoes + todos validadores valid/invalido/miss) | Todas |
-| GUI T2: menu terminal | `GEBGUIMAIN` (`GEBGUI_MAIN.prw`) | `T_GEBGUI_MAIN.prw` (MENU e CONFIG modos; 2/2 passam) | — |
-| GUI T3: browses | 17 browses (`GEBGUI_BRW.prw`) | `T_GEBGUI_BRW.prw` (GEBGUIMENU + 17 BRW_* criam alias sem erro) | Todas |
-| GUI T4: configuracao | `GEBGUICONF_*`, `GEBGUIMIG` (`GEBGUI_CFG.prw`) | `T_GEBGUI_CFG.prw` (SHOW, PARAM EMISSAO/APURACAO, ALIQ, CAD_*, RESUMO; GEBGUIMIG cria SC/LC) | GE4, GEBGUICONFIG_SC/LC |
-| GUI T5: integracao | GEBGUIMAIN + migracoes + operacoes | `T_GEBGUI_INTEG.prw` (fluxo end-to-end: nucleo → fiscal → derrama → estoque → contabil → fin → compras → fluxo) | Todas |
+| INTERFACE: formulários | todas as operações (`TUIFormularios`, `TUIExecuta`) | `T_GEBTUI_OPS.prw` (executa todos os formulários + verificações dirigidas) | Todas |
+| INTERFACE: frente de loja | `TUIPdv*` (`GEBTUIPDV.prw`) | `T_GEBTUIPDV.prw` (abre caixa, vende, devolve, orçamento, fecha) | GLJ* |
+| INTERFACE: fluxos e permissões | `TUIModulos`, `TUIPode` | `T_GEBTUI_FLUXOS.prw`, `T_GEBTUI_PERM.prw` | SEC_PERM |
 
-## 9. MÓDULO GUI — Interface (GEBGUI_*.prw)
+## 9. MÓDULO INTERFACE — PO-UI (GEBTUI.prw)
 
-**Fontes:** `src/GEBGUI_VLD.prw` (validadores), `src/GEBGUI_MNU.prw` (menu),
-`src/GEBGUI_BRW.prw` (browses), `src/GEBGUI_CFG.prw` (configuracao),
-`src/GEBGUI_MAIN.prw` (entrada terminal)
-**Tabelas:** GE1–GC4 (leitura via workarea), GEBGUICONFIG_SC, GEBGUICONFIG_LC (escrita).
+**Fontes:** `src/GEBTUI.prw` (aplicação, formulários e páginas), `src/GEBTUIPDV.prw` (frente de loja),
+`src/GEBTUIBO.prw` (DANFE da NFC-e), `src/GEBEXP_TRAK.prw` (rastreabilidade). Componentes PO-UI do
+runtime AdvPP (`PoApp`, `PoMenu`, `PoPage`, `PoTabs`, `PoWidget`, `PoTable`, `PoChart`, `PoTree`...).
+**Entrada:** `advplc serve src/GEBTUI.prw --port 8081` → `User Function GEBTUI()`; cada janela do
+navegador é uma sessão (VM própria).
 
-### 9.1 Validadores centrais (`GEBGUI_VLD.prw`)
+**Fluxo de entrada**
+1. `TUILogin`: usuário e senha → `GEBSECLOGIN` (Argon2id, bloqueio após 5 erros; recusa genérica).
+2. `TROCA_OBRIGATORIA`/`SENHA_EXP` → `TUISenhaPg` → `GEBTUITROCASENHA` (política `GEBSECPOL_VERIFICA`).
+3. Empresa (`GEBTUIEMPRESAS`): uma só → automática; várias → escolha; catálogo vazio → o `super`
+   cria a primeira (`TUIPrimeira`). Filial (`GEBTUIFILIAL`, "" = matriz).
+4. `TUIAbre`: menu lateral só com os módulos em que o usuário tem ao menos um item permitido
+   (`TUIPode`/RBAC), Início, Rastreabilidade, Minha senha e Sair.
 
-| Funcao | Tabela | Regra | Retorna |
-|--------|--------|-------|---------|
-| `GEBGUIPROD_CK(cCod)` | GF1 | Produto existe, ativo, na filial | `.T.`/`.F.` |
-| `GEBGUIFORN_CK(cCod)` | GCP1 | Fornecedor existe, ativo, na filial | `.T.`/`.F.` |
-| `GEBGUICLI_CK(cCod)` | GV3 | Cliente/fiado existe, ativo, na filial | `.T.`/`.F.` |
-| `GEBGUIPROD_EST(cProd, nQtd)` | GV1 | Estoque >= qtd; alerta minimo se < MIN | `.T.`/`.F.` |
-| `GEBGUIFIADO_LIM(cCli, nValor)` | GV3 | Soma ABERTA + novo <= 1000 | `.T.`/`.F.` |
-| `GEBGUIFIN_BAI(cTipo, cDoc, nValor)` | GFN2/GFN3 | Tipo REC/PAG valido; doc existe; saldo >= valor; delega `GEBFNBAI` | `.T.`/`.F.` |
-| `GEBGUIFIN_FLX()` | GFN2+GFN3 | Retorna `{rec, pag, saldo}` | Array 3 |
-| `GEBGUIFIS_EMI(cChave, cCod, nQtd, nPreco)` | GF1+GF3+GF4 | Params nao vazios, qtd/preco > 0; delega `GEBFEMI` | `.T.`/`.F.` |
-| `GEBGUIFIS_APU(cComp)` | GF3+GF4+GF5 | Comp nao vazio; delega `GEBFAPU` | `.T.`/`.F.` |
-| `GEBGUIFIS_GER(cComp)` | GF5+GD1 | Comp nao vazio; delega `GEBDGER` | `cGuia`/`""` |
-| `GEBGUICTB_DIR(cCli, cContaD, cContaC, nValor)` | GC4 | Flag PERMITE_DIRETA==`"S"`; delega `GEBCDIR` | `.T.`/`.F.` |
-| `GEBGUICONFIG_LC(cChave)` | GE4 | Leitura via `GEBCFG` | `cValor` |
-| `GEBGUICONFIG_SC(cChave, cValor)` | GE4 | Upsert: update se existir, insert se nao | `.T.`/`.F.` |
+**Páginas**
+- **Início** (`TUIInicio`): sessão, indicadores (saldo em contas, títulos em aberto, guias da Derrama,
+  estoque abaixo do mínimo), gráfico de saldo por conta e acesso rápido aos módulos.
+- **Módulo** (`TUIModulos` → `TUIModPg`): tabelas do módulo em abas (`TUICarrega`: colunas lidas
+  do `information_schema`, filtro `D_E_L_E_T_` e filial — exceto GE1/GE2 —, até 500 linhas, sem
+  colunas de credencial (`TUISigilo`)); clicar numa linha preenche os campos ligados dos formulários.
+  Abaixo, os formulários em abas pelo prefixo do título: Operações, Relatórios, Banco,
+  NF-e de fornecedores, Simples Nacional e Documentos eletrônicos.
+- **Frente de loja** (`TUIPdvPg`): venda numa tela (carrinho, preço/promoção, pagamentos múltiplos,
+  troco), caixa, orçamentos, consultas, cadastros, relatórios, TEF/NFC-e e devolução.
+- **Rastreabilidade** (`TUIRastreio`): origem + número → árvore com os registros de cada etapa (`GEBTRAK*`).
+- **Resultado**: relatórios (`GBR1` ou a tabela do relatório) com botão Voltar (`GEBTUIBRW`).
 
-### 9.2 Menu terminal (`GEBGUI_MAIN.prw`)
+**Formulários** (`TUIFormularios` = `TUIFormBase` + `TUIFormDfe` + `TUIFormNuc`, mais os do PDV):
+cada operação é uma especificação `{módulo, 0, 0, título, campos, bloco, retorno, msg|tabela, permissão[, cálculo, itens]}`.
+Campo: `{rótulo, "C" | "N" | "P" (senha) | {opções}, padrão[, coluna ligada]}`. `TUIExecuta`
+confere a permissão (`GEBSECRBAC(usuário, menu, item)`) antes de chamar o bloco, que usa as mesmas
+funções de negócio da API REST — a validação fica na regra de negócio, não na tela. Retorno `"BO"`
+= `{lOk, cMsg}`; `"REL"` = relatório na página Resultado; `"201"`/`"200"` = status REST
+(`GEBTUIMOTIVO` traduz a recusa). Operações com vários itens têm grade (`TUIFormItens`: incluir e
+remover item; o bloco recebe os itens).
 
-`GEBGUIMAIN(cModo)` orquestra menu numerado 1–9 via ConOut/ConIn. Cada opcao chama handler static que executa a migracao do modulo. Modos: `"MENU"` (padrao, iterativo) e `"CONFIG"` (abre configuracoes rapidas). Retorno `.T.` se sem erro.
-
-```
-1 - Nucleo      → GEBGUINUC()     → GENMIG + GEBFMIG
-2 - Fiscal      → GEBGUIFIS()     → GEBFMIG
-3 - Derrama     → GEBGUIDER()     → GEBDMIG
-4 - Estoque     → GEBGUIEST()     → GEBVMIG
-5 - Contabil    → GEBGUICtb()     → GEBCMIG
-6 - Financeiro  → GEBGUIFIN()     → GEBFNMIG
-7 - Compras     → GEBGUICOM()     → GEBCMMIG
-8 - Configurac. → GEBGUICFG()     → GEBCFG leitura
-9 - Sair        → encerra
-```
-
-### 9.3 Browses (`GEBGUI_BRW.prw`)
-
-17 funcoes `BRW_*` criam `FWMBrowse` sobre cada tabela. Cada uma guarda existencia via `sqlite_master`; se tabela ausente retorna `.F.` com log. Alias e Description configurados; Activate/Destroy pulados no modo balisador (requerem `advplc serve`).
-
-Tabelas mapeadas: GE1, GE2, GF1, GF2, GF3, GF5, GD1, GV1, GV2, GFN1, GFN2, GFN3, GFN4, GCP1, GCP3, GC1, GC3.
-
-### 9.4 Configuracao (`GEBGUI_CFG.prw`)
-
-- `GEBGUICONF_SHOW`: exibe secoes navegaveis (parametros, alíquota, cadastro rapido, ajuda).
-- `GEBGUICONF_PARAM(cSeccao)`: garante linha em GE4 com valor padrao (`ONLINE_FILA`, `AUTO`, `N`, `AVISA_E_LIBERA_COM_BO`).
-- `GEBGUICONF_ALIQ(cNCM)`: mostra alíquota vigente + exemplo calculo.
-- `GEBGUICONF_CAD_*`: stubs para cadastros rapidos (GE1, GE2, GF1, GCP1, GFN1).
-- `GEBGUICONF_RESUMO`: dashboard numerico (`GEBNFLX` + `GEBBAL` + `GEBDRE`).
-- `GEBGUIMIG`: cria tabelas `GEBGUICONFIG_SC` (char) e `GEBGUICONFIG_LC` (logical) com indices.
+**Testes:** `T_GEBTUI_OPS` (executa todos os formulários com valores padrão + verificações
+dirigidas), `T_GEBTUIPDV` (venda, devolução, orçamento e caixa), `T_GEBTUI_FLUXOS`, `T_GEBTUI_PERM`,
+`T_GEBTUIBO`; lints `tests/local/T_LOCAL_FUNCOES.sh` (função inexistente),
+`T_NOMES_RESERVADOS.sh` (variável com nome de palavra-chave) e `T_LOCAL_APOS_RETURN.sh`, rodados
+pelo `o script de publicacao` antes de publicar.
 
 ---
 
 ## 10. MÓDULO EXPANSAO — Multi-empresa (GEBEXP_*.prw)
 
 **Fontes:** `src/GEBEXP_MIG.prw`, `src/GEBEXP_CTX.prw`, `src/GEBEXP_REL_BIZ.prw`,
-`src/GEBEXP_TRAK.prw`, `src/GEBEXP_WEB.prw`, `src/GEBEXP_REL_NUC.prw`
-**Tabelas novas:** `GEH` (historico acesso), `GEI` (audit log), `GEX` (contexto sessao),
-`GEBGUICONFIG_SC`, `GEBGUICONFIG_LC`.
+`src/GEBEXP_TRAK.prw`, `src/GEBEXP_REL_NUC.prw`
+**Tabelas novas:** `GEH` (historico acesso), `GEI` (audit log), `GEX` (contexto sessao).
 
 ### 10.1 Migracao multi-empresa (`GEBEXP_MIG`)
 
@@ -777,13 +767,10 @@ Cada tracker retorna `array` de `arrays`, uma posicao por etapa do fluxo. Linhas
 | `GEBTRAKNOTAFISCAL(cChave)` | GF3 → GF4 → calculo → GFN2 → GF5 → GD1 |
 | `GEBTRAKDERRAMA(cGuia)` | GF5 → GD1 → GD2 → GD3 → GFN3 → GFN4 → GC3 |
 
-### 10.6 Dashboard web (`GEBEXP_WEB`)
+### 10.6 Painel inicial
 
-`GEBEXP_WEB(cEmpresa, cUsuario)`:
-1. Chama `GEBEXPCONTEXTO` — falha ⇒ `.F.`.
-2. Busca GE1 (nome), GE4 (`REGIME`), GCP1 (CNPJ ficticio se vazio).
-3. Exibe dashboard com: dados empresa, resumo financeiro (`GEBRELFIN`), resumo fiscal (`GEBRELFISCAL`), alertas mentor (`GEBRELMENTOR`), acoes rapidas 1–9.
-4. Retorna `.T.` se dashboard exibido com sucesso.
+O antigo painel web (`GEBEXP_WEB`) foi removido; o painel é a página **Início** da interface
+(capítulo 9), que usa os mesmos números consolidados.
 
 - Fluxos `EMISSAO`/`APURACAO` configuráveis via GE4: **implementado** (§2.7; `DIRETA` só muda log — direta real é `GEBCDIR`).
 - Misto online/fila offline GE5: **implementado** (emissão; fila `PENDENTE`, retry exponencial é futuro).

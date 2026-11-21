@@ -5,8 +5,11 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 
 ## [Não lançado]
 
-### Interface (AdvPP 4.8.4, PO-UI)
-- **Requer AdvPP 4.8.4 ou posterior** (`Nil` como texto vazio, passagem por referência `@var`, curto-circuito, aritmética de datas).
+### Interface (AdvPP 4.8.5, PO-UI)
+- **Requer AdvPP 4.8.5 ou posterior** (`Nil` e `NULL` do banco como texto vazio, passagem por referência `@var`, curto-circuito, aritmética de datas).
+- **Cancelar cupom** volta à frente de loja (aba Caixa); **Cotação de fornecedor** e **Menor preço cotado** ganham formulário em Compras.
+- Tabelas da interface nunca mostram colunas de credencial; login e troca de senha em duas colunas; grade de itens com números no formato brasileiro.
+- Documentação técnica e manual atualizados para a interface nova; telas novas no README.
 - **Todas as operações viram formulários de tela única** nos módulos (abas por grupo: Operações, Banco, NF-e, Simples Nacional, Documentos eletrônicos, Relatórios); operações com vários itens têm grade para incluir e remover itens. Saem as telas de perguntas em sequência.
 - **Frente de loja (PDV):** venda numa tela só (carrinho, preço e promoção resolvidos, vários pagamentos com troco, CPF na nota, vendedor e supervisor), caixa, orçamentos, consultas, devolução com os dados do consumidor da NFC-e, cadastros, relatórios e TEF/NFC-e.
 - **Início** com indicadores e gráfico; **Rastreabilidade** em árvore.

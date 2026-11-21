@@ -33,8 +33,11 @@ log "2/6 advplc.exe (Windows)"
 if [ -n "${ADVPLC_WIN:-}" ]; then
     cp "$ADVPLC_WIN" "$PAYLOAD/advplc.exe"
 else
+    # O GEBAN exige AdvPP >= 4.8.4 (Nil como "", passagem por referencia @var).
+    ADVPP_VER=$(cd "$ADVPP_SRC" && git describe --tags --abbrev=0 --match 'v[0-9]*')
+    log "    AdvPP $ADVPP_VER"
     (cd "$ADVPP_SRC" && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
-        go build -trimpath -ldflags "-s -w -X main.version=v4.6.1" \
+        go build -trimpath -ldflags "-s -w -X main.version=$ADVPP_VER" \
         -o "$PAYLOAD/advplc.exe" ./cmd/advplc)
 fi
 

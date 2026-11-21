@@ -16,7 +16,7 @@ O MVP tem uma promessa só, escrita no design aprovado:
 
 Tudo o mais — Mentor, fila offline, split, parcelamento, protesto, partida dobrada — existe para sustentar essa promessa quando a internet cai, o cliente pede fiado e o contador inventa um lançamento direto às 23h58.
 
-Arquitetura em uma casca de banana: monolito modular AdvPL, um banco SQLite (`geban.db`), entrada `GEBAN.prw` com MenuDef, ordem de construção `GEB_NUCLEO > GEB_FISCAL > GEB_DERRAMA > GEB_ESTOQ_VENDA > GEB_CONTABIL`. Nenhum caminho pula o `CTB_Lanca()` — muda só quem aperta o botão.
+Arquitetura em uma casca de banana: monolito modular AdvPL, Postgres com um schema por empresa (originalmente SQLite `geban.db`), interface web PO-UI (`src/GEBTUI.prw`) e API REST (`src/GEBWEB.prw`), ordem de construção `GEB_NUCLEO > GEB_FISCAL > GEB_DERRAMA > GEB_ESTOQ_VENDA > GEB_CONTABIL`. Nenhum caminho pula o `CTB_Lanca()` — muda só quem aperta o botão.
 
 ---
 
@@ -487,75 +487,29 @@ A expansão `GEB_EXPANSAO` (`src/GEBEXP_MIG.prw`) adicionou coluna `EMPRESA CHAR
 
 ---
 
-## 16. Navegação GUI — menu de 9 opções e dashboard web
+## 16. Navegação — interface PO-UI (`src/GEBTUI.prw`)
 
-A camada `GEB_GUI` (`src/GEBGUI_*.prw`) expõe duas interfaces ao usuário:
+A interface roda no navegador (`advplc serve src/GEBTUI.prw`, porta 8081). Regras:
 
-### 16.1 Terminal (GEBGUIMAIN)
-
-`GEBGUIMAIN(cModo)` em `src/GEBGUI_MAIN.prw` exibe menu numérico por ConOut/ConIn:
-
-```
-1 - Nucleo    (migra GE1-GE5)
-2 - Fiscal    (migra GF1-GF6, apura)
-3 - Derrama   (migra GD1, gera guias)
-4 - Estoque   (migra GV1-GV3, venda)
-5 - Contabil  (migra GC1-GC4, lanca)
-6 - Financeiro(migra GFN, fluxo)
-7 - Compras   (migra, cotas, pedidos)
-8 - Configurac.
-9 - Sair
-```
-
-Cada opção delega para um `Static Function` que chama a migração correspondente do módulo. Modo `"CONFIG"` abre configurações rápidas via `GEBGUICONF_PARAM`.
-
-### 16.2 Web (GEBEXP_WEB)
-
-`GEBEXP_WEB(cEmpresa, cUsuario)` em `src/GEBEXP_WEB.prw`:
-
-1. Chama `GEBEXPCONTEXTO(cEmpresa, cFilial, cUsuario)` — se falhar, retorna `.F.`.
-2. Busca nome da empresa em GE1, regime em GE4 (`REGIME`), CNPJ fictício em GCP1.
-3. Exibe dashboard com:
-   - Dados da empresa logada (nome, regime, CNPJ, usuário, data)
-   - Resumo financeiro (GEBRELFIN: contas, a receber, a pagar, saldo, movimentos)
-   - Resumo fiscal (GEBRELFISCAL: notas, base, IBS/CBS, débito, crédito, saldo derrama, apurações, regime)
-   - Alertas do mentor (GEBRELMENTOR: eventos + modos configurados)
-   - Ações rápidas numeradas (1–9, same as terminal)
-
-### 16.3 Camada de validação (GEBGUI_VLD)
-
-13 validadores centrais que o frontend/backend consomem antes de chamar funções de domínio:
-
-| Função | Tabela checada | Regra |
-|--------|---------------|-------|
-| `GEBGUIPROD_CK` | GF1 | Produto existe ativo na filial |
-| `GEBGUIFORN_CK` | GCP1 | Fornecedor existe ativo na filial |
-| `GEBGUICLI_CK` | GV3 | Cliente/Fiado existe ativo na filial |
-| `GEBGUIPROD_EST` | GV1 | Estoque suficiente para quantidade solicitada; alerta mínimo |
-| `GEBGUIFIADO_LIM` | GV3 | Limite 1000 não transgredido |
-| `GEBGUIFIN_BAI` | GFN2/GFN3 | Tipo válido, doc existe, saldo >= valor |
-| `GEBGUIFIN_FLX` | GFN2+GFN3 | Retorna `{rec, pag, saldo}` |
-| `GEBGUIFIS_EMI` | GF1+GF3+GF4 | Params válidos (chave, produto, qtd, preço > 0) |
-| `GEBGUIFIS_APU` | GF3+GF4+GF5 | Competência não vazia |
-| `GEBGUIFIS_GER` | GF5+GD1 | Competência não vazia; retorna guia |
-| `GEBGUICTB_DIR` | GC4 | Flag PERMITE_DIRETA == "S"; delega para GEBCDIR |
-| `GEBGUICONFIG_LC` | GE4 | Leitura de configuração (GEBCFG) |
-| `GEBGUICONFIG_SC` | GE4 | Escrita de configuração (upsert por evento) |
-
-### 16.4 Browses (GEBGUI_BRW)
-
-17 browses `FWMBrowse` mapeados 1:1 com tabelas: Empresas(GE1), Usuários(GE2), Produtos(GF1), Alíquotas(GF2), Notas(GF3), Apuração(GF5), Guias(GD1), Estoque(GV1), Vendas(GV2), Contas(GFN1), A Receber(GFN2), A Pagar(GFN3), Fluxo(GFN4), Fornecedores(GCP1), Pedidos(GCP3), Plano de Contas(GC1), Lançamentos(GC3). Cada um exige tabela existente (guarda via `sqlite_master`).
-
-### 16.5 Configuração (GEBGUI_CFG)
-
-- `GEBGUICONF_SHOW`: exibe seções navegáveis (parametros, alíquota, cadastro rápido, ajuda).
-- `GEBGUICONF_PARAM(cSeccao)`: lê/criaGE4 com padrão da seção (EMISSAO=`ONLINE_FILA`, APURACAO=`AUTO`, PERMITE_DIRETA=`N`, MENTOR=`AVISA_E_LIBERA_COM_BO`).
-- `GEBGUICONF_ALIQ(cNCM)`: mostra alíquota vigente via `ALIQF` + exemplo `CALCIBS(1000)`.
-- `GEBGUICONF_RESUMO()`: dashboard numérico com `GEBNFLX` + `GEBBAL` + `GEBDRE`.
-- `GEBGUICONF_CAD_*`: stubs de cadastro rápido (GE1, GE2, GF1, GCP1, GFN1).
-- `GEBGUIMIG()`: cria tabelas `GEBGUICONFIG_SC` (config string) e `GEBGUICONFIG_LC` (config logical) — usadas como storage complementar.
-
----
+1. **Acesso:** usuário e senha conferidos com Argon2id; 5 erros seguidos bloqueiam a conta; a recusa
+   é sempre genérica ("Credenciais inválidas"), para não revelar se o usuário existe. Senha vencida
+   (90 dias) ou troca pedida pelo ADMIN obrigam a nova senha antes de entrar.
+2. **Empresa e filial:** só as empresas vinculadas ao usuário (o `super` vê todas). Com o catálogo
+   vazio, só o `super` entra, e cria a primeira empresa.
+3. **Menu:** um módulo só aparece se o perfil tem ao menos um item permitido nele; ADMIN da empresa
+   e `super` veem tudo.
+4. **Operação:** cada formulário confere a permissão (menu/item) antes de executar e chama a mesma
+   função de negócio da API REST — a regra vale igual pela tela e pela API.
+5. **Validação:** fica na função de negócio, não na tela. A tela só mostra o resultado: mensagem de
+   sucesso ou o motivo da recusa.
+6. **Dados exibidos:** as tabelas ignoram registros excluídos (`D_E_L_E_T_`), filtram a filial da
+   sessão (exceto empresas e usuários, que são do catálogo), mostram até 500 linhas e nunca exibem
+   colunas de credencial (salt, hash, senha, token).
+7. **Relatórios:** vão para a grade `GBR1` da filial e abrem na página Resultado. Limitação
+   conhecida: dois usuários da mesma filial gerando relatório ao mesmo tempo veem o último gerado.
+8. **Frente de loja:** venda, sangria, suprimento e cancelamento só com o caixa aberto; o cupom com
+   devolução não se cancela (usa-se a devolução); desconto acima de `LOJ_DESC_MAX` exige usuário e
+   senha de um supervisor com a permissão de liberar desconto.
 
 ## 17. Trackers — rastreio ponta a ponta
 

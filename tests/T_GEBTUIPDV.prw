@@ -136,6 +136,8 @@ User Function T_GEBTUIPDV()
     ConOut("  ultima venda: " + aSt[6])
     lOk := Chk(lOk, "troco na venda e carrinho limpo", "R$ 20,00" $ aSt[6] .And. Len(aSt[3]) == 0 .And. Len(aSt[4]) == 0)
 
+    lOk := Chk(lOk, "cancelar cupom inexistente recusado", !GEBLOJCAN("CP99999999", "teste")[1])
+
     // devolucao do cupom da venda (grade de itens: P1 x 1) em vale-troca
     aR := TUIPdvDevolve(aSt, {SubStr(aSt[6], At("CP", aSt[6]), 10), "VALE", "teste", "", "", "", "", "", "", "", "", "", ""}, {{"P1", 1}})
     ConOut("  devolucao: " + BOSTR(aR[2]))

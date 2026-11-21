@@ -1,12 +1,11 @@
 # 05 — Referência Técnica Completa do ERP GEBAN
 
 > **Autor:** Peder Munksgaard · **Data:** 26/09/2026 · **Idioma:** PT-BR
-> **Fontes primárias:** `src/*.prw` (57 arquivos, 386 funções — todas catalogadas na seção 8),
-> `docs/02-regras-negocio.md`, planos e ledgers em `documentacao interna` e `registro interno`.
-> **Estado verificado:** suíte completa **67/67 PASS** contra Postgres sob o
-> runtime **AdvPP advplc v4.3.2** (que inclui a correção `rowid` → `R_E_C_N_O_` do `FWMBrowse`,
-> sem a qual nenhum browse abre em banco remoto). Commits: `cfcf004` (conta super) e `e72582b`
-> (higiene de testes). Sem mocks: todo comportamento abaixo foi lido dos fontes e executado.
+> **Fontes primárias:** `src/*.prw` (83 arquivos, 589 `User Function` — todas catalogadas na seção 8,
+> gerada por `scripts/doc-funcoes.py`), `docs/02-regras-negocio.md`, planos e ledgers em `documentacao interna`.
+> **Estado verificado (21/11/2026):** suíte completa **89/89 PASS** contra Postgres real sob o runtime
+> **AdvPP advplc v4.8.5**. Interface em componentes PO-UI (`src/GEBTUI.prw`), todas as operações
+> em formulários de tela única.
 > PDFs gerados com o template `jmpm` (`md2pdf.py --template jmpm --cover`).
 
 ---
@@ -16,12 +15,12 @@
 O GEBAN é o ERP da fictícia República das Bananias: monolito modular em **AdvPL** (`.prw`,
 encoding CP-1252, `#include "totvs.ch"`, só `User`/`Static Function`, notação húngara) sobre
 **Postgres multi-tenant**, compilado e executado pelo runtime próprio **AdvPP** (`advplc
-check/run/serve/build`). Entrada única: `User Function GEBAN()` em `src/GEBAN.prw`.
+check/run/serve/build`). Entradas: `advplc serve src/GEBTUI.prw` (interface web PO-UI, porta 8081), `advplc run src/GEBWEB.prw` (API REST, porta 8090) e `advplc run src/GEBSCHJOB.prw` (agendador, a cada minuto).
 Ordem de construção dos 9 subprojetos:
 
 ```
 GEB_NUCLEO → GEB_FISCAL → GEB_DERRAMA → GEB_ESTOQ_VENDA → GEB_CONTABIL
-    → GEB_FIN → GEB_COM → GEB_EXPANSAO → GEB_GUI (+ GEB_SEGURANCA e GEB_REST transversais)
+    → GEB_FIN → GEB_COM → GEB_EXPANSAO → GEB_TUI (+ GEB_SEGURANCA e GEB_REST transversais)
 ```
 
 Regra de ouro que atravessa todos os módulos: **nenhum caminho pula o contábil** — toda
@@ -98,7 +97,6 @@ ser validada antes do uso; toda geração fecha com gap analysis.
 | `GEU1` | Unidades | Unidades (`UU`) |
 | `SEC_PERM` | Segurança | RBAC (`PERFIL`, `MENU`, `ITEM`, `PERMITE`) |
 | `SEC_MON` / `SEC_ADMIN_SESSION` | Segurança | Monitor / sessões admin |
-| `GEBGUICONFIG_SC/LC` | GUI | Storage complementar de configuração |
 
 ## 5. Infra de dados e segurança (funções-base)
 
@@ -125,7 +123,7 @@ ser validada antes do uso; toda geração fecha com gap analysis.
   para sempre; `GEBWAPIAUTH` exige token válido + usuário ativo + vínculo com a empresa.
 - Núcleo: `GENMIG` (catálogo+empresa), `GEBCFG`, `GEBAUD` (B.O. em GE3), `GEBMNT`
   (`AVISA_E_TRAVA` / `AVISA_E_LIBERA_COM_BO` / `DESLIGADO`), `GEBFILA` (fila GE5),
-  `GEBMON*` (monitor), `GEBINIC`, `CTBLAN`/`CTBGRV` (partida dobrada + stub compatível).
+  `GEBMON*` (monitor), `CTBLAN`/`CTBGRV` (partida dobrada + stub compatível).
 
 ## 6. Camada HTTP/REST (`GEBREST` + `GEBWEB_API`, 120 funções)
 
@@ -208,702 +206,1036 @@ Compras, Núcleo, Sair. Submenus:
 - **Fiscal** ganhou **+ Nova aliquota (NCM)** (`GEBRESTALISC`: IBS/CBS em %, vigência AAAAMMDD sem sobreposição) — sem alíquota a NCM tributa a zero.
 - Browses `FWMBrowse`: as grades do catálogo (GE1, GEU1, GEF1, GE2) são **somente leitura** (`SetMenuDef("")`, AdvPP 4.4.0-geban); as demais seguem editáveis.
 
-## 8. Referência completa de funções por arquivo (386 funções)
+## 8. Referência completa de funções por arquivo (589 funções)
 
-Assinaturas exatas extraídas dos fontes; propósitos do bloco `Protheus.doc` ou da regra
-de negócio verificada. `Retorna:` indica o `@return` documentado quando existe.
+Gerada por `scripts/doc-funcoes.py` a partir dos fontes: assinatura exata da
+declaração e propósito da primeira linha do `Protheus.doc` (ou do comentário
+logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 
 ### GEB_NUCLEO
 
-**`src/GENUC_MIG.prw`** — 9 funções
+**`src/GEBAUD.prw`** — 5 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GENMIGCatalogo` | `GENMIGCatalogo()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `GENMIGEmpresa` | `GENMIGEmpresa()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `GENMIG` | `GENMIG()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `GEBCFG` | `GEBCFG(cChave)` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGE1` | `CriaGE1()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGE2` | `CriaGE2()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGE3` | `CriaGE3()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGE4` | `CriaGE4()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGE5` | `CriaGE5()` | GENUC_MIG Retorna: .T. se migracao OK, .F. se falhar |
+| `GBAUDINIC` | `GBAUDINIC()` | — |
+| `GBAUDLOG` | `GBAUDLOG(cTabela, cAcao, cRegistro, cUsuario, cEmpresa, cFilial)` | — |
+| `GBAUDLISTAR` | `GBAUDLISTAR(cEmpresa, cInicio, cFim, nMax)` | — |
+| `GBAUDRESUMO` | `GBAUDRESUMO(cEmpresa)` | — |
+| `GBAUDExport` | `GBAUDExport(cEmpresa, cFormato)` | — |
 
-**`src/GENUC_CAD.prw`** — 7 funções
+**`src/GEBDB_CORE.prw`** — 6 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBAUD` | `GEBAUD(cUsuario, cEvento, cMotivo)` | GENUC_CAD Retorna: .T. se gravou/autorizado, .F. caso contrario |
-| `GEBUSR` | `GEBUSR(cCodUser)` | GENUC_CAD Retorna: .T. se gravou/autorizado, .F. caso contrario |
-| `GEBCAD` | `GEBCAD()` | Dispatcher de cadastros do Nucleo. |
-| `CADMenu` | `CADMenu()` | Menu de cadastros (stub). |
-| `GEBCADemp` | `GEBCADemp()` | Stub cadastro de empresa. |
-| `GEBCADusu` | `GEBCADusu()` | Stub cadastro de usuario. |
-| `GEBCADaud` | `GEBCADaud()` | Stub consulta auditoria. |
-
-**`src/GENUC_MNT.prw`** — 5 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBMNT` | `GEBMNT(cEvento)` | GENUC_MNT Retorna: .T. liberado/enfileirado/balanceado, .F. travado ou erro |
-| `GEBFILA` | `GEBFILA(cChave, cPayload)` | GENUC_MNT Retorna: .T. liberado/enfileirado/balanceado, .F. travado ou erro |
-| `CTBLAN` | `CTBLAN(cOrigem, nValor)` | Partida dobrada via GC4 (debito == credito) ou stub. |
-| `CTBGRV` | `CTBGRV(cOrigem, cDeb, cCred, nValor, cTipo)` | Grava lote GC2 + 2 pernas GC3. |
-| `NovoLote` | `NovoLote()` | Gera numero de lote contabil. |
-
-**`src/GEBAUD.prw`** — 9 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GBAUDINIC` | `GBAUDINIC()` | GEBAUD Retorna: string formatada (GBAUDExport) |
-| `GBAUDLOG` | `GBAUDLOG(cTabela, cAcao, cRegistro, cUsuario, cEmpresa, cFilial)` | Grava trilha de auditoria em GE3 (usuario, evento, motivo). |
-| `GBAUDLISTAR` | `GBAUDLISTAR(cEmpresa, cInicio, cFim, nMax)` | Lista trilhas GE3 por empresa e periodo (limite nMax). |
-| `GBAUDRESUMO` | `GBAUDRESUMO(cEmpresa)` | Conta trilhas GE3 por evento (resumo). |
-| `GBAUDExport` | `GBAUDExport(cEmpresa, cFormato)` | Exporta trilhas GE3 em CSV ou JSON. |
-| `IifObj` | `IifObj(xVal, xPadrao)` | Coalescencia Nil (xVal Nil retorna xPadrao). |
-| `StrRep` | `StrRep(cStr, cOld, cNew)` | Substitui ocorrencias (wrapper de StrTran). |
-| `EscCSV` | `EscCSV(cVal)` | Escapa valor para CSV. |
-| `EscJSON` | `EscJSON(cVal)` | Escapa valor para JSON. |
-
-**`src/GEBMON.prw`** — 7 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBMONINIC` | `GEBMONINIC()` | GEBMONINIC Retorna: .T. se sucesso, .F. se erro |
-| `GEBMONATUALIZA` | `GEBMONATUALIZA(cToken, cRotina)` | GEBMONATUALIZA Retorna: void |
-| `GEBMONLISTAR` | `GEBMONLISTAR()` | GEBMONLISTAR Retorna: Array {token, usuario, empresa, filial, ip, loginem, tempoconectado, min, ultimaacao, rotina} |
-| `GEBMONDESLIGAR` | `GEBMONDESLIGAR(cToken)` | GEBMONDESLIGAR Retorna: .T. se sucesso, .F. se token invalido |
-| `GEBMONMETRICAS` | `GEBMONMETRICAS()` | GEBMONMETRICAS Retorna: Object {nUsuariosOnline, nEmpresasAtivas, nReqPorSeg, gargalos} |
-| `GEBMONUNICO` | `GEBMONUNICO(aArr)` | GEBMONUNICO Retorna: Array unico |
-| `GEBMONROTINA` | `GEBMONROTINA(cToken)` | GEBMONROTINA Retorna: cRotina Nome da rotina ("" se nao encontrado) |
-
-**`src/GEBINIC.prw`** — 1 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBINIC` | `GEBINIC()` | GEBINIC Retorna: .T. se o catalogo foi provisionado com sucesso, .F. caso |
-
-**`src/GEBDB_CORE.prw`** — 4 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBDBTableExists` | `GEBDBTableExists(cTabela)` | GEBDB_CORE |
-| `GEBDBTableExistsHere` | `GEBDBTableExistsHere(cTabela)` | GEBDB_CORE |
-| `GEBDBColumnExists` | `GEBDBColumnExists(cTabela, cColuna)` | GEBDB_CORE |
-| `GEBDBTableEnsure` | `GEBDBTableEnsure(cTabela, cDDL, aColsObrigatorias)` | GEBDB_CORE |
+| `GEBDBQuote` | `GEBDBQuote(xVal)` | em quem chama. |
+| `GEBDBTableExists` | `GEBDBTableExists(cTabela)` | use GEBDBTableExistsHere(). |
+| `GEBDBTableExistsHere` | `GEBDBTableExistsHere(cTabela)` | schema do tenant -- mascarando a necessidade de cria-la ali. |
+| `GEBDBColumnExists` | `GEBDBColumnExists(cTabela, cColuna)` | GEBDBColumnExists(cTabela, cColuna) -> .T./.F. |
+| `GEBDBTableEnsure` | `GEBDBTableEnsure(cTabela, cDDL, aColsObrigatorias)` | as que faltarem (tabela ja existente) sao adicionadas como TEXT. |
+| `GEBDBMoedaFix` | `GEBDBMoedaFix()` | Migracao: rodar uma vez por empresa (ver o runbook de operacao (interno)), nao a cada login. |
 
 **`src/GEBDB_TENANT.prw`** — 7 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBDBConecta` | `GEBDBConecta()` | GEBDB_TENANT |
-| `GEBDBSchemaValido` | `GEBDBSchemaValido(cCod)` | GEBDB_TENANT |
-| `IsAlphaNumUnder` | `IsAlphaNumUnder(cTxt)` | GEBDB_TENANT |
-| `GEBDBSchemaExists` | `GEBDBSchemaExists(cCod)` | GEBDB_TENANT |
-| `GEBDBSetTenant` | `GEBDBSetTenant(cCod)` | GEBDB_TENANT |
-| `GEBDBProvisionaCatalogo` | `GEBDBProvisionaCatalogo()` | GEBDB_TENANT |
-| `GEBDBProvisionaEmpresa` | `GEBDBProvisionaEmpresa(cCod, cNome)` | GEBDB_TENANT |
+| `GEBDBConecta` | `GEBDBConecta()` | — |
+| `GEBDBSchemaValido` | `GEBDBSchemaValido(cCod)` | — |
+| `GEBDBSchemaExists` | `GEBDBSchemaExists(cCod)` | entao GEBDBSetTenant() precisa desta checagem antes de trocar. |
+| `GEBDBTenantAtual` | `GEBDBTenantAtual()` | emp_<cod>), ou "" fora de uma empresa (catalogo/public). |
+| `GEBDBSetTenant` | `GEBDBSetTenant(cCod)` | — |
+| `GEBDBProvisionaCatalogo` | `GEBDBProvisionaCatalogo()` | — |
+| `GEBDBProvisionaEmpresa` | `GEBDBProvisionaEmpresa(cCod, cNome)` | esta funcao de novo para o mesmo cCod sem duplicar o cadastro. |
 
-**`src/_init.prw`** — 1 funções
+**`src/GEBFIL_MIG.prw`** — 3 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `TEST_INIT` | `TEST_INIT()` | Bootstrap de tabelas para testes (helper _init). |
+| `GEFFILMIG` | `GEFFILMIG()` | — |
+| `GEFFILVALIDA` | `GEFFILVALIDA(cEmp, cFil)` | Valida codigo de filial EEUUFF contra a empresa (puro, sem I/O). |
+| `GEFFILUNI` | `GEFFILUNI(cFil)` | Extrai a unidade de negocios (UU, posicoes 3-4) do codigo EEUUFF. |
+
+**`src/GEBMON.prw`** — 6 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBMONINIC` | `GEBMONINIC()` | Inicializa a tabela SEC_MON (monitoramento) se nao existir. |
+| `GEBMONATUALIZA` | `GEBMONATUALIZA(cToken, cRotina)` | Atualiza ultima acao e rotina do token na SEC_MON. |
+| `GEBMONLISTAR` | `GEBMONLISTAR()` | Lista todos os usuarios monitorados. |
+| `GEBMONDESLIGAR` | `GEBMONDESLIGAR(cToken)` | Remove da SEC_MON e encerra sessao via GEBSECTOKENDEL. |
+| `GEBMONMETRICAS` | `GEBMONMETRICAS()` | Calcula metricas em tempo real. |
+| `GEBMONROTINA` | `GEBMONROTINA(cToken)` | Retorna o nome da rotina em execucao para o token informado. |
+
+**`src/GEBSCH.prw`** — 10 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBSCHROTINAS` | `GEBSCHROTINAS()` | GEBSCHROTINAS() -> lista publica de rotinas {codigo, descricao} (para a tela). |
+| `GEBSCHROTINAOK` | `GEBSCHROTINAOK(cCod)` | GEBSCHROTINAOK(cCod) -> .T. se a rotina esta na lista fechada. |
+| `GEBSCHVALIDA` | `GEBSCHVALIDA(cHora, cDia)` | GEBSCHVALIDA(cHora, cDia) -> .T. se horario HHMM e dia "D" ou "M01".."M28" sao validos. |
+| `GEBSCHDEVE` | `GEBSCHDEVE(cHoje, cHoraAgora, cDia, cHora, cUltExec)` | Funcao pura: sem relogio, sem banco. cHoje e cUltExec em AAAAMMDD; horarios em HHMM. |
+| `GEBSCHMIG` | `GEBSCHMIG()` | Cria as tabelas de agendamento no tenant corrente (idempotente). |
+| `GEBSCHAGENDA` | `GEBSCHAGENDA(cUsuLog, cRotina, cHora, cDia, cAtivo)` | GEBSCHAGENDA(cUsuLog, cRotina, cHora, cDia, cAtivo) -> {lOk, cMsg}. Cria ou altera o agendamento. |
+| `GEBSCHDESATIVA` | `GEBSCHDESATIVA(cUsuLog, cRotina)` | GEBSCHDESATIVA(cUsuLog, cRotina) -> {lOk, cMsg}. Desliga sem mexer no horario. |
+| `GEBSCHEXEC` | `GEBSCHEXEC(cRot)` | Executa uma rotina da lista fechada. Devolve {lOk, cMsg}. |
+| `GEBSCHRODA` | `GEBSCHRODA()` | Roda os agendamentos devidos do tenant corrente. Devolve quantas rotinas rodaram. |
+| `GEBSCHALL` | `GEBSCHALL()` | Roda o agendador em todas as empresas provisionadas (chamado pelo timer a cada minuto). |
+
+**`src/GEBSCHJOB.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBSCHJOB` | `GEBSCHJOB()` | Executor do agendador. |
+
+**`src/GEBUNI_MIG.prw`** — 2 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEUNIMIG` | `GEUNIMIG()` | — |
+| `GEUVALIDA` | `GEUVALIDA(cUni)` | Valida codigo de unidade (UU): 2 chars alfanumericos+underscore. |
+
+**`src/GENUC_CAD.prw`** — 3 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBAUD` | `GEBAUD(cUsuario, cEvento, cMotivo)` | — |
+| `GEBUSR` | `GEBUSR(cCodUser)` | — |
+| `GEBCAD` | `GEBCAD()` | — |
+
+**`src/GENUC_MIG.prw`** — 5 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GENMIGCatalogo` | `GENMIGCatalogo()` | — |
+| `GENMIGEmpresa` | `GENMIGEmpresa()` | — |
+| `GENMIG` | `GENMIG()` | — |
+| `GEBCFG` | `GEBCFG(cChave)` | — |
+| `GEBREGIME` | `GEBREGIME()` | Regime tributario da empresa: SIMPLES ou REGULAR. |
+
+**`src/GENUC_MNT.prw`** — 4 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBMNT` | `GEBMNT(cEvento)` | — |
+| `GEBFILA` | `GEBFILA(cChave, cPayload)` | — |
+| `CTBLAN` | `CTBLAN(cOrigem, nValor)` | — |
+| `CTBGRV` | `CTBGRV(cOrigem, cDeb, cCred, nValor, cTipo)` | — |
 
 ### GEB_FISCAL
 
-**`src/GEBFIS_MIG.prw`** — 9 funções
+**`src/GEBFIS_APU.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBFMIG` | `GEBFMIG()` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `CALCIBS` | `CALCIBS(nBase, nAliqIBS, nAliqCBS)` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `ALIQF` | `ALIQF(cNCM, dData)` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `CriaGF1` | `CriaGF1()` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `CriaGF2` | `CriaGF2()` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `CriaGF3` | `CriaGF3()` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `CriaGF4` | `CriaGF4()` | GEBFIS_MIG Retorna: .T. se migracao OK, .F. se falhar (GEBFMIG); array {nIBS, nCBS} (CALCIBS/ALIQF) |
-| `CriaGF5` | `CriaGF5()` | DDL idempotente da tabela GF5 (apuracao). |
-| `CriaGF6` | `CriaGF6()` | DDL idempotente da tabela GF6 (creditos). |
+| `GEBFAPU` | `GEBFAPU(cComp)` | — |
+| `GEBFCRE` | `GEBFCRE(cComp, cOrig, nValor, cTipo)` | — |
 
 **`src/GEBFIS_CAD.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBFPRO` | `GEBFPRO(cCod)` | GEBFIS_CAD Retorna: Array {COD, NCM, DESC} ou {} (GEBFPRO); array {IBS, CBS} (GEBFALI) |
-| `GEBFALI` | `GEBFALI(cNCM, dData)` | GEBFIS_CAD Retorna: Array {COD, NCM, DESC} ou {} (GEBFPRO); array {IBS, CBS} (GEBFALI) |
+| `GEBFPRO` | `GEBFPRO(cCod)` | — |
+| `GEBFALI` | `GEBFALI(cNCM, dData)` | — |
 
-**`src/GEBFIS_EMI.prw`** — 4 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBFEMI` | `GEBFEMI(cChave, cCod, nQtd, nPreco)` | GEBFIS_EMI Retorna: Status AUTORIZADA ou EM_FILA (GEBFEMI); array de parcelas (GEBFSPL) |
-| `GEBFSPL` | `GEBFSPL(nTotal, nPartes)` | Divide total em N parcelas (ultima ajusta residuo). |
-| `GrvGF3` | `GrvGF3(cChave, nBase, nIBS, nCBS, cStatus)` | Grava header GF3 da nota. |
-| `GrvGF4` | `GrvGF4(cChave, cCod, nQtd, nPreco, nBase, nIBS, nCBS)` | Grava item GF4 da nota. |
-
-**`src/GEBFIS_APU.prw`** — 7 funções
+**`src/GEBFIS_EMI.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBFAPU` | `GEBFAPU(cComp)` | GEBFIS_APU Retorna: .T. se apurou/gravou, .F. se tabelas ausentes (ambas) |
-| `GEBFCRE` | `GEBFCRE(cComp, cOrig, nValor, cTipo)` | Credito GF6 TRANSF ou RESSARC (sem lastro nega). |
-| `RegimeGE1` | `RegimeGE1()` | Deduz SIMPLES ou REGULAR pelo nome da empresa. |
-| `ChavesComp` | `ChavesComp(cComp)` | Chaves GF3 da competencia AAAAMM. |
-| `SomaGF4` | `SomaGF4(aChaves)` | Soma IBS+CBS dos itens das chaves. |
-| `BaixaGF5` | `BaixaGF5(cComp)` | Baixa logica das apuracoes ativas da competencia. |
-| `GrvGF5` | `GrvGF5(cComp, nDeb, nCred, nSaldo, cRegime)` | Grava linha GF5 (debito, credito, saldo, regime). |
+| `GEBFEMI` | `GEBFEMI(cChave, cCod, nQtd, nPreco)` | — |
+| `GEBFSPL` | `GEBFSPL(nTotal, nPartes)` | — |
+
+**`src/GEBFIS_MIG.prw`** — 3 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBFMIG` | `GEBFMIG()` | — |
+| `CALCIBS` | `CALCIBS(nBase, nAliqIBS, nAliqCBS)` | — |
+| `ALIQF` | `ALIQF(cNCM, dData)` | — |
+
+**`src/GEBRET.prw`** — 5 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBRETMIG` | `GEBRETMIG()` | Cria GRT1 e GRT2. |
+| `GEBRETCAD` | `GEBRETCAD(cCod, cTrib, nAliq, cDesc)` | Cadastra ou altera uma regra de retencao. |
+| `GEBRETVAL` | `GEBRETVAL(xCod)` | Valida os codigos de retencao de um documento (lista ou texto separado por virgula): existem e no maximo um por tributo. |
+| `GEBRETAPL` | `GEBRETAPL(cDoc, cForn, nBase, aReg, cData, aTit)` | Aplica as retencoes validadas a um documento de entrada: grava GRT2, abate o valor dos titulos do fornecedor (aTit, na ordem), contabiliza RET_FORN e acumula a guia da Derrama... |
+| `GEBRETREL` | `GEBRETREL(cComp)` | Relatorio: retencoes da competencia por documento e tributo, com a guia. |
+
+**`src/GEBSN.prw`** — 13 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBSNMIG` | `GEBSNMIG()` | — |
+| `GEBSNCALC` | `GEBSNCALC(nRBT12, cAnexo, nRecMes)` | Calculo puro (sem banco) de uma receita sem ST/monofasico/exportacao. |
+| `GEBSNREPART` | `GEBSNREPART(nRBT12, cAnexo, nRec, lST, lMono, lExp)` | Calculo puro com reparticao por tributo. |
+| `GEBSNCFG` | `GEBSNCFG(cAnexo, cInicio)` | Grava o Anexo padrao (I..V ou FR) e o mes de inicio de atividade (AAAAMM ou vazio) da empresa corrente em GE4 (SN_ANEXO / SN_INICIO). |
+| `GEBSNATV` | `GEBSNATV(cCod, cDesc, cAnexo)` | Cadastra ou altera uma atividade (codigo, descricao, Anexo I..V ou FR). |
+| `GEBSNPRD` | `GEBSNPRD(cProd, cAtiv, cST, cMono)` | Liga um produto (GF1) a uma atividade e marca ST e monofasico (S/N). |
+| `GEBSNEXP` | `GEBSNEXP(cChave, cExp)` | Marca (S) ou desmarca (N) uma nota (GF3_CHAVE) como exportacao. |
+| `GEBSNFER` | `GEBSNFER(cData, cDesc)` | Cadastra um feriado (municipal/estadual/bancario) AAAAMMDD para o vencimento do DAS. |
+| `GEBSNFOL` | `GEBSNFOL(cComp, nFolha, nRecExt, cAtiv)` | Informa a folha de salarios (com pro-labore e encargos, para o Fator R) e a receita de fora do GEBAN de uma competencia. |
+| `GEBSNAPU` | `GEBSNAPU(cComp)` | Apura o Simples Nacional da competencia, grava GSN2 (resumo) e GSN4 (por atividade/tipo/tributo), refazendo o mes. |
+| `GEBSNVENC` | `GEBSNVENC(cComp, nDia)` | Vencimento de tributo da competencia: dia nDia (padrao 20; 1 a 28) do mes seguinte; sabado, domingo e feriado passam para o proximo dia util. |
+| `GEBSNEXTRATO` | `GEBSNEXTRATO(cComp)` | Relatorio: extrato da apuracao de uma competencia (resumo, receita por atividade/tipo com a reparticao por tributo, totais por tributo e situacao da guia). |
+| `GEBSNANUAL` | `GEBSNANUAL(cAno)` | Relatorio: acompanhamento do ano-calendario (mes a mes: receita, RBT12, aliquota, DAS, guia; receita acumulada contra o sublimite de 3.600.000 e o limite de 4.800.000). |
+
+### GEB_DFE (documentos eletronicos)
+
+**`src/GEBDFE.prw`** — 14 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEURL` | `GEBDFEURL(cMod, cUF, cAmb, cServ)` | Endereco do servico. |
+| `GEBDFEENVIA` | `GEBDFEENVIA(cMod, cUF, cAmb, cServ, cMsg)` | Envia a mensagem ao servico (SOAP 1.2, certificado da filial). |
+| `GEBDFERESPTEC` | `GEBDFERESPTEC()` | Responsavel tecnico (opcional; algumas UFs exigem). |
+| `GEBDFENFCE` | `GEBDFENFCE(cDoc, aItens, aPag, cCPF)` | NFC-e da venda. |
+| `GEBDFEDOC` | `GEBDFEDOC(cChave)` | Documento (GDF5) pela chave: {status, prot, xml, dhaut, mod, serie, nnf, tpamb, doc, chorig, xmlorig, qr, urlch, vnf, dhemi, dest} ou {}. |
+| `GEBDFETRANSMITE` | `GEBDFETRANSMITE()` | Transmite as NFC-e em contingencia. |
+| `GEBDFECONSULTAR` | `GEBDFECONSULTAR(cChave, lAtualiza)` | Situacao do documento na SEFAZ (consSitNFe). |
+| `GEBDFECANCELA` | `GEBDFECANCELA(cChave, cJust)` | Cancela a NF-e/NFC-e autorizada (evento 110111) dentro de DFE_CANC_MIN minutos (padrao 30) da autorizacao. |
+| `GEBDFEINUTILIZA` | `GEBDFEINUTILIZA(cMod, nSerie, nIni, nFim, cJust)` | Inutiliza a faixa de numeros (nIni a nFim) do modelo/serie. |
+| `GEBDFEPENDINUT` | `GEBDFEPENDINUT()` | Numeros rejeitados ainda nao inutilizados: {{cMod, nSerie, nNNF}...}. |
+| `GEBDFEINUTPEND` | `GEBDFEINUTPEND(cJust)` | Inutiliza todos os numeros pendentes (um pedido por numero). |
+| `GEBDFESTATSVC` | `GEBDFESTATSVC(cMod)` | Status do servico de autorizacao (consStatServ) do modelo. |
+| `GEBDFEROTEIRO` | `GEBDFEROTEIRO(lTestar)` | O que falta para emitir NFC-e (e o que precisa de atencao), na ordem em que o lojista deve resolver. |
+| `GEBDFEDOCS` | `GEBDFEDOCS(cIni, cFim, cStatus)` | Relatorio dos documentos do periodo (grade BOREL): numero, chave, situacao, valor, protocolo, motivo. |
+
+**`src/GEBDFE_CAD.prw`** — 16 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFECADMIG` | `GEBDFECADMIG()` | — |
+| `GEBDFEDOCOK` | `GEBDFEDOCOK(cDoc)` | CPF (11) ou CNPJ (14) com digitos verificadores; recusa digitos repetidos. |
+| `GEBDFEMUNNOME` | `GEBDFEMUNNOME(cCod)` | Nome do municipio pelo codigo IBGE ("" se nao existir). |
+| `GEBDFEMUNBUSCA` | `GEBDFEMUNBUSCA(cTexto, cUF)` | Municipios da UF cujo nome contem cTexto (sem acento, maiusculas): {{codigo, nome}...}. |
+| `GEBDFEEMIT` | `GEBDFEEMIT(o)` | Grava o emitente da filial. |
+| `GEBDFEEMITLE` | `GEBDFEEMITLE()` | Emitente da filial no formato do montador de XML (EMIT de GEBDFEMONTA), ou Nil se nao houver. |
+| `GEBDFECERTDIR` | `GEBDFECERTDIR()` | Pasta dos certificados da empresa/filial corrente. |
+| `GEBDFECERT` | `GEBDFECERT(cPfxB64, cSenha)` | Instala o certificado A1 da filial. |
+| `GEBDFECERTLE` | `GEBDFECERTLE()` | Certificado instalado da filial. |
+| `GEBDFEPRODFIS` | `GEBDFEPRODFIS(o)` | Perfil fiscal do produto (GDF4). |
+| `GEBDFEPRODITEM` | `GEBDFEPRODITEM(cProd, lSimples)` | Item do XML (ITENS de GEBDFEMONTA) do produto: GF1 + perfil (GDF4) + padroes da empresa; GTIN do cadastro de codigos de barras da loja (GLJ8) quando o perfil nao tiver. |
+| `GEBDFECONFIG` | `GEBDFECONFIG(o)` | Configuracao dos documentos eletronicos da empresa (parametros DFE_*). |
+| `GEBDFEPROXNUM` | `GEBDFEPROXNUM(cMod, nSerie)` | Proximo numero do modelo/serie (GBS1). |
+| `GEBDFESETNUM` | `GEBDFESETNUM(cMod, nSerie, nProximo)` | Ajusta a numeracao para que o proximo seja nProximo. |
+| `GEBDFEIBPTIMP` | `GEBDFEIBPTIMP(cConteudo, cUF)` | Importa a tabela do IBPT (Lei 12.741/2012, "De Olho no Imposto"): o CSV oficial da UF (codigo;ex;tipo;descricao;nacionalfederal;importadosfederal;... |
+| `GEBDFETRIB` | `GEBDFETRIB(aIt, cUF, cCRT, cData)` | Completa os itens antes do XML: tributos aproximados (Lei 12.741, tabela IBPT da UF do emitente: federal nacional ou importado pela origem, estadual e municipal) e, se... |
+
+**`src/GEBDFE_DANFE.prw`** — 2 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEDANFE` | `GEBDFEDANFE(cChave)` | DANFE em HTML: NFC-e (80 mm) ou, para modelo 55, o A4 (GEBDFEDANFE55). |
+| `GEBDFEDANFETXT` | `GEBDFEDANFETXT(cChave)` | Linhas do DANFE NFC-e (marcadores: "== " titulo, "!! " aviso, "// a/b" linha com valor a direita, "QR " conteudo do QR, "---" linha). |
+
+**`src/GEBDFE_DANFE55.prw`** — 3 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBC128` | `GEBC128(cDig)` | — |
+| `GEBC128SVG` | `GEBC128SVG(cDig, nAltura)` | — |
+| `GEBDFEDANFE55` | `GEBDFEDANFE55(cChave)` | DANFE A4 da NF-e. |
+
+**`src/GEBDFE_DIST.prw`** — 7 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEDISTMIG` | `GEBDFEDISTMIG()` | — |
+| `GEBDFEDISTBUSCA` | `GEBDFEDISTBUSCA()` | Busca as notas novas do CNPJ (a partir do ultimo NSU). |
+| `GEBDFEDISTCHAVE` | `GEBDFEDISTCHAVE(cChave)` | Nota completa de uma chave (consChNFe), depois da ciencia. |
+| `GEBDFEMANIF` | `GEBDFEMANIF(cChave, cTipo, cJust)` | Manifestacao do destinatario. |
+| `GEBDFEDEPARA` | `GEBDFEDEPARA(cForn, cProdForn, cProd, nFator)` | De-para do produto do fornecedor. |
+| `GEBDFEIMPORTA` | `GEBDFEIMPORTA(cChave, cPed, cData)` | Importa a nota recebida (completa) como entrada de compra. |
+| `GEBDFERECEBIDAS` | `GEBDFERECEBIDAS(cSituacao)` | Relatorio das notas recebidas (grade BOREL). |
+
+**`src/GEBDFE_EFD.prw`** — 6 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEEFDMIG` | `GEBDFEEFDMIG()` | — |
+| `GEBDFEEFDVER` | `GEBDFEEFDVER(cComp)` | Versao do leiaute pelo ano da competencia (DFE_EFD_CODVER sobrepoe). |
+| `GEBDFEEFD` | `GEBDFEEFD(cComp, cFin)` | Gera, guarda (GDFG) e devolve a EFD ICMS/IPI da competencia. |
+| `GEBDFEEFDLE` | `GEBDFEEFDLE(cComp)` | Arquivo guardado da competencia ("" se nao gerado). |
+| `GEBDFEEFDTXT` | `GEBDFEEFDTXT(oE, oP, aDocs)` | Monta o arquivo (funcao pura, sem banco). |
+| `GEBDFEEFDBLOCOS` | `GEBDFEEFDBLOCOS(cXml, cTag)` | Blocos <cTag ...>...</cTag> em ordem. |
+
+**`src/GEBDFE_IE.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEIEOK` | `GEBDFEIEOK(cIE, cUF, lIsento)` | — |
+
+**`src/GEBDFE_MUN.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEMUNTAB` | `GEBDFEMUNTAB()` | — |
+
+**`src/GEBDFE_NFE.prw`** — 11 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFENFEMIG` | `GEBDFENFEMIG()` | — |
+| `GEBDFEPART` | `GEBDFEPART(o)` | Cadastro fiscal do cliente (TIPO C, codigo da GFT1) ou do fornecedor (TIPO F, codigo da GCP1). |
+| `GEBDFEPARTLE` | `GEBDFEPARTLE(cTipo, cCod)` | Destinatario do XML (DEST de GEBDFEMONTA) ou Nil. |
+| `GEBDFEVINC` | `GEBDFEVINC(cTipo, cDoc, cPart, cChave)` | Vinculo de chave (ENT: NF-e do fornecedor da entrada; DEVCLI: NF-e de devolucao do cliente). |
+| `GEBDFEVINCLE` | `GEBDFEVINCLE(cTipo, cDoc, cPart)` | — |
+| `GEBDFEALIQINT` | `GEBDFEALIQINT(cUF)` | Aliquota interna modal do ICMS da UF (padrao: tabela publicada em 2026; DFE_ALIQ_INT_<UF> sobrepoe). |
+| `GEBDFEFCPPAD` | `GEBDFEFCPPAD(cUF)` | FCP geral do destino (RJ 2%, SE 1%; nas demais UFs o FCP e' por produto e fica no parametro). |
+| `GEBDFEALIQINTER` | `GEBDFEALIQINTER(cUFOrig, cUFDest, cOrigem)` | Aliquota interestadual do ICMS (Res. Senado 22/1989 e 13/2012). |
+| `GEBDFENFE` | `GEBDFENFE(oP)` | Emite a NF-e (modelo 55). |
+| `GEBDFERESOLVE` | `GEBDFERESOLVE()` | Resolve as NF-e PENDENTE (sem resposta da SEFAZ): consulta cada chave. |
+| `GEBDFECCE` | `GEBDFECCE(cChave, cTexto)` | Carta de correcao (evento 110110) da NF-e autorizada; texto de 15 a 1000 letras; ate 20 por nota (cada uma substitui a anterior). |
+
+**`src/GEBDFE_NFSE.prw`** — 11 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFENFSEMIG` | `GEBDFENFSEMIG()` | — |
+| `GEBDFESERV` | `GEBDFESERV(o)` | Servico fiscal. |
+| `GEBDFENFSEURL` | `GEBDFENFSEURL()` | Base das APIs: {cSefin, cAdn}. |
+| `GEBDFEDPSID` | `GEBDFEDPSID(cMun, cDoc, nSerie, nNum)` | Id da DPS: "DPS" + municipio (7) + tipo de inscricao (1 CPF, 2 CNPJ) + inscricao (14) + serie (5) + numero (15). |
+| `GEBDFEDPSXML` | `GEBDFEDPSXML(oD)` | XML da DPS (sem assinatura). |
+| `GEBDFENFSE` | `GEBDFENFSE(oP)` | Emite a NFS-e. |
+| `GEBDFENFSECANC` | `GEBDFENFSECANC(cChave, cMotivo, cTexto)` | Cancela a NFS-e (evento e101101). |
+| `GEBDFEPEDCANC` | `GEBDFEPEDCANC(cChave, cTpAmb, cDh, cCNPJ, cMotivo, cTexto)` | Pedido de registro do evento de cancelamento (e101101), sem assinatura. |
+| `GEBDFENFSERESOLVE` | `GEBDFENFSERESOLVE()` | DPS sem resposta (PENDENTE): consulta o Id da DPS na Sefin. |
+| `GEBDFEDANFSE` | `GEBDFEDANFSE(cChave)` | DANFSe oficial (PDF) da NFS-e, baixado do ADN com o certificado. |
+| `GEBFATSERV` | `GEBFATSERV(cCli, cServ, nValor, cDescricao, cCond, cData, lRetido, nDesc)` | Faturamento de servico: NFS-e (se DFE_NFSE = S), livro fiscal (GF3/GF4 tipo NFE, para o Simples e a apuracao), titulos a receber pela condicao e receita no contabil... |
+
+**`src/GEBDFE_QR.prw`** — 2 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBQRMATRIZ` | `GEBQRMATRIZ(cTexto, nMascara)` | — |
+| `GEBQRSVG` | `GEBQRSVG(cTexto, nModulo)` | QR Code em SVG (um retangulo por trecho escuro de cada linha). |
+
+**`src/GEBDFE_WS.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEWSTAB` | `GEBDFEWSTAB()` | — |
+
+**`src/GEBDFE_XML.prw`** — 31 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDFEUFS` | `GEBDFEUFS()` | {sigla, codigo IBGE, fuso} |
+| `GEBDFECUF` | `GEBDFECUF(cUF)` | Codigo IBGE da UF ("" se nao existir). |
+| `GEBDFEUFSIG` | `GEBDFEUFSIG(cCod)` | — |
+| `GEBDFEFUSO` | `GEBDFEFUSO(cUF)` | — |
+| `GEBDFEAGORA` | `GEBDFEAGORA(cUF, cUTC)` | Data e hora local da UF calculadas do UTC (DateTimeUTC), qualquer que seja o fuso do servidor. |
+| `GEBDFEDV` | `GEBDFEDV(c43)` | DV modulo 11 da chave (pesos 2 a 9 da direita; resto 0 ou 1 => 0). |
+| `GEBDFECHAVE` | `GEBDFECHAVE(cCUF, cAAMM, cCNPJ, cMod, nSerie, nNF, cTpEmis, cCNF)` | Chave de acesso: cUF AAMM CNPJ mod serie nNF tpEmis cNF DV (44 digitos). |
+| `GEBDFECNF` | `GEBDFECNF(nNF)` | Codigo numerico aleatorio de 8 digitos, diferente do numero da nota. |
+| `GEBDFEDIG` | `GEBDFEDIG(c)` | So os digitos. |
+| `GEBDFETXT` | `GEBDFETXT(cTxt, nMax)` | Texto para o XML: troca letras acentuadas (UTF-8) pela letra sem acento, tira o que nao for ASCII imprimivel, junta espacos repetidos, apara, corta em nMax e escapa &, < e >... |
+| `GEBDFEESC` | `GEBDFEESC(c)` | — |
+| `GEBDFEN` | `GEBDFEN(nVal, nDec)` | Numero com ponto e nDec casas. |
+| `GEBDFEMONTA` | `GEBDFEMONTA(oNF)` | Monta o <NFe> (sem infNFeSupl e sem assinatura). |
+| `GEBDFESUPL` | `GEBDFESUPL(cXml, cQR, cUrlChave)` | Insere <infNFeSupl> (QR Code e URL de consulta da NFC-e) depois do infNFe. |
+| `GEBDFEBLOCO` | `GEBDFEBLOCO(cXml, cTag)` | Trecho do elemento cTag (da abertura ate o fechamento). |
+| `GEBDFEDIGEST` | `GEBDFEDIGEST(cXml, cTag)` | (NF-e: portalfiscal; NFS-e nacional: sped.fazenda.gov.br/nfse). |
+| `GEBDFECERTB64` | `GEBDFECERTB64(cPem)` | Corpo do certificado (Base64 do DER) a partir do PEM. |
+| `GEBDFEASSINA` | `GEBDFEASSINA(cXml, cTag, cRaiz, cKeyPem, cCertPem)` | Assinatura XMLDSig envelopada do elemento cTag (que tem o atributo Id), inserida antes do fechamento de cRaiz. |
+| `GEBDFEQRCODE` | `GEBDFEQRCODE(oQ)` | Conteudo do QR Code da NFC-e. |
+| `GEBDFELOTE` | `GEBDFELOTE(cNFe, cIdLote)` | Lote de autorizacao sincrono com uma nota. |
+| `GEBDFESTATUS` | `GEBDFESTATUS(cTpAmb, cCUF)` | — |
+| `GEBDFECONSULTA` | `GEBDFECONSULTA(cTpAmb, cChave)` | — |
+| `GEBDFEEVCANC` | `GEBDFEEVCANC(cChave, cCNPJ, cTpAmb, cProt, cJust, cDh, nSeq)` | Evento de cancelamento (110111), sem assinatura. |
+| `GEBDFEEVCCE` | `GEBDFEEVCCE(cChave, cCNPJ, cTpAmb, cTexto, cDh, nSeq)` | Carta de correcao (110110), sem assinatura. Texto da condicao de uso: o do schema (sem acento). |
+| `GEBDFEDISTMSG` | `GEBDFEDISTMSG(cTpAmb, cCUF, cCNPJ, cUltNSU, cChave)` | Pedido de distribuicao de DF-e (1.01): por ultimo NSU ou por chave (cChave preenchida). |
+| `GEBDFEEVMANIF` | `GEBDFEEVMANIF(cChave, cCNPJ, cTpAmb, cTpEvento, cDesc, cJust, cDh)` | Manifestacao do destinatario (2102xx), sem assinatura; cOrgao 91 (Ambiente Nacional). |
+| `GEBDFELOTEEV` | `GEBDFELOTEEV(cEvento, cIdLote)` | — |
+| `GEBDFEINUT` | `GEBDFEINUT(cTpAmb, cCUF, cAno, cCNPJ, cMod, nSerie, nIni, nFim, cJust)` | Inutilizacao de faixa de numeros, sem assinatura. |
+| `GEBDFESOAP` | `GEBDFESOAP(cOperacao, cMsg)` | Envelope SOAP 1.2 do servico (cOperacao: NFeAutorizacao4, NFeStatusServico4...). |
+| `GEBDFETAG` | `GEBDFETAG(cXml, cTag)` | Conteudo da primeira ocorrencia de cTag (com ou sem prefixo de namespace); "" se nao houver. |
+| `GEBDFEPROC` | `GEBDFEPROC(cNFe, cProt)` | nfeProc (documento autorizado): NFe assinada + protNFe do retorno. |
 
 ### GEB_DERRAMA
-
-**`src/GEBDER_MIG.prw`** — 4 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBDMIG` | `GEBDMIG()` | GEBDER_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGD1` | `CriaGD1()` | GEBDER_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGD2` | `CriaGD2()` | GEBDER_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGD3` | `CriaGD3()` | GEBDER_MIG Retorna: .T. se migracao OK, .F. se falhar |
-
-**`src/GEBDER_GUI.prw`** — 1 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBDGER` | `GEBDGER(cComp)` | GEBDER_GUI: guia do IBS/CBS (GD mais cComp) com titulo no financeiro (`GEBDERGUIA`); regime Simples nao gera. Retorna o codigo da guia gravada ou vazio |
-
-**`src/GEBDER_COB.prw`** — 3 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBDJUR` | `GEBDJUR(cGuia, nDias)` | GEBDER_COB Retorna: .T.-.F. para GEBDPAR e GEBDPRO |
-| `GEBDPAR` | `GEBDPAR(cGuia, nParc)` | GEBDER_COB Retorna: .T.-.F. para GEBDPAR e GEBDPRO |
-| `GEBDPRO` | `GEBDPRO(cGuia)` | Protesto: grava GD3 PROTESTO/ABERTA e marca guia PROTESTADA. |
 
 **`src/GEBDER_BAI.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBDBAI` | `GEBDBAI(cGuia[, cConta, cData])` | GEBDER_BAI: paga a guia pelo financeiro (`GEBDERPAGA`, conta padrao `DER_CONTA`/CAIXA). Retorna .T. se pagou (ou ja estava baixada) |
+| `GEBDBAI` | `GEBDBAI(cGuia, cConta, cData)` | — |
+
+**`src/GEBDER_COB.prw`** — 3 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDJUR` | `GEBDJUR(cGuia, nDias)` | — |
+| `GEBDPAR` | `GEBDPAR(cGuia, nParc)` | — |
+| `GEBDPRO` | `GEBDPRO(cGuia)` | — |
+
+**`src/GEBDER_GUI.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDGER` | `GEBDGER(cComp)` | — |
+
+**`src/GEBDER_MIG.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDMIG` | `GEBDMIG()` | — |
 
 ### GEB_ESTOQ_VENDA
 
-**`src/GEBV_MIG.prw`** — 4 funções
+**`src/GEBV_EST.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBVMIG` | `GEBVMIG()` | GEBV_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGV1` | `CriaGV1()` | GEBV_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGV2` | `CriaGV2()` | GEBV_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGV3` | `CriaGV3()` | GEBV_MIG Retorna: .T. se migracao OK, .F. se falhar |
+| `GEBVEST` | `GEBVEST(cProd, nQtd)` | — |
+| `GEBVESTGV1` | `GEBVESTGV1(cProd, nQtd)` | Atualiza so' o saldo antigo GV1 (uso interno do GEBESTMOV, que mantem GES1/GES2 e chama esta funcao para as telas antigas). |
 
-**`src/GEBV_EST.prw`** — 1 funções
+**`src/GEBV_FIA.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBVEST` | `GEBVEST(cProd, nQtd)` | GEBV_EST Retorna: Novo saldo em GV1, 0 se bloqueado por guarda |
+| `GEBVFIA` | `GEBVFIA(cCli, nValor)` | — |
+| `GEBVJUR` | `GEBVJUR(cCli, nDias)` | — |
 
-**`src/GEBV_VEN.prw`** — 2 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBVVEN` | `GEBVVEN(cVenda, cProd, nQtd, nPreco)` | GEBV_VEN: venda a vista (estoque com custo + CMV, nota, titulo recebido no CAIXA). Retorna: VENDIDA ou BLOQUEADA ou SEM_ESTOQUE |
-| `TemFiscal` | `TemFiscal()` | Diz se ha contexto fiscal (GF1/GF3) para integrar venda. |
-
-**`src/GEBV_FIA.prw`** — 3 funções
+**`src/GEBV_MIG.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBVFIA` | `GEBVFIA(cCli, nValor)` | GEBV_FIA: fiado com limite + titulo a receber FIA-<registro> e receita. Retorna: .T. se abriu, .F. se bloqueado |
-| `GEBVJUR` | `GEBVJUR(cCli, nDias)` | GEBV_FIA Retorna: .T. se abriu, .F. se bloqueado (GEBVFIA); soma dos totais (GEBVJUR) |
-| `SomaAberto` | `SomaAberto(cCli, cFil)` | Soma em aberto do cliente em GV3. |
+| `GEBVMIG` | `GEBVMIG()` | — |
+
+**`src/GEBV_VEN.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBVVEN` | `GEBVVEN(cVenda, cProd, nQtd, nPreco)` | — |
 
 ### GEB_CONTABIL
 
-**`src/GEBCTB_MIG.prw`** — 7 funções
+**`src/GEBCTB_BAL.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBCMIG` | `GEBCMIG()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGC1` | `CriaGC1()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGC2` | `CriaGC2()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGC3` | `CriaGC3()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGC4` | `CriaGC4()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `SeedGC1` | `SeedGC1()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `SeedGC4` | `SeedGC4()` | GEBCTB_MIG Retorna: .T. se migracao OK, .F. se falhar |
+| `GEBBAL` | `GEBBAL(cComp)` | — |
+| `GEBDRE` | `GEBDRE(cComp)` | — |
 
 **`src/GEBCTB_DIR.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBCDIR` | `GEBCDIR(cContaD, cContaC, nValor, cUser)` | GEBCTB_DIR Retorna: .T. se gravou direto, .F. se alguma trava negou |
+| `GEBCDIR` | `GEBCDIR(cContaD, cContaC, nValor, cUser)` | — |
 
-**`src/GEBCTB_BAL.prw`** — 3 funções
+**`src/GEBCTB_MIG.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBBAL` | `GEBBAL(cComp)` | GEBCTB_BAL Retorna: Array do balancete (GEBBAL) ou resultado (GEBDRE) |
-| `GEBDRE` | `GEBDRE(cComp)` | GEBCTB_BAL Retorna: Array do balancete (GEBBAL) ou resultado (GEBDRE) |
-| `PosConta` | `PosConta(aBal, cConta)` | Indice da conta no array do balancete. |
+| `GEBCMIG` | `GEBCMIG()` | — |
 
 ### GEB_FIN
 
-**`src/GEBFIN_MIG.prw`** — 6 funções
+**`src/GEBFIN_BAI.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBFNMIG` | `GEBFNMIG()` | GEBFIN_MIG Retorna: .T. se migracao/conta OK, .F. se falhar |
-| `GEBFNCON` | `GEBFNCON(cConta, cNome)` | GEBFIN_MIG Retorna: .T. se migracao/conta OK, .F. se falhar |
-| `CriaGFN1` | `CriaGFN1()` | GEBFIN_MIG Retorna: .T. se migracao/conta OK, .F. se falhar |
-| `CriaGFN2` | `CriaGFN2()` | GEBFIN_MIG Retorna: .T. se migracao/conta OK, .F. se falhar |
-| `CriaGFN3` | `CriaGFN3()` | GEBFIN_MIG Retorna: .T. se migracao/conta OK, .F. se falhar |
-| `CriaGFN4` | `CriaGFN4()` | GEBFIN_MIG Retorna: .T. se migracao/conta OK, .F. se falhar |
+| `GEBFNBAI` | `GEBFNBAI(cTipo, cDoc, nValor)` | — |
 
 **`src/GEBFIN_CON.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBFNREC` | `GEBFNREC(cDoc, cCli, nValor, dVenc)` | GEBFIN_CON Retorna: .T. se lancou, .F. se recusou |
-| `GEBFNPAG` | `GEBFNPAG(cDoc, cForn, nValor, dVenc)` | GEBFIN_CON Retorna: .T. se lancou, .F. se recusou |
-
-**`src/GEBFIN_BAI.prw`** — 4 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBFNBAI` | `GEBFNBAI(cTipo, cDoc, nValor)` | GEBFIN_BAI: mentor + limite ao saldo e baixa pelo financeiro (`GEBFXBAI`) na conta CAIXA. Retorna: .T. se baixou, .F. se recusou |
+| `GEBFNREC` | `GEBFNREC(cDoc, cCli, nValor, dVenc)` | — |
+| `GEBFNPAG` | `GEBFNPAG(cDoc, cForn, nValor, dVenc)` | — |
 
 **`src/GEBFIN_FLX.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBNFLX` | `GEBNFLX()` | GEBFIN_FLX Retorna: Array {nReceber, nPagar, nSaldo} |
+| `GEBNFLX` | `GEBNFLX()` | — |
 
-### GEB_COM
-
-**`src/GEBCOM_MIG.prw`** — 6 funções
+**`src/GEBFIN_MIG.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBCMMIG` | `GEBCMMIG()` | GEBCOM_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGCP1` | `CriaGCP1()` | GEBCOM_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGCP2` | `CriaGCP2()` | GEBCOM_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGCP3` | `CriaGCP3()` | GEBCOM_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGCP4` | `CriaGCP4()` | GEBCOM_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGCP5` | `CriaGCP5()` | GEBCOM_MIG Retorna: .T. se migracao OK, .F. se falhar |
+| `GEBFNMIG` | `GEBFNMIG()` | — |
+| `GEBFNCON` | `GEBFNCON(cConta, cNome)` | — |
+
+### GEB_COM
+
+**`src/GEBCOM_ENT.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBCMENT` | `GEBCMENT(cNF, cPed)` | — |
 
 **`src/GEBCOM_FOR.prw`** — 3 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBCMFOR` | `GEBCMFOR(cCod, cNome)` | Cria fornecedor GCP1 (idempotente; vazio nega). |
-| `GEBCMCOT` | `GEBCMCOT(cForn, cProd, nPreco)` | Grava cotacao GCP2 (fornecedor, produto, preco). |
-| `GEBCMMEL` | `GEBCMMEL(cProd)` | Menor preco cotado do produto (0 se sem cotacao). |
+| `GEBCMFOR` | `GEBCMFOR(cCod, cNome)` | — |
+| `GEBCMCOT` | `GEBCMCOT(cForn, cProd, nPreco)` | — |
+| `GEBCMMEL` | `GEBCMMEL(cProd)` | — |
+
+**`src/GEBCOM_MIG.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBCMMIG` | `GEBCMMIG()` | — |
 
 **`src/GEBCOM_PED.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBCMPED` | `GEBCMPED(cPed, cForn)` | Cria pedido GCP3 ABERTO apos guia COMPRA_IMPULSIVA (travado vira BLOQUEADO). |
-| `GEBCMIT` | `GEBCMIT(cPed, cProd, nQtd, nPreco)` | Grava item GCP4 (exige pedido existente). |
+| `GEBCMPED` | `GEBCMPED(cPed, cForn)` | — |
+| `GEBCMIT` | `GEBCMIT(cPed, cProd, nQtd, nPreco)` | — |
 
-**`src/GEBCOM_ENT.prw`** — 3 funções
+### GEB_BACKOFFICE
+
+**`src/GEBBCO.prw`** — 18 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBCMENT` | `GEBCMENT(cNF, cPed)` | Entrada de NF pelo documento de entrada do backoffice (`GEBCPXENT`): estoque com custo, titulo pela condicao, COMPRA_ESTOQUE, credito de IBS/CBS, RECEBIDO/RECEBIDA. |
-| `SomaItens` | `SomaItens(cPed, cFil4)` | Soma QTD x PRECO dos itens GCP4 do pedido. |
-| `EntraEstoque` | `EntraEstoque(cPed, cFil4)` | Apropria itens do pedido no estoque via GEBVEST. |
+| `GEBBCOMIG` | `GEBBCOMIG()` | — |
+| `GEBBCOCFG` | `GEBBCOCFG(cConta, cBanco, cAgencia, cAgDv, cCC, cCCDv, cCarteira, cCodEmp, cBenef, cCnpj, cLayout, cModal)` | Dados de cobranca de uma conta financeira (GFN1). |
+| `GEBBCOBOL` | `GEBBCOBOL(cDoc, cConta)` | Gera (ou devolve, se ja existe) o boleto de um titulo a receber aberto. |
+| `GEBBCOLIVRE` | `GEBBCOLIVRE(cBanco, cAgencia, cConta, cCarteira, cCodEmp, cModal, cSeq)` | Campo livre (25 posicoes) e nosso numero do banco (calculo puro). |
+| `GEBBCOBARRAS` | `GEBBCOBARRAS(cBanco, cFator, nValor, cLivre)` | Codigo de barras FEBRABAN: banco(3) + moeda 9 + DV + fator(4) + valor(10, centavos) + campo livre(25). |
+| `GEBBCOLINHA` | `GEBBCOLINHA(cBar)` | Linha digitavel (formatada) a partir do codigo de barras. |
+| `GEBBCOMOD10` | `GEBBCOMOD10(cNum)` | Modulo 10 (pesos 2,1 da direita; produto > 9 soma os digitos). |
+| `GEBBCOMOD11` | `GEBBCOMOD11(cNum)` | Modulo 11 do codigo de barras (pesos 2 a 9 da direita; 0, 10 e 11 viram 1). |
+| `GEBBCONNDV` | `GEBBCONNDV(cCarteira, cNN)` | DV do nosso numero Bradesco: modulo 11 base 7 sobre carteira(2) + nosso numero(11). |
+| `GEBBCOFATOR` | `GEBBCOFATOR(cVenc)` | Fator de vencimento: dias desde 07/10/1997; a partir de 10.000 recomeca em 1.000 (ciclo de 9.000). |
+| `GEBBCOHTML` | `GEBBCOHTML(cDoc)` | Pagina HTML do boleto (beneficiario, pagador, valores, linha digitavel e codigo de barras intercalado 2 de 5 desenhado em barras). |
+| `GEBBCOREM` | `GEBBCOREM(cConta, cArquivo)` | Remessa CNAB dos boletos GERADO da conta, no leiaute da conta (400 Bradesco/Itau ou 240 FEBRABAN). |
+| `GEBBCORET` | `GEBBCORET(cConta, cConteudo)` | Le o retorno CNAB da conta (400 Bradesco/Itau ou 240 FEBRABAN) e baixa os titulos liquidados: principal = valor pago - juros + desconto (limitado ao saldo), com juros e... |
+| `GEBBCOOFX` | `GEBBCOOFX(cConta, cConteudo)` | Importa extrato OFX da conta (sem repetir FITID) e concilia sozinho. |
+| `GEBBCOCONC` | `GEBBCOCONC(cConta)` | Conciliacao automatica: cada linha pendente do extrato com um movimento da conta (GFX4) ainda nao conciliado, de mesmo valor e sentido, com data ate GE4 BCO_DIAS_CONC dias de... |
+| `GEBBCOCONCMAN` | `GEBBCOCONCMAN(cConta, cFitid, nMov)` | Concilia na mao uma linha do extrato (FITID) com um movimento (numero R_E_C_N_O_ da GFX4, mostrado no relatorio), ou desfaz (nMov = 0). |
+| `GEBBCOLANCA` | `GEBBCOLANCA(cConta, cFitid, cCtaCtb, cCC)` | Lanca no sistema a linha do extrato que so' existe no banco (tarifa, rendimento) como movimento avulso (GEBFXMOV) e ja concilia. |
+| `GEBBCOREL` | `GEBBCOREL(cConta, cIni, cFim)` | Relatorio: conciliacao da conta no periodo: linhas conciliadas, pendentes no banco (extrato sem movimento) e pendentes no sistema (movimento sem extrato), com o total de cada lado. |
+
+**`src/GEBBO.prw`** — 3 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBBOROTAS` | `GEBBOROTAS()` | — |
+| `GEBBOROTA` | `GEBBOROTA(cRota, cMetodo)` | Rota {metodo, rota, menu, item, descricao}; {} se nao existe. |
+| `GEBBOEXEC` | `GEBBOEXEC(cMetodo, cRota, o, cUsu)` | Executa a rota do backoffice. |
+
+**`src/GEBBOLIB.prw`** — 24 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `BOMIG` | `BOMIG()` | — |
+| `BOTAB` | `BOTAB(cTab, cCols, cIdx)` | BOTAB("GXX1", "GXX1_A TEXT NOT NULL, ...", "GXX1_A") -> cria se faltar + indice (filial, cIdx). |
+| `BOSTR` | `BOSTR(xVal)` | — |
+| `BOCOL` | `BOCOL(xVal)` | Texto aparado (colunas de TCSqlQuery, campos da API). |
+| `BOVAL` | `BOVAL(xVal)` | — |
+| `BONUM` | `BONUM(nVal, nDec)` | — |
+| `BOQ` | `BOQ(oReq, cCampo)` | — |
+| `BOQN` | `BOQN(oReq, cCampo)` | — |
+| `BOQITENS` | `BOQITENS(oReq, cCampo, aCampos, aNum)` | Itens de uma lista da API: array de JsonObject -> array de arrays com os campos pedidos (numericos pelo nome em aNum). |
+| `BOHOJE` | `BOHOJE()` | — |
+| `BODATAOK` | `BODATAOK(cData)` | Data AAAAMMDD valida? |
+| `BODATA` | `BODATA(cData)` | Data vazia => hoje; invalida => "". |
+| `BOJDN` | `BOJDN(cData)` | — |
+| `BODEJDN` | `BODEJDN(nJ)` | — |
+| `BODTADD` | `BODTADD(cData, nDias)` | — |
+| `BODIAS` | `BODIAS(cData1, cData2)` | Dias de cData1 ate cData2 (positivo se cData2 for depois). |
+| `BOPARM` | `BOPARM(cChave, cDefault)` | Parametro da empresa (GE4) com default. |
+| `BOMOD` | `BOMOD(nA, nB)` | Resto inteiro (nA, nB positivos). |
+| `BOSETPARM` | `BOSETPARM(cChave, cValor)` | Grava parametro da empresa (GE4). |
+| `BOMESADD` | `BOMESADD(cComp, nDelta)` | BOMESADD("202601", -1) -> "202512" |
+| `BOCOMPOK` | `BOCOMPOK(cComp)` | Competencia AAAAMM valida? |
+| `BOFIMMES` | `BOFIMMES(cComp)` | Ultimo dia da competencia (AAAAMMDD). |
+| `BOSEQ` | `BOSEQ(cChave, nTam)` | Proximo numero da chave (GBS1). |
+| `BOREL` | `BOREL(aLinhas)` | Regrava a grade de relatorio da tela (GBR1). |
+
+**`src/GEBCPX.prw`** — 10 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBCPXMIG` | `GEBCPXMIG()` | — |
+| `GEBCPXSC` | `GEBCPXSC(cNum, aItens, cSolic)` | Solicitacao de compra. |
+| `GEBCPXPED` | `GEBCPXPED(cPed, cForn, aItens, cCond, cLocal, cData)` | Pedido de compra com varios itens. |
+| `GEBCPXGERA` | `GEBCPXGERA(cNumSC, cCond, cLocal, cData)` | Gera os pedidos de uma solicitacao pelo menor preco cotado (GCP2), um pedido por fornecedor. |
+| `GEBCPXAPR` | `GEBCPXAPR(cPed, cUsuario, lAprova)` | Libera (lAprova .T.) ou rejeita um pedido PENDENTE de alcada. |
+| `GEBCPXENT` | `GEBCPXENT(cNF, cPed, aItens, nFrete, cData, aRet, cChaveNF)` | Documento de entrada de um pedido. |
+| `GEBCPXDEV` | `GEBCPXDEV(cNF, cForn, aItens, cData, cChaveForn)` | Devolucao de compra: itens de um documento de entrada voltam ao fornecedor pelo custo da entrada (com o frete rateado) e pelos mesmos lotes. |
+| `GEBCPXABERTOS` | `GEBCPXABERTOS()` | Relatorio: pedidos abertos/parciais por item (pedido, fornecedor, produto, pedida, recebida, saldo, preco, valor pendente, liberacao). |
+| `GEBCPXPORFORN` | `GEBCPXPORFORN(cIni, cFim)` | Relatorio: compras por fornecedor no periodo (entradas, mercadoria, frete, total). |
+| `GEBCPXSCPEND` | `GEBCPXSCPEND()` | Relatorio: solicitacoes de compra abertas (por necessidade). |
+
+**`src/GEBCTX.prw`** — 13 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBCTXMIG` | `GEBCTXMIG()` | — |
+| `GEBCTXLP` | `GEBCTXLP(cEvento, nValor, cDoc, cData, cDeb, cCred, cCC)` | Lancamento padrao do evento na data do fato. |
+| `GEBCTXRATEIA` | `GEBCTXRATEIA(cCC, nValor)` | Divide um valor pelo centro de custo ou pelo rateio (o ultimo centro fica com o centavo). |
+| `GEBCTXCC` | `GEBCTXCC(cCod, cDesc, cBloq)` | Cadastra/altera centro de custo (bloqueado S = nao recebe lancamento). |
+| `GEBCTXRAT` | `GEBCTXRAT(cCod, aItens)` | Cadastra/altera um rateio: {{cCentro, nPercentual}...}, somando 100. |
+| `GEBCTXCCRES` | `GEBCTXCCRES(cIni, cFim)` | Relatorio: resultado por centro de custo no periodo (receita bruta, deducoes, CMV, outras receitas, despesas, resultado); a ultima linha "(sem centro)" e' o que nao foi marcado. |
+| `GEBCTXREV` | `GEBCTXREV(cEvento, nValor, cDoc, cData, cDeb, cCred, cCC)` | Estorno: mesmo evento com as contas trocadas. |
+| `GEBCTXCONTAS` | `GEBCTXCONTAS(cEvento)` | {cDebito, cCredito} do evento ("" se nao existe). |
+| `GEBCTXFIN` | `GEBCTXFIN(cConta)` | ponytail: CAIXA* = Caixa, o resto = Bancos; criar de-para por conta se a empresa quiser um razao por banco |
+| `GEBCTXRAZAO` | `GEBCTXRAZAO(cConta, cIni, cFim)` | Relatorio: razao de uma conta no periodo (saldo anterior, lancamentos com saldo acumulado, saldo final). |
+| `GEBCTXBALAN` | `GEBCTXBALAN(cIni, cFim, cCC)` | Relatorio: balancete do periodo. |
+| `GEBCTXDRE` | `GEBCTXDRE(cIni, cFim, cCC)` | Relatorio: DRE estruturada do periodo. |
+| `GEBCTXCORRIGE` | `GEBCTXCORRIGE()` | Corrige os lancamentos antigos que cairam no PADRAO (CTBLAN pelo numero do documento: D 1.01.001 Caixa / C 3.01.001 Receita, tipo AUTO). |
+
+**`src/GEBDER_FIN.prw`** — 7 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDERFMIG` | `GEBDERFMIG()` | Garante as tabelas da Derrama, do financeiro e o complemento GD4. |
+| `GEBDERGUIA` | `GEBDERGUIA(cGuia, cTipo, cComp, nValor, cVenc, cCtaCtb, cCredor)` | Cria ou atualiza a guia da Derrama e o titulo a pagar. |
+| `GEBDERPAGA` | `GEBDERPAGA(cGuia, cConta, cData)` | Paga a guia pela Derrama: baixa no financeiro todos os titulos abertos da guia (o dinheiro sai da conta). |
+| `GEBDERPODEPAR` | `GEBDERPODEPAR(cGuia)` | A guia pode ser parcelada? Nao se ja tem pagamento ou esta baixada. |
+| `GEBDERPARTIT` | `GEBDERPARTIT(cGuia, nParc, nTot)` | Troca os titulos abertos da guia por um titulo por parcela (30 em 30 dias). |
+| `GEBDERTITS` | `GEBDERTITS(cGuia)` | Titulos a pagar de uma guia (o da guia ou os das parcelas). |
+| `GEBDERPROV` | `GEBDERPROV(cEvento, cDoc, nAlvo, cData, cDeb, cCred)` | Lanca a provisao de um tributo: deixa o saldo lancado do evento para o documento igual a nAlvo, lancando so' a diferenca (positiva no sentido do evento, negativa com as pernas... |
+
+**`src/GEBEST.prw`** — 17 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBESTMIG` | `GEBESTMIG()` | — |
+| `GEBESTMOV` | `GEBESTMOV(cProd, cLocal, cTipo, nQtd, nCusto, cOrigem, cDoc, cData, aDet, cDocRef, lCustoInf)` | Movimenta o estoque com custo. |
+| `GEBESTSLD` | `GEBESTSLD(cProd, cLocal)` | Saldo do produto: {nQtd, nCM, nValor}. |
+| `GEBESTAJU` | `GEBESTAJU(cProd, cLocal, nContado, nCusto, cDoc, cData, aDet)` | Inventario: informa a quantidade contada; a diferenca entra ou sai ao custo medio (sem CM, nCusto informado vale para a entrada) e e' contabilizada (EST_AJ_POS / EST_AJ_NEG). |
+| `GEBESTTRF` | `GEBESTTRF(cProd, cOrig, cDest, nQtd, cDoc, cData, aDet, cEnderDest)` | Transferencia entre armazens ao custo medio da origem. |
+| `GEBESTKARDEX` | `GEBESTKARDEX(cProd, cLocal, cIni, cFim)` | Relatorio: kardex do produto no periodo (saldo inicial, cada movimento com custo e saldo, saldo final). |
+| `GEBESTPOS` | `GEBESTPOS(cLocal)` | Relatorio: posicao do estoque valorizada (por produto e armazem: quantidade, custo medio, valor; minimo da GV1 e alerta abaixo do minimo). |
+| `GEBESTCTL` | `GEBESTCTL(cProd, cRastro, cEnder)` | Controle do produto: rastro N (nenhum), L (lote, com validade opcional) ou S (numero de serie: uma unidade por serie) e endereco S/N. |
+| `GEBESTENDER` | `GEBESTENDER(cLocal, cEnder, cDesc)` | Cadastra endereco (armazem + endereco, ex.: 01 / A-01-03). |
+| `GEBESTENDTRF` | `GEBESTENDTRF(cProd, cLocal, cLote, cOrig, cDest, nQtd, cData)` | Muda um lote de endereco dentro do armazem (nao mexe no custo). |
+| `GEBESTLOTES` | `GEBESTLOTES(cProd, cLocal, cData)` | Relatorio: saldo por lote/serie e endereco (com validade e dias para vencer). |
+| `GEBESTVENCER` | `GEBESTVENCER(nDias, cData)` | Relatorio: lotes vencidos ou vencendo em ate nDias a partir de cData. |
+| `GEBESTFECHA` | `GEBESTFECHA(cComp)` | Fechamento mensal do estoque (como a virada de saldo SB9 do Protheus): grava o saldo de cada produto/armazem no fim da competencia (GES7, pelo kardex) e bloqueia movimentos com... |
+| `GEBESTREABRE` | `GEBESTREABRE(cComp)` | Reabre a ultima competencia fechada. |
+| `GEBESTFECHREL` | `GEBESTFECHREL(cComp)` | Relatorio: fechamento da competencia por produto/armazem (saldo do fechamento anterior, entradas, saidas e saldo final, em quantidade e valor) com a conferencia inicial +... |
+| `GEBESTVALLOTE` | `GEBESTVALLOTE(cProd, cLocal, cTipo, nQtd, aDet, cDocRef, cData)` | Produto sem controle devolve .T. |
+| `GEBESTDET` | `GEBESTDET(cLote, cValid, cEnder, nQtd)` | Lotes de um item da API/tela: lote (series separadas por ";"), validade, endereco, quantidade. |
+
+**`src/GEBFAT.prw`** — 13 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBFATMIG` | `GEBFATMIG()` | — |
+| `GEBFATCLI` | `GEBFATCLI(cCod, cNome, cDoc, cUF, nLimite, cCond, cTab)` | Cadastra/altera cliente. |
+| `GEBFATPRC` | `GEBFATPRC(cTab, cProd, nPreco)` | Preco do produto numa tabela (vazia = PADRAO). |
+| `GEBFATPED` | `GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC)` | Pedido de venda. |
+| `GEBFATLIB` | `GEBFATLIB(cNum, lForca)` | Liberacao do pedido (credito e estoque). |
+| `GEBFATCAN` | `GEBFATCAN(cNum)` | Cancela pedido sem nenhum faturamento. |
+| `GEBFATFAT` | `GEBFATFAT(cNum, aItens, cData, cNota)` | Documento de saida do pedido liberado. |
+| `GEBFATNOTA` | `GEBFATNOTA(cChave, aItens, cData, cTipo)` | Nota fiscal com varios itens: GF3 (cabecalho) + GF4 (um por item). |
+| `GEBFATDEV` | `GEBFATDEV(cNota, aItens, cData, cChaveCli)` | Devolucao de venda (itens de uma nota). |
+| `GEBFATREL` | `GEBFATREL(cIni, cFim, cAgrupa)` | Relatorio: faturamento do periodo por CLIENTE ou PRODUTO: quantidade, valor liquido de devolucoes, custo, margem e margem %. |
+| `GEBFATCARTEIRA` | `GEBFATCARTEIRA()` | Relatorio: carteira de pedidos (itens com saldo a faturar). |
+| `GEBFATABC` | `GEBFATABC(cIni, cFim)` | Relatorio: curva ABC dos produtos pelo valor faturado no periodo (A ate 80% acumulado, B ate 95%, C o resto). |
+| `GEBFATPRECO` | `GEBFATPRECO(cTab, cProd)` | Preco do produto na tabela (vazia = PADRAO, cai para PADRAO se faltar); 0 se nao tem. |
+
+**`src/GEBFNX.prw`** — 13 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBFXMIG` | `GEBFXMIG()` | — |
+| `GEBFXCOND` | `GEBFXCOND(cCod, cDesc, cDias)` | Cadastra/altera condicao de pagamento (dias separados por virgula, em ordem crescente; "0" = a vista). |
+| `GEBFXPARC` | `GEBFXPARC(cCond, nValor, cEmissao)` | Parcelas de um valor pela condicao (codigo GFX1 ou lista de dias; vazio = a vista). |
+| `GEBFXTIT` | `GEBFXTIT(cTipo, cDoc, cParceiro, nValor, cCond, cEmissao, cOrigem, cCtaCtb)` | Gera os titulos (parcelas) a receber (R) ou a pagar (P). |
+| `GEBFXCALC` | `GEBFXCALC(cTipo, cDoc, cData)` | Juros e multa por atraso de um titulo aberto na data. |
+| `GEBFXBAI` | `GEBFXBAI(cTipo, cDoc, nPrinc, nJuros, nMulta, nDesc, cConta, cData)` | Baixa (parcial ou total) de titulo a receber (R) ou a pagar (P). |
+| `GEBFXTRF` | `GEBFXTRF(cOrig, cDest, nValor, cData, cHist)` | Transferencia entre contas financeiras. |
+| `GEBFXMOV` | `GEBFXMOV(cConta, cDC, nValor, cHist, cData, cCtaCtb, cCC)` | Movimento avulso na conta (C = entrada, D = saida), sem titulo. |
+| `GEBFXDESP` | `GEBFXDESP(cDoc, cForn, nValor, cCond, cEmissao, cCtaDesp, cCC, cHist)` | Despesa a pagar: gera os titulos (GEBFXTIT P) e ja reconhece a despesa (FIN_DESPESA: debito cCtaDesp, padrao 4.02.006 Despesas gerais; credito Fornecedores), com centro de... |
+| `GEBFXPOSICAO` | `GEBFXPOSICAO(cTipo, cData)` | Relatorio: titulos abertos (R ou P) na data, por faixa de atraso: a vencer, 1-30, 31-60, 61-90 e mais de 90 dias. |
+| `GEBFXEXTRATO` | `GEBFXEXTRATO(cConta, cIni, cFim)` | Relatorio: extrato da conta no periodo (saldo anterior, movimentos com saldo acumulado, saldo final). |
+| `GEBFXFLUXO` | `GEBFXFLUXO(cIni, nDias)` | Relatorio: fluxo de caixa projetado de cIni por nDias: saldo inicial (soma das contas GFN1), titulos vencidos ate cIni na primeira linha, depois receber/pagar por dia de... |
+| `GEBFXMOVCONTA` | `GEBFXMOVCONTA(cConta, cDC, nValor, cHist, cDoc, cData)` | Movimento na conta sem lancamento contabil (quem chama contabiliza): {lOk, cMsg}. |
+
+### GEB_LOJA (frente de loja e PDV)
+
+**`src/GEBLOJ.prw`** — 12 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBLOJMIG` | `GEBLOJMIG()` | — |
+| `GEBLOJCX` | `GEBLOJCX(cCod, cNome, cConta, cLocal, cCC)` | Cadastra/altera um caixa. |
+| `GEBLOJABRE` | `GEBLOJABRE(cCaixa, cOper, nFundo, cData)` | Abre a sessao do caixa (uma aberta por caixa). |
+| `GEBLOJVEN` | `GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc)` | Venda no caixa (cupom). |
+| `GEBLOJCAN` | `GEBLOJCAN(cCupom, cMotivo)` | Cancela um cupom da sessao aberta. |
+| `GEBLOJSAN` | `GEBLOJSAN(cSessao, cTipo, nValor, cMotivo, cConta)` | Sangria (SANGRIA: caixa -> cofre) ou suprimento (SUPRIMENTO: cofre -> caixa). |
+| `GEBLOJFECHA` | `GEBLOJFECHA(cSessao, nContado)` | Fecha a sessao com o dinheiro contado. |
+| `GEBLOJRESUMO` | `GEBLOJRESUMO(cSessao)` | Relatorio: resumo da sessao (cupons, cancelados, total por forma de pagamento, sangrias, suprimentos, fundo, dinheiro esperado, contado e diferenca). |
+| `GEBLOJVENDAS` | `GEBLOJVENDAS(cData, cCaixa)` | Relatorio: vendas do dia por produto (cupons nao cancelados; cCaixa vazio = todos). |
+| `GEBLOJSES` | `GEBLOJSES(cSessao)` | Sessao do caixa: {cSessao, cCaixa, cStatus, cDataAbertura, nFundo, cOperador, nContado, nDiferenca}; {} se nao existe. |
+| `GEBLOJCXA` | `GEBLOJCXA(cCaixa)` | Caixa: {cCod, cConta, cLocal, cCentroCusto}; {} se nao existe. |
+| `GEBLOJESP` | `GEBLOJESP(cSessao)` | Dinheiro esperado na gaveta da sessao. |
+
+**`src/GEBLOJ_CAD.prw`** — 10 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBLOJCADMIG` | `GEBLOJCADMIG()` | — |
+| `GEBLOJBAR` | `GEBLOJBAR(cCodigo, cProd, nFator)` | Cadastra o codigo de barras (GTIN com digito valido) ou o PLU de balanca (5 digitos) do produto. |
+| `GEBLOJEANOK` | `GEBLOJEANOK(cCodigo)` | GTIN-8/12/13/14 com digito verificador certo (modulo 10, pesos 3 e 1). |
+| `GEBLOJRESOLVE` | `GEBLOJRESOLVE(cCodigo, nQtd, nPreco)` | Traduz o que foi lido no caixa em produto, quantidade e preco: codigo do produto, codigo de barras (quantidade x fator) ou etiqueta de balanca. |
+| `GEBLOJPROMO` | `GEBLOJPROMO(cCod, cProd, cTipo, nQtdMin, nValor, cIni, cFim)` | Cadastra/altera a promocao (cCod). |
+| `GEBLOJPRECO` | `GEBLOJPRECO(cProd, nQtd, cData)` | Preco unitario do item na data: o da tabela PADRAO ou o da promocao vigente que deixar o item mais barato. |
+| `GEBLOJVEND` | `GEBLOJVEND(cCod, cNome, nComis)` | Cadastra/altera o vendedor e o percentual de comissao. |
+| `GEBLOJVENDOK` | `GEBLOJVENDOK(cCod)` | Vendedor cadastrado? |
+| `GEBLOJCPFOK` | `GEBLOJCPFOK(cDoc)` | CPF (11 digitos) ou CNPJ (14 digitos) com digitos verificadores certos. |
+| `GEBLOJDIGITOS` | `GEBLOJDIGITOS(cTxt)` | So' os digitos do texto. |
+
+**`src/GEBLOJ_OPE.prw`** — 10 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBLOJORC` | `GEBLOJORC(aItens, cCli, cVend, nDesc, cData)` | Grava o orcamento. |
+| `GEBLOJORCFIN` | `GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup)` | Finaliza o orcamento no caixa: vira cupom (GEBLOJVEN) com os precos do orcamento. |
+| `GEBLOJORCCAN` | `GEBLOJORCCAN(cOrc)` | Cancela o orcamento aberto. |
+| `GEBLOJORCS` | `GEBLOJORCS(cStatus)` | Relatorio: orcamentos pelo status (vazio = ABERTO). |
+| `GEBLOJDEV` | `GEBLOJDEV(cSessao, cCupom, aItens, cModo, cMotivo, oCons)` | Devolucao/troca no caixa (sessao aberta) de itens de um cupom vendido. |
+| `GEBLOJVALE` | `GEBLOJVALE(cVale)` | Consulta o vale-troca. |
+| `GEBLOJCUPOM` | `GEBLOJCUPOM(cCupom)` | Segunda via do cupom em texto (uma linha por elemento; tambem na grade). |
+| `GEBLOJCONS` | `GEBLOJCONS(cCodigo, cCaixa)` | Consulta de preco: produto (ou codigo de barras), descricao, preco da tabela, promocao vigente e saldo no armazem do caixa (vazio = 01). |
+| `GEBLOJGER` | `GEBLOJGER(cIni, cFim, cAgrupa)` | Relatorio gerencial da loja no periodo, agrupado por DIA (padrao), CAIXA, OPERADOR ou VENDEDOR. |
+| `GEBLOJCOMIS` | `GEBLOJCOMIS(cIni, cFim)` | Relatorio: comissao por vendedor no periodo. |
+
+**`src/GEBPDV_API.prw`** — 16 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBPDVCAIXALST` | `GEBPDVCAIXALST(cUsuario)` | Lista caixas cadastrados via API REST. |
+| `GEBPDVCAIXAABR` | `GEBPDVCAIXAABR(cUsuario, aBody)` | Abre sessao de caixa via API REST. |
+| `GEBPDVCAIXAFECH` | `GEBPDVCAIXAFECH(cUsuario, aBody)` | Fecha sessao de caixa via API REST. |
+| `GEBPDVCUPOMNOV` | `GEBPDVCUPOMNOV(cUsuario, aBody)` | Cria novo cupom via API REST. |
+| `GEBPDVCUPOMGET` | `GEBPDVCUPOMGET(cUsuario, cCupom)` | Busca cupom por ID (segunda via) via API REST. |
+| `GEBPDVCUPCANC` | `GEBPDVCUPCANC(cUsuario, aBody)` | Cancela cupom via API REST. |
+| `GEBPDVPRODUTBUSC` | `GEBPDVPRODUTBUSC(cUsuario, cCodigo)` | Busca produto por codigo ou codigo de barras via API REST. |
+| `GEBPDVRELGER` | `GEBPDVRELGER(cUsuario, aBody)` | Relatorio gerencial da loja via API REST. |
+| `GEBPDVRELCOM` | `GEBPDVRELCOM(cUsuario, aBody)` | Relatorio de comissao por vendedor via API REST. |
+| `GEBPDVPERIFLIST` | `GEBPDVPERIFLIST(cUsuario, cTipo)` | Lista perifÃ©ricos configurados via API REST. |
+| `GEBPDVPERIFREG` | `GEBPDVPERIFREG(cUsuario, aBody)` | Registra perifÃ©rico via API REST. |
+| `GEBPDVPERIFDEL` | `GEBPDVPERIFDEL(cUsuario, nId)` | Remove perifÃ©rico via API REST. |
+| `GEBPDVSANGRIA` | `GEBPDVSANGRIA(cUsuario, aBody)` | Sangria ou suprimento de caixa via API REST. |
+| `GEBPDVRELGERCSV` | `GEBPDVRELGERCSV(cUsuario, aBody)` | Relatorio gerencial exportado como CSV. |
+| `GEBPDVRELCOMCSV` | `GEBPDVRELCOMCSV(cUsuario, aBody)` | Relatorio de comissao exportado como CSV. |
+| `GEBPDVCAIXARESUMO` | `GEBPDVCAIXARESUMO(cUsuario, cSessao)` | Resumo completo da sessao de caixa (para fechamento). |
+
+**`src/GEBPDV_HTML.prw`** — 2 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBPDVHTML` | `GEBPDVHTML(oReq)` | Serve a interface PDV (pÃ¡gina HTML autocontida). |
+| `GEBPDVWS` | `GEBPDVWS(oReq)` | Health check do serviÃ§o WebSocket de perifÃ©ricos. |
+
+**`src/GEBPERIF_MIG.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBPERIFMIG` | `GEBPERIFMIG()` | — |
+
+**`src/GEBTEF.prw`** — 10 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBTEFMIG` | `GEBTEFMIG()` | — |
+| `GEBTEFCFG` | `GEBTEFCFG(cProv, cUrl, cMerchantId, cChave, cCartao, cBandeira)` | Configura o TEF da empresa (GE4): provedor SIMULADOR, HTTP ou CIELO e os dados do provedor. |
+| `GEBTEFAUT` | `GEBTEFAUT(cForma, nValor, nParc, cRef)` | Autoriza um pagamento em cartao (DEBITO/CREDITO). |
+| `GEBTEFCONF` | `GEBTEFCONF(cId)` | Confirma a transacao pendente (CONFIRMADA). |
+| `GEBTEFDESF` | `GEBTEFDESF(cId)` | Desfaz a transacao pendente (DESFEITA). |
+| `GEBTEFCANC` | `GEBTEFCANC(cId)` | Cancela/estorna a transacao confirmada (CANCELADA). |
+| `GEBTEFRESOLVE` | `GEBTEFRESOLVE()` | Desfaz as transacoes que ficaram PENDENTE (venda interrompida). |
+| `GEBTEFREL` | `GEBTEFREL(cData)` | Relatorio: transacoes TEF do dia (para conferir com a adquirente): cada transacao e os totais confirmados por forma e bandeira. |
+| `GEBTEFRESP` | `GEBTEFRESP(cJson)` | Interpreta a resposta JSON do gateway HTTP. |
+| `GEBTEFCIELO` | `GEBTEFCIELO(cOper, cJson, cExt)` | Interpreta a resposta da Cielo (API e-Commerce 3.0) para a operacao: autorizar = Payment.Status 1; confirmar = 2; desfazer/cancelar = 10 ou 11. |
 
 ### GEB_EXPANSAO
 
-**`src/GEBEXP_MIG.prw`** — 3 funções
+**`src/GEBEXP_CTX.prw`** — 5 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBEXPCriaAuditoria` | `GEBEXPCriaAuditoria()` | GEBEXP_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGEH` | `CriaGEH()` | GEBEXP_MIG Retorna: .T. se migracao OK, .F. se falhar |
-| `CriaGEI` | `CriaGEI()` | GEBEXP_MIG Retorna: .T. se migracao OK, .F. se falhar |
+| `GEBEXPCONTEXTO` | `GEBEXPCONTEXTO(cEmpresa, cFilial, cUsuario)` | — |
+| `GEBEXPIST` | `GEBEXPIST()` | Verifica se ha sessao de contexto ativa (linha em GEX). |
+| `GEBEXPCONTEXT_GET` | `GEBEXPCONTEXT_GET()` | — |
+| `GEBEXPCLEAR` | `GEBEXPCLEAR()` | Encerra sessao: remove linha ativa de GEX. |
+| `GEXBINIT` | `GEXBINIT()` | Inicializa tabelas auxiliares GEH (historico) e GEX (contexto) se nao existirem. |
 
-**`src/GEBEXP_CTX.prw`** — 6 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBEXPCONTEXTO` | `GEBEXPCONTEXTO(cEmpresa, cFilial, cUsuario)` | GEBEXP_CTX Retorna: .T. se sessao iniciada, .F. se usuario nao existe na empresa |
-| `GEBEXPIST` | `GEBEXPIST()` | GEBEXPIST Retorna: .T. se sessao ativa, .F. caso contrario |
-| `GEBEXPCONTEXT_GET` | `GEBEXPCONTEXT_GET()` | GEBEXPCONTEXT Retorna: Array 3 posicoes: [1]=empresa, [2]=filial, [3]=usuario |
-| `GEBEXPCLEAR` | `GEBEXPCLEAR()` | GEBEXPCLEAR Retorna: void |
-| `GEXBINIT` | `GEXBINIT()` | GEXBINIT Retorna: .T. sempre |
-| `GEXPCREATE` | `GEXPCREATE()` | GEXPCREATE Retorna: .T. sempre |
-
-**`src/GEBEXP_TRAK.prw`** — 4 funções
+**`src/GEBEXP_MIG.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBTRAKCOMPRA` | `GEBTRAKCOMPRA(cPedido)` | GEBEXP_TRAK |
-| `GEBTRAKVENDA` | `GEBTRAKVENDA(cVenda)` | Rastreio venda: header, itens, estoque, receber, lancamentos. |
-| `GEBTRAKNOTAFISCAL` | `GEBTRAKNOTAFISCAL(cChave)` | Rastreio NF: header, itens, IBS/CBS, receber, apuracao, guia. |
-| `GEBTRAKDERRAMA` | `GEBTRAKDERRAMA(cGuia)` | Rastreio guia: apuracao, guia, parcelas, protesto, pagar, baixa, lancamentos. |
-
-**`src/GEBEXP_WEB.prw`** — 1 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBEXP_WEB` | `GEBEXP_WEB(cEmpresa, cUsuario)` | GEBEXP_WEB Retorna: .T. se dashboard exibido com sucesso |
-
-**`src/GEBEXP_REL_NUC.prw`** — 9 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBRELEMPRESAS` | `GEBRELEMPRESAS()` | GEBEXP_REL_NUC |
-| `GEBRELUSUARIOS` | `GEBRELUSUARIOS(cEmpresa)` | GEBEXP_REL_NUC |
-| `GEBRELAUDITORIA` | `GEBRELAUDITORIA(cEmpresa, cInicio, cFim)` | Historico de acesso GEH por periodo. |
-| `GEBRELMENTOR` | `GEBRELMENTOR(cEmpresa)` | Modos do Mentor por empresa. |
-| `GEBRELCADASTROS` | `GEBRELCADASTROS(cEmpresa)` | Contagem de cadastros ativos. |
-| `RNEmpAlvo` | `RNEmpAlvo(cEmpresa)` | Normaliza codigo de empresa para relatorios Nucleo. |
-| `RNTabNoSchema` | `RNTabNoSchema(cEmp, cTabela)` | Verifica tabela no schema do tenant. |
-| `RNContaTenant` | `RNContaTenant(cCod, cTabela)` | Conta registros de tabela do tenant. |
-| `RNDataValida` | `RNDataValida(cData)` | Valida data AAAAMMDD para filtros. |
+| `GEBEXPCriaAuditoria` | `GEBEXPCriaAuditoria()` | — |
 
 **`src/GEBEXP_REL_BIZ.prw`** — 7 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBRELFISCAL` | `GEBRELFISCAL(cEmpresa, cComp)` | GEBEXP_REL_BIZ |
-| `GEBRELDERRAMA` | `GEBRELDERRAMA(cEmpresa, cComp)` | GEBEXP_REL_BIZ |
-| `GEBRELFIN` | `GEBRELFIN(cEmpresa)` | Posicao financeira {contas, receber, pagar, valores, saldo, movs}. |
-| `GEBRELSTOQUE` | `GEBRELSTOQUE(cEmpresa)` | Estoque {produtos, abaixo-minimo, valor, movs}. |
-| `GEBRELCOMPRAS` | `GEBRELCOMPRAS(cEmpresa)` | Compras {fornecedores, pedidos, recebidos, valor, cotacoes}. |
-| `GEBRELCONTABIL` | `GEBRELCONTABIL(cEmpresa, cComp)` | Lancamentos por competencia {qtd, debitos, creditos, valores, saldo}. |
-| `GEBRELGERAL` | `GEBRELGERAL(cEmpresa)` | Consolidado fiscal+derrama+fin+estoque+compras+contabil. |
+| `GEBRELFISCAL` | `GEBRELFISCAL(cEmpresa, cComp)` | — |
+| `GEBRELDERRAMA` | `GEBRELDERRAMA(cEmpresa, cComp)` | — |
+| `GEBRELFIN` | `GEBRELFIN(cEmpresa)` | — |
+| `GEBRELSTOQUE` | `GEBRELSTOQUE(cEmpresa)` | — |
+| `GEBRELCOMPRAS` | `GEBRELCOMPRAS(cEmpresa)` | — |
+| `GEBRELCONTABIL` | `GEBRELCONTABIL(cEmpresa, cComp)` | — |
+| `GEBRELGERAL` | `GEBRELGERAL(cEmpresa)` | — |
 
-**`src/GEBFIL_MIG.prw`** — 4 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEFFILMIG` | `GEFFILMIG()` | GEBFIL_MIG |
-| `GEFFILVALIDA` | `GEFFILVALIDA(cEmp, cFil)` | GEFFILVALIDA Retorna: .T. se formato OK |
-| `GEFFILUNI` | `GEFFILUNI(cFil)` | GEFFILUNI Retorna: 2 chars da unidade ("" se invalido) |
-| `CriaGEF1` | `CriaGEF1()` | GEFFILUNI Retorna: 2 chars da unidade ("" se invalido) |
-
-**`src/GEBUNI_MIG.prw`** — 3 funções
+**`src/GEBEXP_REL_NUC.prw`** — 5 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEUNIMIG` | `GEUNIMIG()` | GEBUNI_MIG |
-| `GEUVALIDA` | `GEUVALIDA(cUni)` | GEUVALIDA Retorna: .T. se formato OK |
-| `CriaGEU1` | `CriaGEU1()` | GEUVALIDA Retorna: .T. se formato OK |
+| `GEBRELEMPRESAS` | `GEBRELEMPRESAS()` | — |
+| `GEBRELUSUARIOS` | `GEBRELUSUARIOS(cEmpresa)` | — |
+| `GEBRELAUDITORIA` | `GEBRELAUDITORIA(cEmpresa, cInicio, cFim)` | — |
+| `GEBRELMENTOR` | `GEBRELMENTOR(cEmpresa)` | — |
+| `GEBRELCADASTROS` | `GEBRELCADASTROS(cEmpresa)` | — |
+
+**`src/GEBEXP_TRAK.prw`** — 4 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBTRAKCOMPRA` | `GEBTRAKCOMPRA(cPedido)` | — |
+| `GEBTRAKVENDA` | `GEBTRAKVENDA(cVenda)` | — |
+| `GEBTRAKNOTAFISCAL` | `GEBTRAKNOTAFISCAL(cChave)` | — |
+| `GEBTRAKDERRAMA` | `GEBTRAKDERRAMA(cGuia)` | — |
 
 ### GEB_SEGURANCA
 
-**`src/GEBSEC_MIG.prw`** — 1 funções
+**`src/GEBSEC_CICLO.prw`** — 6 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `TCSecMIG` | `TCSecMIG()` | GEBSEC_MIG Retorna: .T. se migracao OK, .F. se falhar |
+| `GEBSECBLOQUEIA` | `GEBSECBLOQUEIA(cUsuLog, cAlvo, lBloq)` | GEBSECBLOQUEIA(cUsuLog, cAlvo, lBloq) -> {lOk, cMsg}. Bloqueia (.T.) ou desbloqueia (.F.). |
+| `GEBSECVALIDADE` | `GEBSECVALIDADE(cUsuLog, cAlvo, cData)` | GEBSECVALIDADE(cUsuLog, cAlvo, cData) -> {lOk, cMsg}. cData AAAAMMDD; "" limpa a validade. |
+| `GEBSECELIMINAACESSOS` | `GEBSECELIMINAACESSOS(cUsuLog, cAlvo)` | GEBSECELIMINAACESSOS(cUsuLog, cAlvo) -> {lOk, cMsg}. |
+| `GEBSECEXCLUI` | `GEBSECEXCLUI(cUsuLog, cAlvo)` | GEBSECEXCLUI(cUsuLog, cAlvo) -> {lOk, cMsg}. So' usuario que nunca acessou; so' o super. |
+| `GEBSECIGNORAEXP` | `GEBSECIGNORAEXP(cUsuLog, cAlvo, lIgnora)` | GEBSECIGNORAEXP(cUsuLog, cAlvo, lIgnora) -> {lOk, cMsg}. Conta de servico: nao expira por troca periodica. |
+| `GEBSECFORCATROCA` | `GEBSECFORCATROCA(cUsuLog, cAlvo, lForca)` | GEBSECFORCATROCA(cUsuLog, cAlvo, lForca) -> {lOk, cMsg}. Troca obrigatoria no proximo logon. |
+
+**`src/GEBSEC_LOGIN.prw`** — 8 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBSECLOGIN` | `GEBSECLOGIN(cUser, cPass, cIP)` | — |
+| `HashSenha` | `HashSenha(cSenha, cSalt)` | para binario -- nao ha necessidade). |
+| `HexEncode` | `HexEncode(cBin)` | — |
+| `GEBSECSALT` | `GEBSECSALT()` | Gera um salt aleatorio por usuario para HashSenha(): 32 caracteres hexadecimais (16 bytes) derivados de UUIDRandom() -- UUID v4 gerado com crypto/rand pelo runtime AdvPP... |
+| `GEBSECPODE` | `GEBSECPODE(cUsuario, cAlvo, lExigeVinc)` | Regra unica de autorizacao para agir sobre usuarios (criar, alterar, trocar senha, excluir, vincular), usada pela API e pela tela. |
+| `GEBSECDERRUBA` | `GEBSECDERRUBA(cUsu)` | troca de senha por outra pessoa costuma responder a comprometimento. |
+| `GEBSECISSUPER` | `GEBSECISSUPER(cUsu)` | Diz se o codigo e' a conta global super (case-insensitive). |
+| `GEBSECCRIAUSU` | `GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSuper, cFilial)` | — |
+
+**`src/GEBSEC_MIG.prw`** — 2 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `TCSecMIG` | `TCSecMIG()` | — |
+| `GEBSECBOOT` | `GEBSECBOOT()` | Conta "super" em instalacao nova. |
 
 **`src/GEBSEC_POL.prw`** — 4 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBSECPOL_VERIFICA` | `GEBSECPOL_VERIFICA(cSenha)` | GEBSEC_POL Retorna: {lOk,cMsg} (GEBSECPOL_VERIFICA), dData (GEBSECPOL_EXPIRACAO), .T./.F. (GEBSECPOL_FORCA), void (GEBSE |
-| `GEBSECPOL_EXPIRACAO` | `GEBSECPOL_EXPIRACAO(cUsuario)` | Calcula vencimento da senha. |
-| `GEBSECPOL_FORCA` | `GEBSECPOL_FORCA(nForca)` | Flag de forca de senha (GE4). |
-| `GEBSECFORCAR` | `GEBSECFORCAR(cUsuario)` | Marca redefinicao obrigatoria. |
+| `GEBSECPOL_VERIFICA` | `GEBSECPOL_VERIFICA(cSenha)` | — |
+| `GEBSECPOL_EXPIRACAO` | `GEBSECPOL_EXPIRACAO(cUsuario)` | — |
+| `GEBSECPOL_FORCA` | `GEBSECPOL_FORCA(nForca)` | — |
+| `GEBSECFORCAR` | `GEBSECFORCAR(cUsuario)` | — |
 
-**`src/GEBSEC_RBA.prw`** — 3 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBSECRBAC` | `GEBSECRBAC(cUsuario, cMenu, cItem)` | GEBSEC_RBA Retorna: .T./.F. (GEBSECRBAC/GEBSECRBACADD) ou array {menu,item,permite} (GEBSECRBACLIST) |
-| `GEBSECRBACADD` | `GEBSECRBACADD(cPerfil, cMenu, cItem, lPermite)` | GEBSEC_RBA Retorna: .T./.F. (GEBSECRBAC/GEBSECRBACADD) ou array {menu,item,permite} (GEBSECRBACLIST) |
-| `GEBSECRBACLIST` | `GEBSECRBACLIST(cPerfil)` | Lista permissoes do perfil. |
-
-**`src/GEBSEC_RAC.prw`** — 1 funções
+**`src/GEBSEC_RBA.prw`** — 5 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBSECRBAC` | `GEBSECRBAC(cUsuario, cMenu, cItem)` | GEBSEC_RAC Retorna: .T. se permitido, .F. caso contrario |
+| `GEBSECRBAC` | `GEBSECRBAC(cUsuario, cMenu, cItem)` | — |
+| `GEBSECRBACADD` | `GEBSECRBACADD(cPerfil, cMenu, cItem, lPermite)` | — |
+| `GEBSECRBACADDEMP` | `GEBSECRBACADDEMP(cPerfil, cEmpresa, cMenu, cItem, lPermite)` | — |
+| `GEBSECRBACLIST` | `GEBSECRBACLIST(cPerfil)` | — |
+| `GEBSECRBACLISTEMP` | `GEBSECRBACLISTEMP(cPerfil, cEmpresa)` | cEmpresa "*" lista so' as globais. |
 
-**`src/GEBSEC_LOGIN.prw`** — 6 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBSECLOGIN` | `GEBSECLOGIN(cUser, cPass, cIP)` | GEBSEC_LOGIN Retorna: cStatus  Codigo de status ("OK" ou erro) |
-| `HashSenha` | `HashSenha(cSenha, cSalt)` | Hash da senha com salt. |
-| `HexEncode` | `HexEncode(cBin)` | Codifica binario em hexadecimal. |
-| `GEBSECSALT` | `GEBSECSALT()` | GEBSECSALT Retorna: cSalt  Salt hexadecimal de 32 chars, ou "" em falha |
-| `GEBSECISSUPER` | `GEBSECISSUPER(cUsu)` | GEBSECISSUPER Retorna: .T. se for super |
-| `GEBSECCRIAUSU` | `GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSuper, cFilial)` | GEBSECISSUPER Retorna: .T. se for super |
-
-**`src/GEBSEC_TOKEN.prw`** — 4 funções
+**`src/GEBSEC_TOKEN.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBSECTOKEN` | `GEBSECTOKEN(cUsuario, cEmpresa, cFilial, cIP)` | GEBSEC_TOKEN Retorna: cToken    Token gerado ("") se falhar |
-| `GBSTokDiaSeguinte` | `GBSTokDiaSeguinte(cData)` | Calcula expiracao do token (dia seguinte). |
-| `GEBSECTOKENDEL` | `GEBSECTOKENDEL(cToken)` | Invalida token (logout). |
-| `HashStr` | `HashStr(cTexto)` | Hash generico de texto (tokens). |
+| `GEBSECTOKEN` | `GEBSECTOKEN(cUsuario, cEmpresa, cFilial, cIP)` | — |
+| `GEBSECTOKENDEL` | `GEBSECTOKENDEL(cToken)` | Invalida token (soft-delete). |
 
-### GEB_GUI_TUI
+### GEB_TUI (interface PO-UI)
 
-**`src/GEBGUI_MAIN.prw`** — 9 funções
+**`src/GEBTUI.prw`** — 9 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBGUIMAIN` | `GEBGUIMAIN(cModo)` | GEBGUI_MAIN Retorna: .T. se menu executado sem erro |
-| `GEBGUINUC` | `GEBGUINUC()` | GEBGUI_MAIN Retorna: .T. se menu executado sem erro |
-| `GEBGUIFIS` | `GEBGUIFIS()` | GEBGUI_MAIN Retorna: .T. se menu executado sem erro |
-| `GEBGUIDER` | `GEBGUIDER()` | GEBGUI_MAIN Retorna: .T. se menu executado sem erro |
-| `GEBGUIEST` | `GEBGUIEST()` | GEBGUI_MAIN Retorna: .T. se menu executado sem erro |
-| `GEBGUIC` | `GEBGUIC` | GEBGUI_MAIN Retorna: .T. se menu executado sem erro |
-| `GEBGUIFIN` | `GEBGUIFIN()` | Submenu Financeiro da GUI. |
-| `GEBGUICOM` | `GEBGUICOM()` | Submenu Compras da GUI. |
-| `GEBGUICFG` | `GEBGUICFG()` | Submenu Configuracao da GUI. |
-
-**`src/GEBGUI_MNU.prw`** — 10 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBGUIMENU` | `GEBGUIMENU()` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `MenuDef` | `MenuDef()` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-| `GEBGUI` | `GEBGUI` | GEBGUI_MNU Retorna: .T. se menu inicializado sem erro |
-
-**`src/GEBGUI_BRW.prw`** — 17 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `BRW_EMPRESAS` | `BRW_EMPRESAS(cTitle)` | GEBGUI_BRW |
-| `BRW_USUARIOS` | `BRW_USUARIOS(cTitle)` | GEBGUI_BRW |
-| `BRW_PRODUTOS` | `BRW_PRODUTOS(cTitle)` | GEBGUI_BRW |
-| `BRW_ALIQ` | `BRW_ALIQ(cTitle)` | GEBGUI_BRW |
-| `BRW_NOTAS` | `BRW_NOTAS(cTitle)` | Browse de notas GF3. |
-| `BRW_APU` | `BRW_APU(cTitle)` | Browse de apuracao GF5. |
-| `BRW_GUIAS` | `BRW_GUIAS(cTitle)` | Browse de guias GD1. |
-| `BRW_ESTOQUE` | `BRW_ESTOQUE(cTitle)` | Browse de estoque GV1. |
-| `BRW_VENDAS` | `BRW_VENDAS(cTitle)` | Browse de vendas GV2. |
-| `BRW_CONTA` | `BRW_CONTA(cTitle)` | Browse de contas GFN1. |
-| `BRW_RECEBER` | `BRW_RECEBER(cTitle)` | Browse de receber GFN2. |
-| `BRW_PAGAR` | `BRW_PAGAR(cTitle)` | Browse de pagar GFN3. |
-| `BRW_FLUXO` | `BRW_FLUXO(cTitle)` | Browse de fluxo GFN4. |
-| `BRW_FORNECEDORES` | `BRW_FORNECEDORES(cTitle)` | Browse de fornecedores GCP1. |
-| `BRW_PEDIDOS` | `BRW_PEDIDOS(cTitle)` | Browse de pedidos GCP3. |
-| `BRW_PLANCON` | `BRW_PLANCON(cTitle)` | Browse de plano de contas GC1. |
-| `BRW_LANCAMENTOS` | `BRW_LANCAMENTOS(cTitle)` | Browse de lancamentos GC3. |
-
-**`src/GEBGUI_CFG.prw`** — 12 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBGUICONF_SHOW` | `GEBGUICONF_SHOW()` | GEBGUI_CFG Retorna: void (todas) |
-| `GEBGUICONF_PARAM` | `GEBGUICONF_PARAM(cSeccao)` | GEBGUI_CFG Retorna: void (todas) |
-| `GEBGUICONF_ALIQ` | `GEBGUICONF_ALIQ(cNCM)` | Exibe aliquota vigente do NCM + exemplo CALCIBS(1000). |
-| `GEBGUICONF_CAD_EMPRESA` | `GEBGUICONF_CAD_EMPRESA()` | Stub de cadastro rapido de empresa. |
-| `GEBGUICONF_CAD_USUARIO` | `GEBGUICONF_CAD_USUARIO()` | Stub de cadastro rapido de usuario. |
-| `GEBGUICONF_CAD_PRODUTO` | `GEBGUICONF_CAD_PRODUTO()` | Stub de cadastro rapido de produto. |
-| `GEBGUICONF_CAD_FORN` | `GEBGUICONF_CAD_FORN()` | Stub de cadastro rapido de fornecedor. |
-| `GEBGUICONF_CAD_CONTA` | `GEBGUICONF_CAD_CONTA()` | Stub de cadastro rapido de conta. |
-| `GEBGUICONF_RESUMO` | `GEBGUICONF_RESUMO()` | Dashboard numerico (fluxo + balancete + DRE). |
-| `GEBGUIMIG` | `GEBGUIMIG()` | Cria tabelas de config da GUI. |
-| `CriaGEBGUICONFIG_SC` | `CriaGEBGUICONFIG_SC()` | DDL da tabela de config string. |
-| `CriaGEBGUICONFIG_LC` | `CriaGEBGUICONFIG_LC()` | DDL da tabela de config logica. |
-
-**`src/GEBGUI_LOGIN.prw`** — 3 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBGUI_LOGIN` | `GEBGUI_LOGIN(cUser, cPass, cEmp, cIP, lSkipDash)` | GEBGUI_LOGIN Retorna: .T. se autenticacao com sucesso, .F. se cancelado ou falha critica |
-| `GEBGUIVINC` | `GEBGUIVINC(cUsu, cEmp, cFilial)` | GEBGUIVINC Retorna: .T. se formato valido e vinculo GE2_EMP existir |
-| `GEBGUI_DASHBOARD` | `GEBGUI_DASHBOARD(cEmpresa, cUsuario, cFilial)` | GEBGUIVINC Retorna: .T. se formato valido e vinculo GE2_EMP existir |
-
-**`src/GEBGUI_VLD.prw`** — 14 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBGUIPROD_CK` | `GEBGUIPROD_CK(cCod)` | GEBGUI_VLD |
-| `GEBGUIFORN_CK` | `GEBGUIFORN_CK(cCod)` | GEBGUI_VLD |
-| `GEBGUICLI_CK` | `GEBGUICLI_CK(cCod)` | GEBGUI_VLD |
-| `GEBGUIPROD_EST` | `GEBGUIPROD_EST(cProd, nQtd)` | GEBGUI_VLD |
-| `GEBGUIFIADO_LIM` | `GEBGUIFIADO_LIM(cCli, nValor)` | Valida limite 1000 do fiado. |
-| `GEBGUIFIN_BAI` | `GEBGUIFIN_BAI(cTipo, cDoc, nValor)` | Valida tipo/documento/saldo para baixa. |
-| `GEBGUIFIN_FLX` | `GEBGUIFIN_FLX()` | Valida e retorna fluxo {rec, pag, saldo}. |
-| `GEBGUIFIS_EMI` | `GEBGUIFIS_EMI(cChave, cCod, nQtd, nPreco)` | Valida params de emissao (chave, produto, qtd, preco). |
-| `GEBGUIFIS_APU` | `GEBGUIFIS_APU(cComp)` | Valida competencia para apuracao. |
-| `GEBGUIFIS_GER` | `GEBGUIFIS_GER(cComp)` | Valida competencia e retorna guia. |
-| `GEBGUICTB_DIR` | `GEBGUICTB_DIR(cCli, cContaD, cContaC, nValor)` | Valida flag PERMITE_DIRETA e delega a GEBCDIR. |
-| `GEBGUICONFIG_LC` | `GEBGUICONFIG_LC(cChave)` | Le configuracao logica (GEBCFG). |
-| `GEBGUICONFIG_SC` | `GEBGUICONFIG_SC(cChave, cValor)` | Le/escreve configuracao string. |
-| `SomaAbertoGV3` | `SomaAbertoGV3(cCli, cFil)` | Soma TOTAL em aberto do cliente (fiado). |
-
-**`src/GEBTUI.prw`** — 14 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBTUI` | `GEBTUI()` | GEBTUI |
-| `GEBTUILOGIN` | `GEBTUILOGIN()` | GEBTUILOGIN Retorna: {cEmp, cFil, cUsu} ou {} se desistir/falhar |
-| `GEBTUIEMPRESAS` | `GEBTUIEMPRESAS()` | GEBTUIEMPRESAS |
-| `GEBTUIFILIAL` | `GEBTUIFILIAL(cUsu, cEmp)` | GEBTUIFILIAL Retorna: Codigo da filial, "" matriz, Nil se desistir |
-| `GEBTUIBRW` | `GEBTUIBRW(cAlias, cTitle)` | GEBTUIBRW |
-| `GEBTUIMENU` | `GEBTUIMENU(cEmp, cFil, cUsu)` | GEBTUIMENU |
-| `GEBTUIFISCAL` | `GEBTUIFISCAL(cEmp, cFil, cUsu)` | GEBTUIFISCAL |
-| `GEBTUIFIN` | `GEBTUIFIN(cEmp, cFil, cUsu)` | GEBTUIFIN |
-| `GEBTUIDER` | `GEBTUIDER(cEmp, cFil, cUsu)` | GEBTUIDER |
-| `GEBTUIEST` | `GEBTUIEST(cEmp, cFil, cUsu)` | GEBTUIEST |
-| `GEBTUICTB` | `GEBTUICTB(cEmp, cFil, cUsu)` | GEBTUICTB |
-| `GEBTUICOM` | `GEBTUICOM(cEmp, cFil, cUsu)` | GEBTUICOM |
-| `GEBTUINUC` | `GEBTUINUC(cEmp, cFil, cUsu)` | GEBTUINUC |
-| `GEBTUITROCASENHA` | `GEBTUITROCASENHA(cUsuLog, cAlvo, cSenha, cNome, cPerfil)` | GEBTUITROCASENHA Retorna: {lOk, cMsg} (cMsg: usuario_atualizado, nada_a_alterar, |
-
-**`src/GEBAN.prw`** — 1 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBAN` | `GEBAN(cEmpresa, cUsuario, cSenha, cModo)` | GEBAN |
+| `GEBTUI` | `GEBTUI()` | Interface do GEBAN em componentes PO-UI (PoApp): login (com troca de senha obrigatoria/expirada), empresa e filial, menu lateral com os modulos permitidos e uma pagina por... |
+| `GEBTUIBRWAPP` | `GEBTUIBRWAPP(bBloco)` | Desvia GEBTUIBRW para um bloco {/cAlias, cTitulo/ ...} (Nil = FWMBrowse). |
+| `GEBTUIEMPRESAS` | `GEBTUIEMPRESAS(cUsu)` | Lista empresas do catalogo para o menu (pares {cod, nome}). |
+| `GEBTUIFILIAL` | `GEBTUIFILIAL(cUsu, cEmp)` | Filiais do usuario na empresa, {{rotulo, codigo}} ("" = matriz). |
+| `GEBTUIBRW` | `GEBTUIBRW(cAlias, cTitle)` | Abre browse FWMBrowse da tabela (padrao GesCon). |
+| `GEBTUITROCASENHA` | `GEBTUITROCASENHA(cUsuLog, cAlvo, cSenha, cNome, cPerfil)` | Troca senha e/ou propriedades (nome, perfil) de um usuario. |
+| `GEBTUIMODOK` | `GEBTUIMODOK(cUsu, cMenu, lAvisa)` | .T. |
+| `GEBTUIPERMSETEMP` | `GEBTUIPERMSETEMP(cUsuLog, cEmpresa, cPerfil, cMenu, cItem, lPermite)` | Concede (lPermite .T.) ou revoga (.F.) uma area para um perfil, numa empresa. |
+| `GEBTUIPERMSET` | `GEBTUIPERMSET(cUsuLog, cPerfil, cMenu, cItem, lPermite)` | Concede ou revoga uma area para um perfil em TODAS as empresas. |
 
 ### GEB_REST_WEB
 
-**`src/GEBREST.prw`** — 61 funções
+**`src/GEBREST.prw`** — 55 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBREST` | `GEBREST(cMetodo, cPath, aParams, cUsuario, cIP)` | GEBREST Retorna: Array {cStatus, cBody} onde cStatus e codigo HTTP e cBody e JSON |
-| `GEBRESTRBAC` | `GEBRESTRBAC(cUsuario, cPath, cMetodo)` | GEBRESTRBAC Retorna: .T. se permitido, .F. caso contrario |
-| `GEBRESTJSONRESP` | `GEBRESTJSONRESP(lOk, xDados, aErros)` | GEBRESTJSONRESP Retorna: String JSON |
-| `GEBRESTJSONENC` | `GEBRESTJSONENC(xVal)` | GEBRESTJSONENC Retorna: String JSON |
-| `GEBRESTJSONESCAPE` | `GEBRESTJSONESCAPE(cStr)` | GEBRESTJSONESCAPE Retorna: String escapada |
-| `GEBRESTJSONDEC` | `GEBRESTJSONDEC(cJson)` | GEBRESTJSONDEC Retorna: Array de tokens |
-| `GEBRESTJSONTOOBJ` | `GEBRESTJSONTOOBJ(aTok)` | GEBRESTJSONTOOBJ Retorna: Array/valor AdvPL |
-| `GEBRESTJSONPARSE` | `GEBRESTJSONPARSE(aTok, ByRef nPos)` | GEBRESTJSONPARSE |
-| `GEBRESTJSONTOARR` | `GEBRESTJSONTOARR(cJson)` | GEBRESTJSONTOARR Retorna: Array AdvPL |
-| `GEBRESTRLIMIT` | `GEBRESTRLIMIT(cIP, nLim)` | GEBRESTRLIMIT Retorna: .T. se dentro do limite, .F. caso contrario |
-| `GEBRESTHEALTH` | `GEBRESTHEALTH(cUsuario)` | GEBRESTHEALTH Retorna: Array {nHttp, cJson} |
-| `GEBRESTUSRLST` | `GEBRESTUSRLST(cUsuario)` | GEBRESTUSRLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTURGET` | `GEBRESTURGET(cUsuario, cCod)` | GEBRESTURGET Retorna: Array {nHttp, cJson} |
-| `GEBRESTURLSC` | `GEBRESTURLSC(cUsuario, aBody)` | GEBRESTURLSC Retorna: Array {nHttp, cJson} |
-| `GEBRESTUSRUPD` | `GEBRESTUSRUPD(cUsuario, cCod, aBody)` | GEBRESTUSRUPD Retorna: Array {nHttp, cJson} |
-| `GEBRESTUSRRM` | `GEBRESTUSRRM(cUsuario, cCod)` | GEBRESTUSRRM Retorna: Array {nHttp, cJson} |
-| `GEBRESTEMPLST` | `GEBRESTEMPLST(cUsuario)` | GEBRESTEMPLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTEMPLSC` | `GEBRESTEMPLSC(cUsuario, aBody)` | GEBRESTEMPLSC Retorna: Array {nHttp, cJson} |
-| `GEBRESTPRDLST` | `GEBRESTPRDLST(cUsuario)` | GEBRESTPRDLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTPRDLSC` | `GEBRESTPRDLSC(cUsuario, aBody)` | GEBRESTPRDLSC Retorna: Array {nHttp, cJson} |
-| `GEBRESTNOTLST` | `GEBRESTNOTLST(cUsuario, aParams)` | GEBRESTNOTLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTNOTPOST` | `GEBRESTNOTPOST(cUsuario, aBody)` | GEBRESTNOTPOST Retorna: Array {nHttp, cJson} |
-| `GEBRESTFLXLST` | `GEBRESTFLXLST(cUsuario)` | GEBRESTFLXLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTCONLST` | `GEBRESTCONLST(cUsuario)` | GEBRESTCONLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTRELFISSC` | `GEBRESTRELFISSC(cUsuario, cComp)` | GEBRESTRELFISSC Retorna: Array {nHttp, cJson} |
-| `GEBRESTRELGER` | `GEBRESTRELGER(cUsuario)` | GEBRESTRELGER Retorna: Array {nHttp, cJson} |
-| `GEBRESTMONUSU` | `GEBRESTMONUSU(cUsuario)` | GEBRESTMONUSU Retorna: Array {nHttp, cJson} |
-| `GEBRESTMONDES` | `GEBRESTMONDES(cUsuario, cToken)` | GEBRESTMONDES Retorna: Array {nHttp, cJson} |
-| `GEBRESTDERLST` | `GEBRESTDERLST(cUsuario)` | GEBRESTDERLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTESTLST` | `GEBRESTESTLST(cUsuario)` | GEBRESTESTLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTVENLST` | `GEBRESTVENLST(cUsuario)` | GEBRESTVENLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTCTBLST` | `GEBRESTCTBLST(cUsuario)` | GEBRESTCTBLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTCTCLST` | `GEBRESTCTCLST(cUsuario)` | GEBRESTCTCLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTCOMLST` | `GEBRESTCOMLST(cUsuario)` | GEBRESTCOMLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTFORLST` | `GEBRESTFORLST(cUsuario)` | GEBRESTFORLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTTENANT` | `GEBRESTTENANT()` | GEBRESTTENANT Retorna: Codigo ("" se fora de tenant) |
-| `GEBRESTFILLST` | `GEBRESTFILLST(cUsuario)` | GEBRESTFILLST Retorna: Array {nHttp, cJson} |
-| `GEBRESTFILSC` | `GEBRESTFILSC(cUsuario, aBody)` | GEBRESTFILSC Retorna: Array {nHttp, cJson} |
-| `GEBRESTVINCSC` | `GEBRESTVINCSC(cUsuario, aBody)` | GEBRESTVINCSC Retorna: Array {nHttp, cJson} |
-| `GEBRESTPUBEMP` | `GEBRESTPUBEMP(cUsuario)` | GEBRESTPUBEMP Retorna: Array {nHttp, cJson} |
-| `GEBRESTDERGER` | `GEBRESTDERGER(cUsuario, aBody)` | GEBRESTDERGER Retorna: Array {nHttp, cJson} 201 {guia} / 400 |
-| `GEBRESTDERBAI` | `GEBRESTDERBAI(cUsuario, aBody)` | GEBRESTDERBAI Retorna: Array {nHttp, cJson} 200 / 404 |
-| `GEBRESTDERPAR` | `GEBRESTDERPAR(cUsuario, aBody)` | GEBRESTDERPAR Retorna: Array {nHttp, cJson} 200 / 400 |
-| `GEBRESTDERJUR` | `GEBRESTDERJUR(cUsuario, aBody)` | GEBRESTDERJUR Retorna: Array {nHttp, cJson} 200 {total} |
-| `GEBRESTDERPRO` | `GEBRESTDERPRO(cUsuario, aBody)` | GEBRESTDERPRO Retorna: Array {nHttp, cJson} 200 / 404 |
-| `GEBRESTESTVEN` | `GEBRESTESTVEN(cUsuario, aBody)` | GEBRESTESTVEN Retorna: Array 201 VENDIDA / 409 SEM_ESTOQUE / 403 BLOQUEADA / 400 |
-| `GEBRESTESTFIA` | `GEBRESTESTFIA(cUsuario, aBody)` | GEBRESTESTFIA Retorna: Array 201 / 400 |
-| `GEBRESTESTFIJ` | `GEBRESTESTFIJ(cUsuario, aBody)` | GEBRESTESTFIJ Retorna: Array 200 {total} |
-| `GEBRESTCTBDIR` | `GEBRESTCTBDIR(cUsuario, aBody)` | GEBRESTCTBDIR Retorna: Array 201 / 400 |
-| `GEBRESTCTBBAL` | `GEBRESTCTBBAL(cUsuario, aComp)` | GEBRESTCTBBAL Retorna: Array 200 |
-| `GEBRESTCTBDRE` | `GEBRESTCTBDRE(cUsuario, aComp)` | GEBRESTCTBDRE Retorna: Array 200 {resultado} |
-| `GEBRESTFINCON` | `GEBRESTFINCON(cUsuario, aBody)` | GEBRESTFINCON Retorna: Array 201 / 400 |
-| `GEBRESTFINBAI` | `GEBRESTFINBAI(cUsuario, aBody)` | GEBRESTFINBAI Retorna: Array 200 / 400 |
-| `GEBRESTCOMFOR` | `GEBRESTCOMFOR(cUsuario, aBody)` | GEBRESTCOMFOR Retorna: Array 201 / 400 |
-| `GEBRESTCOMPED` | `GEBRESTCOMPED(cUsuario, aBody)` | GEBRESTCOMPED Retorna: Array 201 ABERTO / 403 BLOQUEADO / 400 |
-| `GEBRESTCOMIT` | `GEBRESTCOMIT(cUsuario, aBody)` | GEBRESTCOMIT Retorna: Array 201 / 400 |
-| `GEBRESTCOMENT` | `GEBRESTCOMENT(cUsuario, aBody)` | GEBRESTCOMENT Retorna: Array 201 / 400 |
-| `GEBRESTFISAPU` | `GEBRESTFISAPU(cUsuario, aBody)` | GEBRESTFISAPU Retorna: Array 200 / 400 |
-| `GEBRESTFISCRE` | `GEBRESTFISCRE(cUsuario, aBody)` | GEBRESTFISCRE Retorna: Array 201 {registro} / 400 |
-| `GEBRESTUNILST` | `GEBRESTUNILST(cUsuario)` | GEBRESTUNILST Retorna: Array {nHttp, cJson} |
-| `GEBRESTUNILSC` | `GEBRESTUNILSC(cUsuario, aBody)` | GEBRESTUNILSC Retorna: Array {nHttp, cJson} 201 / 400 / 409 |
+| `GEBREST` | `GEBREST(cMetodo, cPath, aParams, cUsuario, cIP)` | — |
+| `GEBRESTHEALTH` | `GEBRESTHEALTH(cUsuario)` | Endpoint /health. |
+| `GEBRESTUSRLST` | `GEBRESTUSRLST(cUsuario)` | Endpoint GET /usuarios. |
+| `GEBRESTURGET` | `GEBRESTURGET(cUsuario, cCod)` | Endpoint GET /usuarios/{cod}. |
+| `GEBRESTURLSC` | `GEBRESTURLSC(cUsuario, aBody)` | Endpoint POST /usuarios. |
+| `GEBRESTUSRUPD` | `GEBRESTUSRUPD(cUsuario, cCod, aBody)` | Endpoint PUT /usuarios/{cod}. |
+| `GEBRESTUSRRM` | `GEBRESTUSRRM(cUsuario, cCod)` | Endpoint DELETE /usuarios/{cod}. |
+| `GEBRESTEMPLST` | `GEBRESTEMPLST(cUsuario)` | Endpoint GET /empresas. |
+| `GEBRESTEMPLSC` | `GEBRESTEMPLSC(cUsuario, aBody)` | Endpoint POST /empresas. |
+| `GEBRESTPRDLST` | `GEBRESTPRDLST(cUsuario)` | Endpoint GET /produtos. |
+| `GEBRESTALISC` | `GEBRESTALISC(cUsuario, aBody)` | Cadastra aliquota IBS/CBS (percentual) de uma NCM com vigencia em GF2. |
+| `GEBRESTPRDLSC` | `GEBRESTPRDLSC(cUsuario, aBody)` | Endpoint POST /produtos. |
+| `GEBRESTNOTLST` | `GEBRESTNOTLST(cUsuario, aParams)` | Endpoint GET /notas. |
+| `GEBRESTNOTPOST` | `GEBRESTNOTPOST(cUsuario, aBody)` | Endpoint POST /notas. |
+| `GEBRESTFLXLST` | `GEBRESTFLXLST(cUsuario)` | Endpoint GET /financeiro/fluxo. |
+| `GEBRESTCONLST` | `GEBRESTCONLST(cUsuario)` | Endpoint GET /financeiro/contas. |
+| `GEBRESTRELFISSC` | `GEBRESTRELFISSC(cUsuario, cComp)` | Endpoint GET /fiscal/relatorio/{comp}. |
+| `GEBRESTRELGER` | `GEBRESTRELGER(cUsuario)` | Endpoint GET /relatorios/gerencial. |
+| `GEBRESTMONUSU` | `GEBRESTMONUSU(cUsuario)` | Endpoint GET /monitor/usuarios. |
+| `GEBRESTMONDES` | `GEBRESTMONDES(cUsuario, cToken)` | Endpoint DELETE /monitor/sessao/{token}. |
+| `GEBRESTDERLST` | `GEBRESTDERLST(cUsuario)` | Endpoint GET /derrama/guias. |
+| `GEBRESTESTLST` | `GEBRESTESTLST(cUsuario)` | Endpoint GET /estoque. |
+| `GEBRESTVENLST` | `GEBRESTVENLST(cUsuario)` | Endpoint GET /estoque/vendas. |
+| `GEBRESTCTBLST` | `GEBRESTCTBLST(cUsuario)` | Endpoint GET /contabil/lancamentos. |
+| `GEBRESTCTCLST` | `GEBRESTCTCLST(cUsuario)` | Endpoint GET /contabil/contas. |
+| `GEBRESTCOMLST` | `GEBRESTCOMLST(cUsuario)` | Endpoint GET /compras/pedidos. |
+| `GEBRESTFORLST` | `GEBRESTFORLST(cUsuario)` | Endpoint GET /compras/fornecedores. |
+| `GEBRESTFILLST` | `GEBRESTFILLST(cUsuario)` | Endpoint GET /filiais. |
+| `GEBRESTFILSC` | `GEBRESTFILSC(cUsuario, aBody)` | Endpoint POST /filiais. |
+| `GEBRESTVINCSC` | `GEBRESTVINCSC(cUsuario, aBody)` | Endpoint POST /vinculos. |
+| `GEBRESTPUBEMP` | `GEBRESTPUBEMP(cUsuario)` | Endpoint GET /public/empresas. |
+| `GEBRESTDERGER` | `GEBRESTDERGER(cUsuario, aBody)` | Endpoint POST /derrama/gerar. |
+| `GEBRESTDERBAI` | `GEBRESTDERBAI(cUsuario, aBody)` | Endpoint POST /derrama/baixar. |
+| `GEBRESTDERPAR` | `GEBRESTDERPAR(cUsuario, aBody)` | Endpoint POST /derrama/parcelar. |
+| `GEBRESTDERJUR` | `GEBRESTDERJUR(cUsuario, aBody)` | Endpoint POST /derrama/juros. |
+| `GEBRESTDERPRO` | `GEBRESTDERPRO(cUsuario, aBody)` | Endpoint POST /derrama/protestar. |
+| `GEBRESTESTVEN` | `GEBRESTESTVEN(cUsuario, aBody)` | Endpoint POST /estoque/vender. |
+| `GEBRESTESTFIA` | `GEBRESTESTFIA(cUsuario, aBody)` | Endpoint POST /estoque/fiado. |
+| `GEBRESTESTFIJ` | `GEBRESTESTFIJ(cUsuario, aBody)` | Endpoint POST /estoque/fiado/juros. |
+| `GEBRESTCTBDIR` | `GEBRESTCTBDIR(cUsuario, aBody)` | Endpoint POST /contabil/lancar. |
+| `GEBRESTCTBBAL` | `GEBRESTCTBBAL(cUsuario, cComp)` | Endpoint GET /contabil/balancete. |
+| `GEBRESTCTBDRE` | `GEBRESTCTBDRE(cUsuario, cComp)` | Endpoint GET /contabil/dre. |
+| `GEBRESTFINCON` | `GEBRESTFINCON(cUsuario, aBody)` | Endpoint POST /financeiro/contas. |
+| `GEBRESTFINBAI` | `GEBRESTFINBAI(cUsuario, aBody)` | Endpoint POST /financeiro/baixar. |
+| `GEBRESTCOMFOR` | `GEBRESTCOMFOR(cUsuario, aBody)` | Endpoint POST /compras/fornecedores. |
+| `GEBRESTCOMPED` | `GEBRESTCOMPED(cUsuario, aBody)` | Endpoint POST /compras/pedidos. |
+| `GEBRESTCOMIT` | `GEBRESTCOMIT(cUsuario, aBody)` | Endpoint POST /compras/itens. |
+| `GEBRESTCOMENT` | `GEBRESTCOMENT(cUsuario, aBody)` | Endpoint POST /compras/entradas. |
+| `GEBRESTFISAPU` | `GEBRESTFISAPU(cUsuario, aBody)` | Endpoint POST /fiscal/apurar. |
+| `GEBRESTSNCFG` | `GEBRESTSNCFG(cUsuario, aBody)` | Endpoints POST /fiscal/simples/config {anexo, inicio AAAAMM}, /fiscal/simples/folha {competencia, folha, receita_externa, atividade}, /fiscal/simples/apurar {competencia},... |
+| `GEBRESTSNFOL` | `GEBRESTSNFOL(cUsuario, aBody)` | — |
+| `GEBRESTSNAPU` | `GEBRESTSNAPU(cUsuario, aBody)` | — |
+| `GEBRESTFISCRE` | `GEBRESTFISCRE(cUsuario, aBody)` | Endpoint POST /fiscal/creditos. |
+| `GEBRESTUNILST` | `GEBRESTUNILST(cUsuario)` | Endpoint GET /unidades. |
+| `GEBRESTUNILSC` | `GEBRESTUNILSC(cUsuario, aBody)` | Endpoint POST /unidades. |
 
-**`src/GEBWEB.prw`** — 2 funções
+**`src/GEBWEB.prw`** — 18 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBWEB` | `GEBWEB(nPorta)` | GEBWEB |
-| `GEBWEB_LOGINAPI` | `GEBWEB_LOGINAPI(oReq)` | GEBWEB_LOGINAPI |
+| `GEBWEB` | `GEBWEB(nPorta)` | Servidor HTTP real (WSRestServer, AdvPP nativo): API REST do ERP (integracoes). |
+| `GEBWEB_LOGINAPI` | `GEBWEB_LOGINAPI(oReq)` | POST /api/login -- autentica de verdade. |
+| `GEBWAPI_PDVCAIXALST` | `GEBWAPI_PDVCAIXALST(oReq)` | — |
+| `GEBWAPI_PDVCAIXAABR` | `GEBWAPI_PDVCAIXAABR(oReq)` | — |
+| `GEBWAPI_PDVCAIXAFECH` | `GEBWAPI_PDVCAIXAFECH(oReq)` | — |
+| `GEBWAPI_PDVCAIXARESUMO` | `GEBWAPI_PDVCAIXARESUMO(oReq)` | — |
+| `GEBWAPI_PDVSANGRIA` | `GEBWAPI_PDVSANGRIA(oReq)` | — |
+| `GEBWAPI_PDVCUPOMNOV` | `GEBWAPI_PDVCUPOMNOV(oReq)` | — |
+| `GEBWAPI_PDVCUPOMGET` | `GEBWAPI_PDVCUPOMGET(oReq)` | — |
+| `GEBWAPI_PDVCUPCANC` | `GEBWAPI_PDVCUPCANC(oReq)` | — |
+| `GEBWAPI_PDVPRODUTBUSC` | `GEBWAPI_PDVPRODUTBUSC(oReq)` | — |
+| `GEBWAPI_PDVRELGER` | `GEBWAPI_PDVRELGER(oReq)` | — |
+| `GEBWAPI_PDVRELGERCSV` | `GEBWAPI_PDVRELGERCSV(oReq)` | — |
+| `GEBWAPI_PDVRELCOM` | `GEBWAPI_PDVRELCOM(oReq)` | — |
+| `GEBWAPI_PDVRELCOMCSV` | `GEBWAPI_PDVRELCOMCSV(oReq)` | — |
+| `GEBWAPI_PDVPERIFLIST` | `GEBWAPI_PDVPERIFLIST(oReq)` | — |
+| `GEBWAPI_PDVPERIFREG` | `GEBWAPI_PDVPERIFREG(oReq)` | — |
+| `GEBWAPI_PDVPERIFDEL` | `GEBWAPI_PDVPERIFDEL(oReq)` | — |
 
-**`src/GEBWEB_API.prw`** — 58 funções
+**`src/GEBWEB_API.prw`** — 64 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBWAPIFIELD` | `GEBWAPIFIELD(oReq, cNome)` | GEBWAPIFIELD Retorna: Valor em string ("" se ausente) |
-| `GEBWAPIAUTH` | `GEBWAPIAUTH(cTok, cEmp)` | GEBWAPIAUTH Retorna: Array {lOk, cUsuario} |
-| `GEBWAPIRESP` | `GEBWAPIRESP(aRes)` | GEBWAPIRESP Retorna: Array sentinela RAW_HTTP |
-| `GEBWAPIDENY` | `GEBWAPIDENY()` | GEBWAPIDENY Retorna: Array sentinela RAW_HTTP 401 |
-| `GEBWAPIW_HEALTH` | `GEBWAPIW_HEALTH()` | GEBWAPIW_HEALTH Retorna: Array sentinela RAW_HTTP |
-| `GEBWAPIW_GET` | `GEBWAPIW_GET(cTok, cEmp, cMetodo, cPath, aParams)` | GEBWAPIW_GET Retorna: Array sentinela RAW_HTTP |
-| `GEBWAPIW_POST` | `GEBWAPIW_POST(cTok, cEmp, cPath, aBody)` | GEBWAPIW_POST Retorna: Array sentinela RAW_HTTP |
-| `GEBWAPIW_PUTDEL` | `GEBWAPIW_PUTDEL(cTok, cEmp, cMetodo, cPath, aBody)` | GEBWAPIW_PUTDEL Retorna: Array sentinela RAW_HTTP |
-| `GEBWAPI_HEALTH` | `GEBWAPI_HEALTH(oReq)` | GEBWAPI_HEALTH |
-| `GEBWAPI_USRLST` | `GEBWAPI_USRLST(oReq)` | GEBWAPI_USRLST |
-| `GEBWAPI_USRGET` | `GEBWAPI_USRGET(oReq)` | GEBWAPI_USRGET |
-| `GEBWAPI_USRPOST` | `GEBWAPI_USRPOST(oReq)` | GEBWAPI_USRPOST |
-| `GEBWAPI_USRPUT` | `GEBWAPI_USRPUT(oReq)` | GEBWAPI_USRPUT |
-| `GEBWAPI_USRDEL` | `GEBWAPI_USRDEL(oReq)` | GEBWAPI_USRDEL |
-| `GEBWAPI_EMPLST` | `GEBWAPI_EMPLST(oReq)` | GEBWAPI_EMPLST |
-| `GEBWAPI_EMPLSC` | `GEBWAPI_EMPLSC(oReq)` | GEBWAPI_EMPLSC |
-| `GEBWAPI_PRDLST` | `GEBWAPI_PRDLST(oReq)` | GEBWAPI_PRDLST |
-| `GEBWAPI_PRDLSC` | `GEBWAPI_PRDLSC(oReq)` | GEBWAPI_PRDLSC |
-| `GEBWAPI_NOTLST` | `GEBWAPI_NOTLST(oReq)` | GEBWAPI_NOTLST |
-| `GEBWAPI_NOTPOST` | `GEBWAPI_NOTPOST(oReq)` | GEBWAPI_NOTPOST |
-| `GEBWAPI_FLXLST` | `GEBWAPI_FLXLST(oReq)` | GEBWAPI_FLXLST |
-| `GEBWAPI_CONLST` | `GEBWAPI_CONLST(oReq)` | GEBWAPI_CONLST |
-| `GEBWAPI_RELFISC` | `GEBWAPI_RELFISC(oReq)` | GEBWAPI_RELFISC |
-| `GEBWAPI_RELGER` | `GEBWAPI_RELGER(oReq)` | GEBWAPI_RELGER |
-| `GEBWAPI_MONUSU` | `GEBWAPI_MONUSU(oReq)` | GEBWAPI_MONUSU |
-| `GEBWAPI_MONDEL` | `GEBWAPI_MONDEL(oReq)` | GEBWAPI_MONDEL |
-| `GEBWAPI_DERLST` | `GEBWAPI_DERLST(oReq)` | GEBWAPI_DERLST |
-| `GEBWAPI_ESTLST` | `GEBWAPI_ESTLST(oReq)` | GEBWAPI_ESTLST |
-| `GEBWAPI_VENLST` | `GEBWAPI_VENLST(oReq)` | GEBWAPI_VENLST |
-| `GEBWAPI_CTBLST` | `GEBWAPI_CTBLST(oReq)` | GEBWAPI_CTBLST |
-| `GEBWAPI_CTCLST` | `GEBWAPI_CTCLST(oReq)` | GEBWAPI_CTCLST |
-| `GEBWAPI_COMLST` | `GEBWAPI_COMLST(oReq)` | GEBWAPI_COMLST |
-| `GEBWAPI_FORLST` | `GEBWAPI_FORLST(oReq)` | GEBWAPI_FORLST |
-| `GEBWAPI_FILLST` | `GEBWAPI_FILLST(oReq)` | GEBWAPI_FILLST |
-| `GEBWAPI_FILSC` | `GEBWAPI_FILSC(oReq)` | GEBWAPI_FILSC |
-| `GEBWAPI_VINCSC` | `GEBWAPI_VINCSC(oReq)` | GEBWAPI_VINCSC |
-| `GEBWAPI_PUBEMP` | `GEBWAPI_PUBEMP(oReq)` | GEBWAPI_PUBEMP |
-| `GEBWAPI_DERGER` | `GEBWAPI_DERGER(oReq)` | GEBWAPI_DERGER |
-| `GEBWAPI_DERBAI` | `GEBWAPI_DERBAI(oReq)` | GEBWAPI_DERBAI |
-| `GEBWAPI_DERPAR` | `GEBWAPI_DERPAR(oReq)` | GEBWAPI_DERPAR |
-| `GEBWAPI_DERJUR` | `GEBWAPI_DERJUR(oReq)` | GEBWAPI_DERJUR |
-| `GEBWAPI_DERPRO` | `GEBWAPI_DERPRO(oReq)` | GEBWAPI_DERPRO |
-| `GEBWAPI_ESTVEN` | `GEBWAPI_ESTVEN(oReq)` | GEBWAPI_ESTVEN |
-| `GEBWAPI_ESTFIA` | `GEBWAPI_ESTFIA(oReq)` | GEBWAPI_ESTFIA |
-| `GEBWAPI_ESTFIJ` | `GEBWAPI_ESTFIJ(oReq)` | GEBWAPI_ESTFIJ |
-| `GEBWAPI_CTBDIR` | `GEBWAPI_CTBDIR(oReq)` | GEBWAPI_CTBDIR |
-| `GEBWAPI_CTBBAL` | `GEBWAPI_CTBBAL(oReq)` | GEBWAPI_CTBBAL |
-| `GEBWAPI_CTBDRE` | `GEBWAPI_CTBDRE(oReq)` | GEBWAPI_CTBDRE |
-| `GEBWAPI_FINCON` | `GEBWAPI_FINCON(oReq)` | GEBWAPI_FINCON |
-| `GEBWAPI_FINBAI` | `GEBWAPI_FINBAI(oReq)` | GEBWAPI_FINBAI |
-| `GEBWAPI_COMFOR` | `GEBWAPI_COMFOR(oReq)` | GEBWAPI_COMFOR |
-| `GEBWAPI_COMPED` | `GEBWAPI_COMPED(oReq)` | GEBWAPI_COMPED |
-| `GEBWAPI_COMIT` | `GEBWAPI_COMIT(oReq)` | GEBWAPI_COMIT |
-| `GEBWAPI_COMENT` | `GEBWAPI_COMENT(oReq)` | GEBWAPI_COMENT |
-| `GEBWAPI_FISAPU` | `GEBWAPI_FISAPU(oReq)` | GEBWAPI_FISAPU |
-| `GEBWAPI_FISCRE` | `GEBWAPI_FISCRE(oReq)` | GEBWAPI_FISCRE |
-| `GEBWAPI_UNILST` | `GEBWAPI_UNILST(oReq)` | GEBWAPI_UNILST |
-| `GEBWAPI_UNILSC` | `GEBWAPI_UNILSC(oReq)` | GEBWAPI_UNILSC |
+| `GEBWAPI_HEALTH` | `GEBWAPI_HEALTH(oReq)` | GET /api/health -- publico, sem token. |
+| `GEBWAPI_USRLST` | `GEBWAPI_USRLST(oReq)` | GET /api/usuarios -- lista usuarios (auth). |
+| `GEBWAPI_USRGET` | `GEBWAPI_USRGET(oReq)` | GET /api/usuarios/{cod} -- detalha usuario (auth). |
+| `GEBWAPI_USRPOST` | `GEBWAPI_USRPOST(oReq)` | POST /api/usuarios -- cria usuario (auth, via GEBSECCRIAUSU). |
+| `GEBWAPI_USRPUT` | `GEBWAPI_USRPUT(oReq)` | PUT /api/usuarios/{cod} -- atualiza nome/perfil/senha (auth). |
+| `GEBWAPI_USRDEL` | `GEBWAPI_USRDEL(oReq)` | DELETE /api/usuarios/{cod} -- remove usuario (auth). |
+| `GEBWAPI_EMPLST` | `GEBWAPI_EMPLST(oReq)` | GET /api/empresas -- lista empresas (auth). |
+| `GEBWAPI_EMPLSC` | `GEBWAPI_EMPLSC(oReq)` | POST /api/empresas -- cria empresa em GE1 (auth). |
+| `GEBWAPI_PRDLST` | `GEBWAPI_PRDLST(oReq)` | GET /api/produtos -- lista produtos GF1 (auth). |
+| `GEBWAPI_PRDLSC` | `GEBWAPI_PRDLSC(oReq)` | POST /api/produtos -- cria produto GF1 (auth). |
+| `GEBWAPI_NOTLST` | `GEBWAPI_NOTLST(oReq)` | GET /api/notas -- lista notas GF3 com filtros periodo/status (auth). |
+| `GEBWAPI_NOTPOST` | `GEBWAPI_NOTPOST(oReq)` | POST /api/notas -- emite nota via GEBFEMI (auth). |
+| `GEBWAPI_FLXLST` | `GEBWAPI_FLXLST(oReq)` | GET /api/financeiro/fluxo -- resumo fluxo de caixa (auth). |
+| `GEBWAPI_CONLST` | `GEBWAPI_CONLST(oReq)` | GET /api/financeiro/contas -- lista contas GFN1 (auth). |
+| `GEBWAPI_RELFISC` | `GEBWAPI_RELFISC(oReq)` | GET /api/fiscal/relatorio/{comp} -- relatorio fiscal (auth). |
+| `GEBWAPI_RELGER` | `GEBWAPI_RELGER(oReq)` | GET /api/relatorios/gerencial -- relatorio gerencial (auth). |
+| `GEBWAPI_MONUSU` | `GEBWAPI_MONUSU(oReq)` | GET /api/monitor/usuarios -- usuarios online (auth, ADMIN/monitor). |
+| `GEBWAPI_MONDEL` | `GEBWAPI_MONDEL(oReq)` | DELETE /api/monitor/sessao/{sessao} -- invalida sessao (auth). |
+| `GEBWAPI_DERLST` | `GEBWAPI_DERLST(oReq)` | GET /api/derrama/guias -- lista guias GD1 (auth). |
+| `GEBWAPI_ESTLST` | `GEBWAPI_ESTLST(oReq)` | GET /api/estoque -- saldos GV1 (auth). |
+| `GEBWAPI_VENLST` | `GEBWAPI_VENLST(oReq)` | GET /api/estoque/vendas -- vendas GV2 (auth). |
+| `GEBWAPI_CTBLST` | `GEBWAPI_CTBLST(oReq)` | GET /api/contabil/lancamentos -- lancamentos GC2 (auth). |
+| `GEBWAPI_CTCLST` | `GEBWAPI_CTCLST(oReq)` | GET /api/contabil/contas -- plano de contas GC1 (auth). |
+| `GEBWAPI_COMLST` | `GEBWAPI_COMLST(oReq)` | GET /api/compras/pedidos -- pedidos GCP3 (auth). |
+| `GEBWAPI_FORLST` | `GEBWAPI_FORLST(oReq)` | GET /api/compras/fornecedores -- fornecedores GCP1 (auth). |
+| `GEBWAPI_FILLST` | `GEBWAPI_FILLST(oReq)` | GET /api/filiais -- filiais GEF1 do tenant (auth). |
+| `GEBWAPI_FILSC` | `GEBWAPI_FILSC(oReq)` | POST /api/filiais -- cadastra filial EEUUFF (auth). |
+| `GEBWAPI_VINCSC` | `GEBWAPI_VINCSC(oReq)` | POST /api/vinculos -- vincula usuario a empresa+filial (auth). |
+| `GEBWAPI_PUBEMP` | `GEBWAPI_PUBEMP(oReq)` | GET /api/public/empresas -- empresas para o seletor de ambiente (publico, sem token). |
+| `GEBWAPI_DERGER` | `GEBWAPI_DERGER(oReq)` | POST /api/derrama/gerar -- gera guia (auth). |
+| `GEBWAPI_DERBAI` | `GEBWAPI_DERBAI(oReq)` | POST /api/derrama/baixar -- quita guia (auth). |
+| `GEBWAPI_DERPAR` | `GEBWAPI_DERPAR(oReq)` | POST /api/derrama/parcelar -- parcela guia (auth). |
+| `GEBWAPI_DERJUR` | `GEBWAPI_DERJUR(oReq)` | POST /api/derrama/juros -- calcula juros (auth). |
+| `GEBWAPI_DERPRO` | `GEBWAPI_DERPRO(oReq)` | POST /api/derrama/protestar -- protesta guia (auth). |
+| `GEBWAPI_ESTVEN` | `GEBWAPI_ESTVEN(oReq)` | POST /api/estoque/vender -- vende (auth). |
+| `GEBWAPI_ESTFIA` | `GEBWAPI_ESTFIA(oReq)` | POST /api/estoque/fiado -- vende fiado (auth). |
+| `GEBWAPI_ESTFIJ` | `GEBWAPI_ESTFIJ(oReq)` | POST /api/estoque/fiados/juros -- juros do fiado (auth). |
+| `GEBWAPI_CTBDIR` | `GEBWAPI_CTBDIR(oReq)` | POST /api/contabil/lancar -- lancamento direto (auth). |
+| `GEBWAPI_CTBBAL` | `GEBWAPI_CTBBAL(oReq)` | GET /api/contabil/balancete/{comp} -- balancete (auth, via dispatcher). |
+| `GEBWAPI_CTBDRE` | `GEBWAPI_CTBDRE(oReq)` | GET /api/contabil/dre/{comp} -- DRE (auth, via dispatcher). |
+| `GEBWAPI_FINCON` | `GEBWAPI_FINCON(oReq)` | POST /api/financeiro/contas -- cria conta (auth). |
+| `GEBWAPI_FINBAI` | `GEBWAPI_FINBAI(oReq)` | POST /api/financeiro/baixar -- baixa titulo (auth). |
+| `GEBWAPI_COMFOR` | `GEBWAPI_COMFOR(oReq)` | POST /api/compras/fornecedores -- cadastra (auth). |
+| `GEBWAPI_COMPED` | `GEBWAPI_COMPED(oReq)` | POST /api/compras/pedidos -- abre pedido (auth). |
+| `GEBWAPI_COMIT` | `GEBWAPI_COMIT(oReq)` | POST /api/compras/itens -- adiciona item (auth). |
+| `GEBWAPI_COMENT` | `GEBWAPI_COMENT(oReq)` | POST /api/compras/entradas -- da entrada (auth). |
+| `GEBWAPI_FISAPU` | `GEBWAPI_FISAPU(oReq)` | POST /api/fiscal/apurar -- apura competencia (auth). |
+| `GEBWAPI_SNCFG` | `GEBWAPI_SNCFG(oReq)` | POST /api/fiscal/simples/config (anexo, inicio), /folha (competencia, folha, receita_externa) e /apurar (competencia) -- Simples Nacional (auth). |
+| `GEBWAPI_SNFOL` | `GEBWAPI_SNFOL(oReq)` | — |
+| `GEBWAPI_SNAPU` | `GEBWAPI_SNAPU(oReq)` | — |
+| `GEBWAPI_SNATV` | `GEBWAPI_SNATV(oReq)` | — |
+| `GEBWAPI_SNPRD` | `GEBWAPI_SNPRD(oReq)` | — |
+| `GEBWAPI_SNEXP` | `GEBWAPI_SNEXP(oReq)` | — |
+| `GEBWAPI_SNFER` | `GEBWAPI_SNFER(oReq)` | — |
+| `GEBWAPI_BOPOST` | `GEBWAPI_BOPOST(oReq)` | POST/GET /api/bo/{modulo}/{acao} -- backoffice (auth). |
+| `GEBWAPI_BOGET` | `GEBWAPI_BOGET(oReq)` | — |
+| `GEBWAPI_SNEXT` | `GEBWAPI_SNEXT(oReq)` | GET /api/fiscal/simples/extrato/{comp} e /anual/{ano} -- relatorios do Simples (auth). |
+| `GEBWAPI_SNANU` | `GEBWAPI_SNANU(oReq)` | — |
+| `GEBWAPI_FISCRE` | `GEBWAPI_FISCRE(oReq)` | POST /api/fiscal/creditos -- lanca credito (auth). |
+| `GEBWAPI_UNILST` | `GEBWAPI_UNILST(oReq)` | GET /api/unidades -- unidades GEU1 (auth). |
+| `GEBWAPI_UNILSC` | `GEBWAPI_UNILSC(oReq)` | POST /api/unidades -- cadastra unidade UU (auth). |
+| `GEBWAPI_DFEPAG` | `GEBWAPI_DFEPAG(oReq)` | GET /api/dfe/configurar -- pagina (publica) do assistente fiscal: entra com empresa/usuario/senha (POST /api/login) e, com o token, mostra o roteiro "o que falta para emitir",... |
+| `GEBWAPI_DFEDANFE` | `GEBWAPI_DFEDANFE(oReq)` | GET /api/dfe/danfe?token=&empresa=&chave= (ou &cupom=) -- DANFE NFC-e em HTML para imprimir (permissao LOJA/CAIXA ou FISCAL/DFE). |
+| `GEBWAPI_DFEEFD` | `GEBWAPI_DFEEFD(oReq)` | GET /api/dfe/efd?token=&empresa=&competencia= -- arquivo da EFD ICMS/IPI gerado (texto para o PVA). |
 
-<!-- arquivos fora dos modulos: [] -->
+### OUTROS
+
+**`src/_init.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `TEST_INIT` | `TEST_INIT()` | — |
+
 ## 9. Testes (72 suítes, 72/72 PASS em duas rodadas seguidas num `geban_test` vazio, 02/10/2026, advplc v4.4.0-geban)
 
 Um comando: **`o runner de testes [T_NOME ...]`** — envia `src/`+`tests/` ao servidor de testes,
@@ -1108,7 +1440,7 @@ Forçar a liberação (`faturamento/liberar` com `forcar=S`) exige também FATUR
 
 ## 13. Documentos fiscais eletrônicos: NFC-e real (19/10/2026)
 
-**Requisito de runtime:** advplc **v4.6.0** ou mais novo (`PrivSignRSA`, `ProcRun`, `HTTPSPost` com certificado de cliente, `DateTimeUTC`). A produção roda a 4.4.5: o deploy desta etapa vai com `o script de publicacao --advplc <binário 4.6.0>`. O servidor também precisa do `openssl` (já existe na servidor de testes) e da cadeia ICP-Brasil instalada (o script de instalacao da cadeia ICP-Brasil, ver docs/07).
+**Requisito de runtime:** advplc **v4.8.5** ou mais novo (`PrivSignRSA`, `ProcRun`, `HTTPSPost` com certificado de cliente, `DateTimeUTC`; `Nil`/`NULL` como texto vazio e passagem por referência `@var`). O servidor também precisa do `openssl` e da cadeia ICP-Brasil instalada (script interno de instalação da cadeia ICP-Brasil).
 
 **Fontes**
 
@@ -1190,7 +1522,7 @@ Situações em GDF5: `AUTORIZADA`, `CONTINGENCIA`, `REJEITADA`, `REJEITADA_CONTI
 
 | Teste | Onde roda | O que confere |
 |---|---|---|
-| `T_GEBDFE` | Suíte, banco de teste | 51 verificações de ponta a ponta contra `tests/emuladores/sefaz_emulador.py` (HTTPS 127.0.0.1:18766; confere digest e RSA de cada documento e simula 100, 204, 297, 373, 539, 778, 108, resposta lenta, 135, 580, 102, 241, 101, 217). O runner de testes sobe o emulador e exporta `ADVPP_HTTP_INSECURE` só para os testes. |
+| `T_GEBDFE` | Suíte, servidor de testes | 51 verificações de ponta a ponta contra `tests/emuladores/sefaz_emulador.py` (HTTPS 127.0.0.1:18766; confere digest e RSA de cada documento e simula 100, 204, 297, 373, 539, 778, 108, resposta lenta, 135, 580, 102, 241, 101, 217). O runner de testes sobe o emulador e exporta `ADVPP_HTTP_INSECURE` só para os testes. |
 | `tests/local/T_GEBDFE_XML.sh` | Local | XSD oficiais PL_010_V1.30 (`tests/xsd`) com `xmllint`; assinatura e QR conferidos com lxml/cryptography |
 | `tests/local/T_GEBDFE_QR.sh` | Local | Matriz idêntica à da biblioteca Python `qrcode` |
 | `tests/local/T_GEBDFE_IE.sh <ie.js>` | Local | 92.000 inscrições conferidas com a implementação de referência gammasoft/ie |

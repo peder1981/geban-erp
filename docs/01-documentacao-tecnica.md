@@ -8,7 +8,7 @@
 > cresceu desde então, com arquivos em estados diferentes (PASS, FAIL conhecido, bloqueio de
 > arquitetura). Status atual por teste: ledgers SDD de cada plano (`registro interno`) e seção
 > `## Pendências` de `documentacao interna` (testes ainda em
-> FAIL/bloqueados). `advplc serve src/GEBAN.prw` → web no ar.
+> FAIL/bloqueados). `advplc serve src/GEBTUI.prw` → interface web no ar (porta 8081).
 > Sem mocks: todo comportamento abaixo foi lido dos fontes e executado no AdvPP.
 
 ---
@@ -28,17 +28,14 @@ A conexão (`GEBDBConecta()`, `src/GEBDB_TENANT.prw`) lê `GEBAN_PG_HOST`, `GEBA
   (vínculo usuário↔empresa, many-to-many — substitui a antiga coluna `GE2_EMPRESA`), `SEC_PERM`,
   `SEC_ADMIN_SESSION`. `GEBDBProvisionaCatalogo()` garante o catálogo; `GEBDBProvisionaEmpresa()`
   provisiona o schema de uma empresa nova.
-- **Entrada:** `src/GEBAN.prw` → `User Function GEBAN(cEmpresa, cUsuario, cSenha, cModo)` roda,
-  nesta ordem: (1) `GEBDBConecta()`; (2) `GEBDBProvisionaCatalogo()`; (3) — só quando empresa,
-  usuário **e** senha foram todos informados — autenticação em nível de catálogo via
-  `GEBSECLOGIN()` (Argon2id contra `GE2_SEC`), checagem de vínculo em `GE2_EMP`, checagem de
-  schema provisionado (`GEBDBSchemaExists()`) e troca de tenant (`GEBDBSetTenant()`); só depois
-  do tenant selecionado é que `GBAUDINIC()`/`GEBMONINIC()` (auditoria/monitor por-tenant) e
-  `GEBEXPCONTEXTO()` (contexto de sessão) rodam; (4) inicia a GUI — `GEBEXP_WEB()` (login válido)
-  ou `GEBGUICONF_SHOW()` (modo `CONFIG`) quando autenticado, senão `GEBGUIMAIN()` (menu terminal,
-  sem tenant selecionado — mesmo fallback para "sem credenciais" e para "credenciais inválidas",
-  de propósito, para não virar oráculo de enumeração de usuário). Ver `src/GEBAN.prw` para o
-  detalhamento completo (comentários de segurança inline).
+- **Entrada:** `advplc serve src/GEBTUI.prw` → `User Function GEBTUI()` roda, nesta ordem:
+  (1) `GEBDBConecta()`; (2) `GEBDBProvisionaCatalogo()` (catálogo + `GEBSECBOOT()`, que cria o
+  `super` numa instalação nova); (3) tela de login → `GEBSECLOGIN()` (Argon2id contra `GE2_SEC`,
+  recusa genérica para não virar oráculo de enumeração de usuário; troca obrigatória/expirada antes
+  de seguir); (4) empresa (vínculo em `GE2_EMP`) e filial; (5) `GEBDBSetTenant()`, depois
+  `GBAUDINIC()`/`GEBMONINIC()` (auditoria/monitor por-tenant) e `GEBEXPCONTEXTO()` (contexto de
+  sessão); (6) monta o menu e as páginas (capítulo 4.1). Outras entradas: `src/GEBWEB.prw` (API
+  REST, porta 8090) e `src/GEBSCHJOB.prw` (agendador).
 - **Decomposição em 7 sub-projetos** (ordem de construção): `GEB_NUCLEO` → `GEB_FISCAL` →
   `GEB_DERRAMA` → `GEB_ESTOQ_VENDA` → `GEB_CONTABIL` → `GEB_FIN` → `GEB_COM`.
 - **Auditoria/contexto por-tenant** (`GEBEXP_CTX`, `src/GEBEXP_CTX.prw`; `GEBEXPCriaAuditoria()`,
@@ -73,8 +70,8 @@ A conexão (`GEBDBConecta()`, `src/GEBDB_TENANT.prw`) lê `GEBAN_PG_HOST`, `GEBA
 
 ```
                         ┌─────────────┐
-                        │  GEBAN.prw  │  entrada: GEBAN() + MenuDef()
-                        │  (Task 2)   │  Núcleo/Fiscal/Derrama/Estoque/Contábil
+                        │ GEBTUI.prw  │  entrada: GEBTUI() (PoApp, PO-UI)
+                        │  + GEBWEB   │  menu de módulos, formulários, Início
                         └──────┬──────┘
                                │ GENMIG()
                ┌───────────────┼────────────────┐
@@ -122,23 +119,17 @@ A conexão (`GEBDBConecta()`, `src/GEBDB_TENANT.prw`) lê `GEBAN_PG_HOST`, `GEBA
                               │ GEBEXP_REL_*:  │
                               │  relatorios +  │
                               │  trackers      │
-                              │ GEBEXP_WEB:    │
-                              │  dashboard web │
                               └───────┬────────┘
                                       │
                               ┌───────▼────────┐
-                              │ GEB_GUI        │
-                              │ (interfaces)   │
-                              │ GEBGUI_VLD:    │
-                              │  13 validadores│
-                              │ GEBGUI_MNU:    │
-                              │  menu 9 opç    │
-                              │ GEBGUI_BRW:    │
-                              │  17 browses    │
-                              │ GEBGUI_CFG:    │
-                              │  configuracoes │
-                              │ GEBGUI_MAIN:   │
-                              │  terminal main │
+                              │ GEB_TUI        │
+                              │ (interface)    │
+                              │ GEBTUI:        │
+                              │  login, menu,  │
+                              │  formularios,  │
+                              │  Inicio, rastro│
+                              │ GEBTUIPDV:     │
+                              │  frente de loja│
                               └────────────────┘
     Dependências reais (chamadas sem prefixo U_):
     GEBFEMI → GEBMNT + GEBCFG + GEBFPRO + GEBFALI + CALCIBS + GEBFILA + CTBLAN
@@ -237,16 +228,49 @@ literais (ver §7 — gap BeginSql).
 > `StartJob`/`FindFunction`; chamada direta `U_X()` dá "unknown function"
 > (documentado no Protheus.doc de cada fonte).
 
-### 4.1 Entrada — `src/GEBAN.prw`
+### 4.1 Interface — `src/GEBTUI.prw`
 
-- `GEBAN(cEmpresa, cUsuario, cSenha, cModo)` → `.T.`/`.F.`. `.F.` se `GEBDBConecta()` ou
-  `GEBDBProvisionaCatalogo()` falharem (ver §1 para a ordem completa do bootstrap real:
-  conexão Postgres → provisionamento do catálogo → autenticação/seleção de empresa →
-  `GEBEXP_WEB()`/`GEBGUICONF_SHOW()`/`GEBGUIMAIN()`). `GENMIG()` continua existindo como migração
-  interna das tabelas de núcleo (chamada por `GEBDBProvisionaCatalogo()`/`GEBDBProvisionaEmpresa()`),
-  não como algo que o operador invoca diretamente.
-- `MenuDef()` (Static) → `aRotina` Núcleo/Fiscal/Derrama/Estoque/Contábil; ações reais
-  (`BrowseDef` por entidade) são stubs com `ConOut` nesta etapa (`GEBANucle/fis/der/est/ctb`).
+**Fontes:** `src/GEBTUI.prw` (aplicação, formulários e páginas), `src/GEBTUIPDV.prw` (frente de loja),
+`src/GEBTUIBO.prw` (DANFE da NFC-e), `src/GEBEXP_TRAK.prw` (rastreabilidade). Componentes PO-UI do
+runtime AdvPP (`PoApp`, `PoMenu`, `PoPage`, `PoTabs`, `PoWidget`, `PoTable`, `PoChart`, `PoTree`...).
+**Entrada:** `advplc serve src/GEBTUI.prw --port 8081` → `User Function GEBTUI()`; cada janela do
+navegador é uma sessão (VM própria).
+
+**Fluxo de entrada**
+1. `TUILogin`: usuário e senha → `GEBSECLOGIN` (Argon2id, bloqueio após 5 erros; recusa genérica).
+2. `TROCA_OBRIGATORIA`/`SENHA_EXP` → `TUISenhaPg` → `GEBTUITROCASENHA` (política `GEBSECPOL_VERIFICA`).
+3. Empresa (`GEBTUIEMPRESAS`): uma só → automática; várias → escolha; catálogo vazio → o `super`
+   cria a primeira (`TUIPrimeira`). Filial (`GEBTUIFILIAL`, "" = matriz).
+4. `TUIAbre`: menu lateral só com os módulos em que o usuário tem ao menos um item permitido
+   (`TUIPode`/RBAC), Início, Rastreabilidade, Minha senha e Sair.
+
+**Páginas**
+- **Início** (`TUIInicio`): sessão, indicadores (saldo em contas, títulos em aberto, guias da Derrama,
+  estoque abaixo do mínimo), gráfico de saldo por conta e acesso rápido aos módulos.
+- **Módulo** (`TUIModulos` → `TUIModPg`): tabelas do módulo em abas (`TUICarrega`: colunas lidas
+  do `information_schema`, filtro `D_E_L_E_T_` e filial — exceto GE1/GE2 —, até 500 linhas, sem
+  colunas de credencial (`TUISigilo`)); clicar numa linha preenche os campos ligados dos formulários.
+  Abaixo, os formulários em abas pelo prefixo do título: Operações, Relatórios, Banco,
+  NF-e de fornecedores, Simples Nacional e Documentos eletrônicos.
+- **Frente de loja** (`TUIPdvPg`): venda numa tela (carrinho, preço/promoção, pagamentos múltiplos,
+  troco), caixa, orçamentos, consultas, cadastros, relatórios, TEF/NFC-e e devolução.
+- **Rastreabilidade** (`TUIRastreio`): origem + número → árvore com os registros de cada etapa (`GEBTRAK*`).
+- **Resultado**: relatórios (`GBR1` ou a tabela do relatório) com botão Voltar (`GEBTUIBRW`).
+
+**Formulários** (`TUIFormularios` = `TUIFormBase` + `TUIFormDfe` + `TUIFormNuc`, mais os do PDV):
+cada operação é uma especificação `{módulo, 0, 0, título, campos, bloco, retorno, msg|tabela, permissão[, cálculo, itens]}`.
+Campo: `{rótulo, "C" | "N" | "P" (senha) | {opções}, padrão[, coluna ligada]}`. `TUIExecuta`
+confere a permissão (`GEBSECRBAC(usuário, menu, item)`) antes de chamar o bloco, que usa as mesmas
+funções de negócio da API REST — a validação fica na regra de negócio, não na tela. Retorno `"BO"`
+= `{lOk, cMsg}`; `"REL"` = relatório na página Resultado; `"201"`/`"200"` = status REST
+(`GEBTUIMOTIVO` traduz a recusa). Operações com vários itens têm grade (`TUIFormItens`: incluir e
+remover item; o bloco recebe os itens).
+
+**Testes:** `T_GEBTUI_OPS` (executa todos os formulários com valores padrão + verificações
+dirigidas), `T_GEBTUIPDV` (venda, devolução, orçamento e caixa), `T_GEBTUI_FLUXOS`, `T_GEBTUI_PERM`,
+`T_GEBTUIBO`; lints `tests/local/T_LOCAL_FUNCOES.sh` (função inexistente),
+`T_NOMES_RESERVADOS.sh` (variável com nome de palavra-chave) e `T_LOCAL_APOS_RETURN.sh`, rodados
+pelo `o script de publicacao` antes de publicar.
 
 ### 4.2 Núcleo — `src/GENUC_MIG.prw`, `src/GENUC_CAD.prw`, `src/GENUC_MNT.prw`
 
@@ -402,7 +426,7 @@ alias literal · workarea p/ leitura · `DbAppend()+RecLock(.T.)+MsUnlock()` p/ 
 | 1 | `FWLogMsg()` **não existe** no runtime | Log via `ConOut()` | Todos os 38 `src/*.prw` |
 | 2 | `GetNextAlias()` **não existe** | Alias literal (`"GE4"`, `"GF2"`, …) | ex. `src/GENUC_MIG.prw` `GEBCFG()` |
 | 3 | `Default` **sobrescreve incondicionalmente** | `If x == Nil` em vez de `Default` | Todos os `User Function` com params |
-| 4 | `GetArea()` retorna `""` sem workarea aberta; `RestArea("")` **aborta** | Guarda `If Len(aArea) > 0` em **todas** as saídas | ex. `src/GEBAN.prw:33-35` |
+| 4 | `GetArea()` retorna `""` sem workarea aberta; `RestArea("")` **aborta** | Guarda `If Len(aArea) > 0` em **todas** as saídas | ex. `src/GEBSEC_LOGIN.prw` |
 | 5 | `BeginSql` standalone é **no-op** no pré-processador (`preprocessor.go:345`, vira atribuição de string) | Leitura via workarea (`DbSelectArea`/`DbGoTop`/scan/`DbSkip`); SQL só via `TCSqlExec`/`TCSqlQuery` literais | ex. `src/GENUC_MIG.prw:75-90`, `src/GEBFIS_APU.prw` `SomaGF4()`, `src/GEBCOM_ENT.prw` `SomaItens()` |
 | 6 | `Select()` e `Used()` são **stubs** (sempre `0`/`.F.`); `DbSelectArea` em tabela ausente **aborta** | Guarda de existência via `TCSqlQuery` antes de abrir — originalmente `SELECT name FROM sqlite_master …` (evidência da era SQLite); após a migração para Postgres (Fase 1c), o guard vive centralizado em `GEBDBTableExists()`/`GEBDBTableExistsHere()` (`src/GEBDB_CORE.prw`, sobre `pg_tables`/`information_schema`) | ex. `src/GENUC_MIG.prw:67-73`, `src/GEBFIS_EMI.prw:110-125`, `src/GEBDB_CORE.prw` |
 | 7 | Escrita via workarea: `DbAppend()` puro **não persiste**; `RecLock()` sozinho **aborta** ("no current record") em tabela vazia | `DbAppend()` + `RecLock(alias, .T.)` + atribuições + `MsUnlock()` — único caminho que persiste (probes Task 3: gravou em vazia e em duplo insert N=2) | ex. `src/GENUC_CAD.prw:60-70`, `src/GENUC_MNT.prw:103-112` |
@@ -415,6 +439,11 @@ diretas sem prefixo (todos os Protheus.doc); `FWxFilial()` retorna 6 espaços se
 (`@` não garantido nos `Static` ⇒ `SomaGF4()` retorna array); `CTBLAN` com fallback stub quando
 GC4 ausente/sem params (compat fiscal/derrama/venda); `GE1` sem coluna de regime ⇒ convenção
 `GE1_NOME == "SIMPLES"`.
+
+**Corrigidos no runtime desde então** (o código antigo segue válido): chamada com `U_` resolve
+em qualquer lugar (AdvPP 4.8.3); passagem por referência `@var` funciona em local, `Private`,
+`Static`, codeblock e métodos (4.8.4); `Nil` convertido em texto vira `""` (4.8.4) e o `NULL`
+do Postgres chega ao `TCSqlQuery` como `""` (4.8.5); `GetEnv` de variável ausente devolve `""`.
 
 ---
 
@@ -429,15 +458,15 @@ GC4 ausente/sem params (compat fiscal/derrama/venda); `GE1` sem coluna de regime
 |-------|---------|----------------|
 | Check | `advplc check src/*.prw tests/*.prw` | **84 files: 84 ok, 0 failed** (8 workers) |
 | Suite | `advplc run tests/T_*.prw --db-path …` (46 arquivos, comando da era SQLite) | **46 PASS, 0 FAIL** (contagem por grep `PASS` por teste) |
-| Serve | `advplc serve src/GEBAN.prw --port 9123` | `AdvPP web: http://localhost:9123 (fonte: GEBAN.prw)` |
+| Serve | `advplc serve src/GEBTUI.prw --port 8081` | `AdvPP web: http://0.0.0.0:8081 (fonte: GEBTUI.prw)` |
 | Massa | `T_GEBAN_MASSA` (100 auditorias), `T_GEBFIS_MASSA` (100 notas), `T_GEBV_MASSA` (100 vendas), `T_GEBDER_MASSA` (50 guias), `T_GEBCTB_MASSA` (200 lançamentos, `BAL`+`DRE`), `T_GEBFIN_MASSA` (100 títulos: 50 receber de 100 + 50 pagar de 50, `FLX {5000,2500,2500}` → baixa total → `{0,0,0}`, `CAIXA` 2500, 100 mov), `T_GEBCOM_MASSA` (50 pedidos: item 2×10=20 + entrada, 50 GCP3 `RECEBIDO` + 50 GCP5 + 50 GFN3), `T_GeExp_MASSA` (3 empresas 01/02/99 isoladas; cada uma: 20 NFs emitidas, 5 guias derrama, 10 pedidos entrada, 10 CTB; `GEBRELGERAL` por empresa confere contagens; 5 trackers validados) | Todos `PASS` na suite acima |
 
-Testes por módulo (`tests/`): núcleo `T_GENUC_{MIG,CAD,MNT}` + `T_GEBAN_{MENU,MASSA}`;
+Testes por módulo (`tests/`): núcleo `T_GENUC_{MIG,CAD,MNT}` + `T_GEBAN_MASSA`;
 fiscal `T_GEBFIS_{MIG,CAD,EMI,APU,MASSA}`; derrama `T_GEBDER_{MIG,GUI,COB,BAI,MASSA}`;
 estoque `T_GEBV_{MIG,EST,VEN,FIA,MASSA}`; contábil `T_GEBCTB_{MIG,CTB,DIR,BAL,MASSA}`;
 financeiro `T_GEBFIN_{MIG,CON_LAN,BAI,FLX,MASSA}`; compras
-`T_GEBCOM_{MIG,FOR_COT,PED,ENT,MASSA}`; multi-empresa `T_GeExp_{MIG,CTX,WEB,REL_BIZ,REL_NUC,MASSA}`;
-GUI `T_GEBGUI_{VLD,MAIN,BRW,CFG,INTEG}`.
+`T_GEBCOM_{MIG,FOR_COT,PED,ENT,MASSA}`; multi-empresa `T_GeExp_{MIG,CTX,REL_BIZ,REL_NUC,MASSA}`;
+interface `T_GEBTUI_{OPS,FLUXOS,PERM}`, `T_GEBTUIPDV`, `T_GEBTUIBO`.
 Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks anteriores.
 
 ---
@@ -464,7 +493,6 @@ Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks an
 
 | Fonte | Responsabilidade | Teste(s) |
 |-------|------------------|----------|
-| `src/GEBAN.prw` | Entrada + `MenuDef` | `tests/T_GEBAN_MENU.prw` |
 | `src/GENUC_MIG.prw` | `GENMIG`, `GEBCFG` (GE1–GE5) | `tests/T_GENUC_MIG.prw` |
 | `src/GENUC_CAD.prw` | `GEBAUD`, `GEBUSR`, `GEBCAD` | `tests/T_GENUC_CAD.prw` |
 | `src/GENUC_MNT.prw` | `GEBMNT`, `GEBFILA`, `CTBLAN`, `CTBGRV` | `tests/T_GENUC_MNT.prw`, `tests/T_GEBCTB_CTB.prw` |
@@ -495,13 +523,10 @@ Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks an
 | `src/GEBEXP_CTX.prw` | `GEBEXPCONTEXTO`, `GEBEXPIST`, `GEBEXPCONTEXT`, `GEBEXPCLEAR` | `tests/T_GeExp_CTX.prw` |
 | `src/GEBEXP_REL_BIZ.prw` | `GEBRELFISCAL`, `GEBRELDERRAMA`, `GEBRELFIN`, `GEBRELSTOQUE`, `GEBRELCOMPRAS`, `GEBRELCONTABIL`, `GEBRELGERAL` | `tests/T_GeExp_REL_BIZ.prw` |
 | `src/GEBEXP_TRAK.prw` | `GEBTRAKCOMPRA`, `GEBTRAKVENDA`, `GEBTRAKNOTAFISCAL`, `GEBTRAKDERRAMA` | `tests/T_GeExp_REL_BIZ.prw` |
-| `src/GEBEXP_WEB.prw` | `GEBEXP_WEB` (dashboard web) | `tests/T_GeExp_WEB.prw` |
 | `src/GEBEXP_REL_NUC.prw` | `GEBRELEMPRESAS`, `GEBRELUSUARIOS`, `GEBRELAUDITORIA`, `GEBRELMENTOR`, `GEBRELCADASTROS` | `tests/T_GeExp_REL_NUC.prw` |
-| `src/GEBGUI_VLD.prw` | Validadores GUI: `GEBGUIPROD_CK`, `GEBGUIFORN_CK`, `GEBGUICLI_CK`, `GEBGUIPROD_EST`, `GEBGUIFIADO_LIM`, `GEBGUIFIN_BAI`, `GEBGUIFIN_FLX`, `GEBGUIFIS_EMI`, `GEBGUIFIS_APU`, `GEBGUIFIS_GER`, `GEBGUICTB_DIR`, `GEBGUICONFIG_LC`, `GEBGUICONFIG_SC` | `tests/T_GEBGUI_VLD.prw` |
-| `src/GEBGUI_MNU.prw` | `GEBGUIMENU`, `MenuDef` (9 opções), handlers por módulo | `tests/T_GEBGUI_BRW.prw`, `tests/T_GEBGUI_INTEG.prw` |
-| `src/GEBGUI_BRW.prw` | 17 browses (FWMBrowse): Empresas, Usuários, Produtos, Alíquotas, Notas, Apuração, Guias, Estoque, Vendas, Contas, Receber, Pagar, Fluxo, Fornecedores, Pedidos, Plano de Contas, Lançamentos | `tests/T_GEBGUI_BRW.prw` |
-| `src/GEBGUI_CFG.prw` | `GEBGUICONF_SHOW`, `GEBGUICONF_PARAM`, `GEBGUICONF_ALIQ`, `GEBGUICONF_RESUMO`, `GEBGUICONF_CAD_*`, `GEBGUIMIG` (GEBGUICONFIG_SC/LC) | `tests/T_GEBGUI_CFG.prw` |
-| `src/GEBGUI_MAIN.prw` | `GEBGUIMAIN` (menu terminal 9 opções) | `tests/T_GEBGUI_MAIN.prw`, `tests/T_GEBGUI_INTEG.prw` |
+| `src/GEBTUI.prw` | Interface PO-UI: login, empresa/filial, menu, Início, páginas de módulo, formulários (`TUIFormularios`), rastreabilidade | `tests/T_GEBTUI_OPS.prw`, `tests/T_GEBTUI_FLUXOS.prw`, `tests/T_GEBTUI_PERM.prw` |
+| `src/GEBTUIPDV.prw` | Frente de loja (PDV): venda, caixa, orçamentos, consultas, devolução | `tests/T_GEBTUIPDV.prw` |
+| `src/GEBTUIBO.prw` | DANFE da NFC-e do cupom | `tests/T_GEBTUIBO.prw` |
 | massas | carga + regressão | `tests/T_GeExp_MASSA.prw` (3 empresas × 20 NFs + 5 guias + 10 pedidos + 10 CTB) + `tests/T_GEBAN_MASSA.prw`, `T_GEBFIS_MASSA`, `T_GEBDER_MASSA`, `T_GEBV_MASSA`, `T_GEBCTB_MASSA`, `T_GEBFIN_MASSA`, `T_GEBCOM_MASSA` |
 
 Spec: `documentacao interna`.

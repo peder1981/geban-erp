@@ -5,7 +5,7 @@
 
 **O que é o GEBAN?** Um programinha de gestão ("ERP", que é só um nome chique para "sistema que junta vendas + estoque + imposto + contas"). Ele roda no seu computador usando dois programas: **AdvPP** (o motor que entende a linguagem) e **advplc** (o comando que você digita para rodar, conferir e abrir o sistema).
 
-**Atualização:** o sistema agora suporta **múltiplas empresas** (você pode ter a banquinha da esquina E o mercadão em同一个 banco, isolados) e uma **interface web com dashboard** (além do menu terminal clássico).
+**Atualização:** o sistema agora suporta **múltiplas empresas** (você pode ter a banquinha da esquina E o mercadão no mesmo banco, isolados) e uma **interface web com dashboard** (além do menu terminal clássico).
 
 **Palavras que vão aparecer muito (cola aqui):**
 
@@ -55,7 +55,7 @@ Passo a passo:
    > Não entendeu o link? Peça ao técnico o "instalador do AdvPP para o meu sistema". Ele te passa um arquivo, você clica e instala.
 4. Confira que o motor funciona:
    ```bash
-   advplc check src/GEBAN.prw --include src
+   advplc check src/GEBTUI.prw --include src
    ```
    Se não mostrar erro, está tudo certo.
 
@@ -69,24 +69,24 @@ Você tem 3 comandos principais. Decore estes 3:
 
 ```bash
 # 1) Conferir se o código está sem erro (não roda, só confere)
-advplc check src/GEBAN.prw --include src
+advplc check src/GEBTUI.prw --include src
 
 # Conferir vários arquivos de uma vez
-advplc check src/GEBAN.prw src/GENUC_MIG.prw src/GEBFIS_MIG.prw --include src
+advplc check src/GEBTUI.prw src/GEBWEB.prw --include src
 
-# 2) Rodar um programa direto no terminal (bom para teste rápido)
-advplc run src/GEBAN.prw --include src
+# 2) Rodar um programa direto no terminal (ex.: a API REST, porta 8090)
+advplc run src/GEBWEB.prw
 
 # 3) Abrir no navegador (jeito normal de usar todo dia) — veja capítulo 3
-advplc serve src/GEBAN.prw --include src --port 9000
-advplc serve src/GEBAN.prw --include src --port 9000 --watch
+advplc serve src/GEBTUI.prw --port 8081
+advplc serve src/GEBTUI.prw --port 8081 --watch
 ```
 
 - `check` = "está tudo escrito certo?".
 - `run` = "roda agora no terminal e mostra o resultado".
 - `serve` = "abre como site no navegador para clicar".
 
-> Dica: `--include src` diz onde estão os outros arquivos. `--watch` faz recarregar sozinho quando o técnico muda algo. `--port 9000` escolhe a porta (a "porta" é só o número do endereço local). As 5 variáveis `GEBAN_PG_*` (capítulo 1) precisam estar configuradas no ambiente **antes** de rodar `run`/`serve` — sem elas, o GEBAN não consegue conectar no banco.
+> Dica: `--include src` (no `check`) diz onde estão os outros arquivos. `--watch` faz recarregar sozinho quando o técnico muda algo. `--port 8081` escolhe a porta (a "porta" é só o número do endereço local). As 5 variáveis `GEBAN_PG_*` (capítulo 1) precisam estar configuradas no ambiente **antes** de rodar `run`/`serve` — sem elas, o GEBAN não consegue conectar no banco.
 
 ---
 
@@ -94,20 +94,32 @@ advplc serve src/GEBAN.prw --include src --port 9000 --watch
 
 1. No terminal, entre na pasta do GEBAN (com as variáveis `GEBAN_PG_*` já configuradas — capítulo 1):
    ```bash
-   advplc serve src/GEBAN.prw --include src --port 9000
+   advplc serve src/GEBTUI.prw --port 8081
    ```
 2. Abra o navegador e digite:
    ```
-   http://localhost:9000
+   http://localhost:8081
    ```
-   > `localhost` significa "minha própria máquina". `9000` é a porta que você escolheu. Se a porta 9000 estiver ocupada (mensagem de erro), troque para 9001, 9002, etc.
+   > `localhost` significa "minha própria máquina". `8081` é a porta que você escolheu. Se ela estiver ocupada (mensagem de erro), troque para 8082, 8083, etc.
 3. Na primeira vez o sistema cria o catálogo sozinho (conexão Postgres + tabelas compartilhadas `GE1`/`GE2`/segurança). Você vai ver mensagens como:
    ```
    OK: GEBDBConecta
    OK: GEBDBProvisionaCatalogo
    ```
-   Isso é normal. Significa "banco conectado, catálogo pronto". Para entrar de fato numa empresa você precisa informar empresa + usuário + senha — veja o capítulo 18.
-4. Para fechar: volte ao terminal e aperte `Ctrl+C`.
+   Isso é normal. Significa "banco conectado, catálogo pronto".
+4. Aparece a tela **Acesso**: informe usuário e senha e clique em **Entrar** (capítulo 18). Numa instalação nova existe só a conta `super`, com a senha inicial da instalação; o primeiro login pede a troca da senha na hora.
+5. Para fechar: volte ao terminal e aperte `Ctrl+C`.
+
+### 3.1 Como a tela funciona
+
+- **Menu lateral:** Início, os módulos que você tem permissão para usar, Rastreabilidade, Minha senha e Sair.
+- **Início:** empresa, filial, usuário e data da sessão; indicadores (saldo em contas, títulos em aberto, guias da Derrama, estoque abaixo do mínimo) e o gráfico de saldo por conta.
+- **Página do módulo:** em cima, as tabelas do módulo em abas (atualizam sozinhas depois de cada operação; clicar numa linha preenche os campos ligados dos formulários). Embaixo, os formulários em abas: **Operações**, **Relatórios** e, conforme o módulo, **Banco**, **NF-e de fornecedores**, **Simples Nacional** e **Documentos eletrônicos**.
+- **Formulário:** cada operação é uma tela única. Preencha e clique em **Confirmar**; o resultado aparece numa mensagem verde (feito) ou vermelha (recusado, com o motivo).
+- **Operações com vários itens** (pedido de compra ou de venda, entrada, devolução, movimento com lote, rateio): preencha o cabeçalho, digite cada item e clique em **Incluir item**; para tirar um, selecione na tabela e clique em **Remover item selecionado**. Depois, **Confirmar**.
+- **Relatórios:** abrem na página **Resultado** (botão **Voltar** para retornar).
+- **Rastreabilidade:** escolha a origem (pedido, nota...) e o número; o caminho do documento aparece em árvore (itens, entrada, estoque, contas, lançamentos).
+- **Minha senha:** troca a sua senha a qualquer momento.
 
 **Se não abrir:** veja o capítulo 15 ("Mentor trava / sem internet / SEFAZ fora").
 
@@ -123,10 +135,10 @@ Você precisa de 1 empresa (sua banquinha/loja) e 1 usuário (você).
   - Perfis: `ADMIN` (faz tudo), `VENDEDOR` (vende), `CAIXA` (só mexe no direto se a permissão `PERMITE_DIRETA` for `S`).
   - **Mesmo usuário em empresas diferentes:** o código `MARIA` é a **mesma pessoa** em qualquer empresa (usuário e senha são únicos no catálogo). O que muda por empresa é o **vínculo**: `MARIA` só entra na empresa `02` se alguém autorizar esse vínculo (tabela `GE2_EMP`). Sem vínculo, o login é recusado mesmo com senha certa.
 
-Como cadastrar (pelo navegador, menu **Núcleo → Empresas / Usuários**):
+Como cadastrar (pelo navegador, módulo **Núcleo**, aba **Operações**; precisa ser o `super` ou o ADMIN da empresa):
 
-1. Menu Núcleo → Empresas → Novo → preencha código e nome → Salvar.
-2. Usuário com senha e vínculo: hoje **não há tela** que grave a senha (`GE2_SEC`) e o vínculo com empresa (`GE2_EMP`). Peça ao técnico — ele roda `GEBSECCRIAUSU(código, senha, {empresas}, nome, perfil)` (`src/GEBSEC_LOGIN.prw`), que cria o usuário, grava a senha com salt aleatório e vincula às empresas informadas (que precisam já estar provisionadas). Rodar de novo para o mesmo código troca a senha e desbloqueia a conta. A senha precisa passar pela política de senha do sistema (mesma regra usada na API REST) e não pode ser vazia nem só espaços.
+1. **Nova empresa:** código e nome → Confirmar. O sistema cria o compartimento (schema) da empresa.
+2. **Novo usuário:** código (letras, números e `_`), nome, perfil, senha e confirmação, empresa e filial (vazio = matriz) → Confirmar. A senha precisa passar pela política (mínimo de 8 caracteres, com maiúscula, minúscula, dígito e caractere especial; sem sequências como `abc`/`123`). Para dar acesso a outra empresa, use **Vincular usuário a empresa**.
 3. Pronto. Tudo que você fizer fica registrado na **Auditoria (GE3)** — um caderninho automático de "quem fez o quê e quando".
 
 > Não cadastre senha inserindo linhas em `GE2_SEC` na mão: salt/hash vazios são sempre recusados no login, e um hash calculado com outro salt nunca confere. Use `GEBSECCRIAUSU()`. Você não precisa decorar isso.
@@ -139,7 +151,7 @@ Como cadastrar (pelo navegador, menu **Núcleo → Empresas / Usuários**):
 
 Sem produto cadastrado, não sai nota.
 
-1. Menu Fiscal → Produtos → Novo:
+1. Fiscal → aba **Operações** → **Novo produto**:
    - `Código` (ex.: `BAN01`), `NCM` (os 8 números do produto), `Descrição` (ex.: `Banana prata kg`).
 2. Confira a alíquota (tabela GF2): para aquele NCM, quanto é de IBS e CBS e de quando até quando vale (`INI` até `FIM`, no formato `AAAAMMDD`).
    > Alíquota é só a porcentagem do imposto. Vigência é o período em que ela vale.
@@ -158,7 +170,7 @@ Função que faz isso: `GEBFEMI(chave, código, quantidade, preço)`.
 
 Passo a passo no navegador:
 
-1. Menu Fiscal → Emitir → preencha chave, produto, quantidade e preço → Confirmar.
+1. **Fiscal → Operações → Emitir nota** → preencha chave, produto, quantidade e preço → Confirmar.
 2. O sistema faz sozinho, nesta ordem:
    a. Pergunta ao **Mentor** (`EMISSAO`). Se ele travar, vai para a fila.
    b. Busca produto + alíquota. Se não achar, calcula imposto zerado (não trava).
@@ -185,7 +197,7 @@ Passo a passo no navegador:
 
 Função: `GEBFAPU(competência)`. Ex.: `GEBFAPU("202609")`.
 
-1. Menu Fiscal → Apurar → digite a competência (`202609`) → Confirmar.
+1. **Fiscal → Operações → Apurar competência** → informe a competência (`202609`) → Confirmar.
 2. O sistema grava em GF5, junto com o regime (`SIMPLES` ou `REGULAR`):
    - **débito:** IBS+CBS das notas **autorizadas** do mês (cancelada e em fila não contam), menos o IBS/CBS das devoluções de venda do mês;
    - **crédito:** IBS+CBS das compras que entraram no mês;
@@ -200,7 +212,7 @@ Função: `GEBFAPU(competência)`. Ex.: `GEBFAPU("202609")`.
 
 ## 7.1 Simples Nacional: apurar o DAS do mês
 
-Para empresas do Simples Nacional, inclusive as que já passaram do porte de MEI. O caminho é o menu **Fiscal > Simples Nacional**.
+Para empresas do Simples Nacional, inclusive as que já passaram do porte de MEI. O caminho é **Fiscal → aba Simples Nacional** (configuração, atividades, produtos, folha, feriados e apuração do DAS); os relatórios do Simples ficam na aba **Relatórios**.
 
 **Uma vez só**
 1. **Configurar anexo padrão:** o Anexo usado pelos produtos sem atividade (`I` comércio, `II` indústria, `III`, `IV` ou `V` serviços, ou `FR` para atividade sujeita ao Fator R). Se a empresa abriu há menos de 12 meses, informe também o mês de início (`AAAAMM`).
@@ -246,7 +258,7 @@ Pense na guia como o boleto do imposto do mês.
 
 Função: `GEBDGER("202609")` → devolve `GD202609`.
 
-1. Menu Derrama → Gerar guia → digite a competência → Confirmar.
+1. **Derrama → Operações → Gerar guia** → informe a competência → Confirmar.
 2. Ela copia o saldo da apuração (GF5) para a guia (GD1): valor, juros 0, multa 0, total = valor, estado `ABERTA`. Normalmente você nem precisa disso, porque a apuração já gera a guia.
 3. A guia aparece no **financeiro** como título a pagar de mesmo número (`GD202609`), com vencimento no dia 20 do mês seguinte em dia útil: entra no fluxo de caixa e na posição de títulos.
 4. Se você gerar de novo o mesmo mês, ele atualiza a mesma guia sem duplicar. Se a guia já foi paga e o imposto subiu, sai a guia complementar `GD202609-C1`.
@@ -256,8 +268,8 @@ Função: `GEBDGER("202609")` → devolve `GD202609`.
 
 Função: `GEBDBAI("GD202609")` → devolve `.T.` (verdadeiro = pagou).
 
-1. Menu Derrama → Baixar guia → escolha a guia → Confirmar. O dinheiro sai da conta `DER_CONTA` (padrão `CAIXA`). Pela API, `POST /api/bo/derrama/pagar` aceita a conta e a data.
-2. Também dá para pagar pelo financeiro (Financeiro avançado → Baixa), como qualquer título: quando o último título da guia é pago, a guia fica `BAIXADA`.
+1. **Derrama → Operações → Baixar guia** → informe a guia (clicar na linha da tabela Guias preenche) → Confirmar. O dinheiro sai da conta `DER_CONTA` (padrão `CAIXA`). Pela API, `POST /api/bo/derrama/pagar` aceita a conta e a data.
+2. Também dá para pagar pelo financeiro (Financeiro → Baixa com juros e multa), como qualquer título: quando o último título da guia é pago, a guia fica `BAIXADA`.
 3. O contábil registra a saída: débito no imposto a recolher, crédito na conta paga. Juros e multa de atraso seguem a regra da Derrama.
 4. Pagar de novo uma guia já paga não faz nada.
 
@@ -283,7 +295,7 @@ Funções: `GEBVEST(produto, quantidade)` mexe no estoque; `GEBVVEN(venda, produ
 
 ### 9.2 Vender (o jeito certo)
 
-1. Menu Estoque → Vender → preencha código da venda (ex.: `V001`), produto, quantidade e preço → Confirmar.
+1. **Estoque → Operações → Vender** → preencha código da venda (ex.: `V001`), produto, quantidade e preço → Confirmar.
 2. O sistema:
    a. Pergunta ao Mentor (`VENDA_IMPULSIVA`). Se travar → `BLOQUEADA` (não mexe em nada).
    b. Confere estoque (GV1). Se não tem → `SEM_ESTOQUE` (não mexe em nada).
@@ -307,9 +319,9 @@ Regras simples:
 
 Passo a passo:
 
-1. Menu Vendas → Fiado → Novo → cliente (ex.: `JOAO`) + valor → Salvar.
+1. **Estoque → Operações → Vender fiado** → cliente (ex.: `JOAO`) + valor → Confirmar.
 2. Se passar do limite, aparece `LIMITE`. É proteção, não erro seu: receba uma parte antes de vender mais.
-3. Para cobrar atraso: Menu Vendas → Juros fiado → cliente + dias → o sistema atualiza todas as linhas `ABERTA` e mostra a soma.
+3. Para cobrar atraso: **Estoque → Operações → Juros do fiado** → cliente + dias → o sistema atualiza todas as linhas `ABERTA` e mostra a soma.
 
 ---
 
@@ -339,19 +351,19 @@ Funções: `GEBBAL("202609")` e `GEBDRE("202609")`.
 - **Balancete:** lista por conta quanto foi débito e crédito no mês. Ex.: conta `3.01` teve 500 de crédito e 0 de débito.
 - **DRE banânica:** `receitas (contas que começam com 3: crédito menos débito) menos despesas (contas que começam com 4: débito menos crédito)`. Resultado positivo = lucro; negativo = prejuízo.
 
-Passo a passo: Menu Contábil → Balancete (ou DRE) → digite a competência → Ver. Se voltar vazio, é porque não há lançamento naquele mês (ou a contabilidade ainda não foi criada).
+Passo a passo: **Contábil → aba Relatórios → Relatório: balancete do período** (ou **DRE do período**) → informe o período → Confirmar; o resultado abre na página Resultado. Se voltar vazio, é porque não há lançamento naquele mês (ou a contabilidade ainda não foi criada).
 
 ---
 
 ## 13. Controlar o caixa (conta, receber, pagar, baixar, fluxo)
 
-> Onde: Menu Financeiro. Tabelas: contas GFN1, receber GFN2, pagar GFN3, movimento GFN4.
+> Onde: módulo **Financeiro**. Tabelas: contas GFN1, receber GFN2, pagar GFN3, movimento GFN4.
 
 ### 13.1 Criar a conta (uma vez só)
 
 Função: `GEBFNCON(conta, nome)`. Ex.: `GEBFNCON("CAIXA", "Caixa loja")`.
 
-1. Menu Financeiro → Contas → Nova → preencha conta (ex.: `CAIXA`) e nome → Salvar.
+1. **Financeiro → Operações → Nova conta** → preencha conta (ex.: `CAIXA`) e nome → Confirmar.
 2. A conta nasce com saldo 0. Se criar de novo a mesma conta, o sistema só devolve "já existe" sem duplicar.
 3. Conta vazia não grava (retorna `.F.`).
 
@@ -366,7 +378,7 @@ Função: `GEBFNREC(documento, cliente, valor, vencimento)`. Ex.: `GEBFNREC("REC
 - **valor** = precisa ser maior que zero.
 - **vencimento** = data como texto `AAAAMMDD` (ex.: `20261231` = 31/12/2026) ou data de verdade.
 
-1. Menu Financeiro → Receber → Novo → preencha os 4 campos → Salvar.
+1. **Financeiro → Operações → Título parcelado** → tipo **Receber**, documento, cliente, valor e condição (`0` = um título só, à vista; um código ou dias gera as parcelas) → Confirmar.
 2. O título nasce com `SALDO = VALOR` e estado `ABERTO`.
 3. Se der `.F.`: documento vazio, valor zerado, documento repetido ou tabela ainda não criada (`GEBFNMIG` não rodou).
 
@@ -391,7 +403,7 @@ Função: `GEBFNBAI(tipo, documento, valor)`. Ex.: `GEBFNBAI("REC", "REC-001", 5
 
 Função: `GEBNFLX()` → devolve `{receber, pagar, saldo}`.
 
-1. Menu Financeiro → Fluxo → Ver.
+1. **Financeiro → Relatórios → Relatório: fluxo de caixa projetado** → Confirmar.
 2. O sistema soma só os títulos `ABERTO` (quitados não entram): `saldo = receber - pagar`.
 3. Ex.: receber 5.000 + pagar 2.500 = saldo 2.500.
 
@@ -399,37 +411,37 @@ Função: `GEBNFLX()` → devolve `{receber, pagar, saldo}`.
 
 ```bash
 advplc check src/GEBFIN_MIG.prw src/GEBFIN_CON.prw src/GEBFIN_BAI.prw src/GEBFIN_FLX.prw --include src
-advplc run src/GEBAN.prw --include src
+advplc serve src/GEBTUI.prw --port 8081
 ```
 
 ---
 
 ## 14. Comprar (fornecedor, cotação, pedido, receber a NF)
 
-> Onde: Menu Compras. Tabelas: fornecedor GCP1, cotação GCP2, pedido GCP3+GCP4, entrada GCP5. Primeira vez: o técnico roda `GEBCMMIG()` para criar GCP1–GCP5.
+> Onde: módulo **Compras**. Tabelas: fornecedor GCP1, cotação GCP2, pedido GCP3+GCP4, entrada GCP5. Primeira vez: o técnico roda `GEBCMMIG()` para criar GCP1–GCP5.
 
 ### 14.1 Cadastrar fornecedor
 
 Função: `GEBCMFOR(código, nome)`. Ex.: `GEBCMFOR("FOR01", "Atacadao do Ze")`.
 
-1. Menu Compras → Fornecedores → Novo → código + nome → Salvar.
+1. **Compras → Operações → Novo fornecedor** → código + nome → Confirmar.
 2. Código ou nome vazio nega (`.F.`). Código repetido não duplica: devolve `.T.` como "já existe".
 
 ### 14.2 Cotar e pegar o menor preço
 
 Funções: `GEBCMCOT(fornecedor, produto, preço)` grava; `GEBCMMEL(produto)` mostra o menor.
 
-1. Menu Compras → Cotação → Nova → fornecedor + produto + preço → Salvar. Ex.: `GEBCMCOT("FOR01", "BAN01", 4.50)`.
+1. **Compras → Operações → Cotação de fornecedor** → fornecedor + produto + preço → Confirmar. Ex.: `GEBCMCOT("FOR01", "BAN01", 4.50)`.
 2. Repita para cada fornecedor (ex.: FOR02 a 4,20).
-3. Para comparar: Menu Compras → Menor preço → digite o produto. Ex.: `GEBCMMEL("BAN01")` devolve `4.20`.
+3. Para comparar: **Compras → Operações → Menor preço cotado** → informe o produto. Ex.: `GEBCMMEL("BAN01")` devolve `4.20`.
 4. Preço zerado, fornecedor/produto vazio negam. Sem cotação, o menor volta 0.
 
 ### 14.3 Fazer o pedido
 
 Funções: `GEBCMPED(pedido, fornecedor)` abre; `GEBCMIT(pedido, produto, quantidade, preço)` põe item.
 
-1. Menu Compras → Pedido → Novo → número (ex.: `PED-001`) + fornecedor → Salvar. Retorno: `ABERTO` (ok) ou `BLOQUEADO` (Mentor travou ou dado vazio — veja capítulo 15).
-2. Menu Compras → Pedido → Itens → Adicionar → produto + quantidade + preço. Ex.: `GEBCMIT("PED-001", "BAN01", 10, 4.50)`.
+1. **Compras → Operações → Abrir pedido** → número (ex.: `PED-001`) + fornecedor → Confirmar. (Ou **Pedido de compra com itens**, que abre o pedido já com a grade de itens.) Retorno: `ABERTO` (ok) ou `BLOQUEADO` (Mentor travou ou dado vazio — veja capítulo 15).
+2. **Compras → Operações → Adicionar item** → pedido + produto + quantidade + preço. Ex.: `GEBCMIT("PED-001", "BAN01", 10, 4.50)`.
 3. Regras do item: pedido precisa existir; quantidade e preço maiores que zero; senão retorna `.F.`.
 4. Pedido repetido não duplica: devolve `ABERTO` de novo.
 
@@ -437,7 +449,7 @@ Funções: `GEBCMPED(pedido, fornecedor)` abre; `GEBCMIT(pedido, produto, quanti
 
 Função: `GEBCMENT(nota, pedido)`. Ex.: `GEBCMENT("NF-001", "PED-001")`.
 
-1. Menu Compras → Entrada → Nova → nota do fornecedor (ex.: `NF-001`) + pedido → Confirmar.
+1. **Compras → Operações → Dar entrada** (ou **Documento de entrada**, com itens) → nota do fornecedor (ex.: `NF-001`) + pedido → Confirmar.
 2. O sistema faz sozinho, nesta ordem:
    a. Confere pedido: precisa existir e estar `ABERTO` (se já está `RECEBIDO`, nega).
    b. Confere a nota: não pode repetir (NF duplicada nega).
@@ -453,7 +465,7 @@ Função: `GEBCMENT(nota, pedido)`. Ex.: `GEBCMENT("NF-001", "PED-001")`.
 
 ```bash
 advplc check src/GEBCOM_MIG.prw src/GEBCOM_FOR.prw src/GEBCOM_PED.prw src/GEBCOM_ENT.prw --include src
-advplc run src/GEBAN.prw --include src
+advplc serve src/GEBTUI.prw --port 8081
 ```
 
 ---
@@ -528,7 +540,7 @@ Se aconteceu mesmo (ex.: lançou `PAG-001` e `PAG-002` para a mesma conta real):
 1. Não apague na mão. O sistema usa "apagar lógico" (`D_E_L_E_T_`).
 2. Baixe só o documento certo; deixe o duplicado `ABERTO`.
 3. Chame o técnico/contador para estornar o duplicado corretamente.
-4. No próximo pedido, confira antes: documento já existe? (Menu Financeiro → Pagar → buscar pelo documento.)
+4. No próximo pedido, confira antes: documento já existe? (**Financeiro → Relatórios → Relatório: títulos por atraso**.)
 
 ### 15.8 Mensagens que parecem erro mas são proteção
 
@@ -610,82 +622,47 @@ Faça nesta ordem, todo mês:
 **Comandos de emergência do técnico (cola rápida):**
 
 ```bash
-advplc check src/GEBAN.prw --include src
-advplc run src/GEBAN.prw --include src
-advplc serve src/GEBAN.prw --include src --port 9000
+advplc check src/GEBTUI.prw --include src
+advplc run src/GEBWEB.prw          # API REST (porta 8090)
+advplc serve src/GEBTUI.prw --port 8081
 ```
 
 ---
 
-## 18. Como fazer login (empresa + usuário + senha reais)
+## 18. Como fazer login (usuário + senha, empresa e filial)
 
-O login hoje é **de verdade**: senha cadastrada, conferida com hash seguro (Argon2id — a senha nunca fica salva "em claro" no banco), e bloqueio automático depois de tentativas erradas. Ainda não existe uma telinha de login dentro do navegador (isso é trabalho futuro) — quem abre a sessão é o comando `GEBAN(empresa, usuário, senha)`, chamado pelo técnico ou por um atalho que ele te preparar:
+O login é **de verdade**: senha conferida com hash seguro (Argon2id — a senha nunca fica salva "em claro" no banco) e bloqueio automático depois de tentativas erradas. Tudo pelo navegador:
 
-```bash
-advplc run src/GEBAN.prw --include src   # depois, dentro do fonte, chame GEBAN("01", "MARIA", "sua-senha")
-```
+1. Na tela **Acesso**, informe usuário e senha e clique em **Entrar**.
+   - Senha errada soma 1 tentativa; **5 erradas seguidas bloqueiam a conta** (o ADMIN destrava em Núcleo → Ciclo do usuário).
+   - O sistema não diz qual foi o motivo exato da recusa (de propósito — proteção contra quem tenta adivinhar usuário/senha de outra pessoa): aparece só "Credenciais inválidas".
+2. **Troca obrigatória:** no primeiro acesso, depois que o ADMIN pediu a troca, ou quando a senha venceu (90 dias), o sistema pede a nova senha antes de continuar. As regras aparecem ao lado do formulário.
+3. **Empresa:** se você está vinculado a uma só, ela já é escolhida; se a mais de uma, escolha na lista. Numa instalação nova, o `super` cria aqui a primeira empresa.
+4. **Filial:** escolha a filial (ou a matriz).
+5. Abre o **Início** (capítulo 19) com o menu dos módulos que você tem permissão para usar.
 
-1. O sistema conecta no Postgres e confere/cria o catálogo compartilhado (empresas, usuários, senhas).
-2. **Só se você informou empresa, usuário E senha juntos**, ele tenta autenticar:
-   a. Confere se seu usuário e sua empresa têm nomes válidos (letras/números/underline, sem "sujeira" — proteção de segurança).
-   b. Confere sua senha contra o hash guardado (Argon2id). Senha errada soma 1 tentativa; **5 erradas seguidas bloqueiam a conta** (você fica bloqueado até o ADMIN destravar).
-   c. Confere se você está **vinculado** àquela empresa (não basta senha certa — precisa estar autorizado a entrar ali, capítulo 4).
-   d. Confere se a empresa já foi provisionada (schema criado).
-   e. Se tudo passou: entra na empresa (o "schema" daquela empresa vira o seu, seus dados ficam isolados dos de outra empresa) e abre o dashboard web (`GEBEXP_WEB`) ou a tela de configuração.
-3. **Se faltou algum dado, ou a senha/vínculo estiver errado:** o sistema não te diz qual foi o motivo exato (de propósito — é proteção para não dar dica a quem está tentando adivinhar usuário/senha de outra pessoa) e volta para o **menu terminal genérico** (`GEBGUIMAIN`), sem nenhuma empresa selecionada.
+**Mesmo usuário, empresas diferentes:** `MARIA` é a **mesma pessoa e a mesma senha** em qualquer empresa — o que muda é o vínculo: ela só entra nas empresas em que foi autorizada (capítulo 4).
 
-**Mesmo usuário, empresas diferentes:** `MARIA` é a **mesma pessoa e a mesma senha** em qualquer empresa — o que muda é o vínculo: ela só entra nas empresas em que foi autorizada (capítulo 4). Não são mais "usuários diferentes por empresa" como em versões antigas.
-
-**Para trocar de empresa:** encerre a sessão atual e chame `GEBAN()` de novo informando a outra empresa (com a mesma senha).
+**Para trocar de empresa ou filial:** clique em **Sair** e entre de novo.
 
 ---
 
-## 19. Dashboard web — explicação
+## 19. Início — explicação
 
-Ao logar na web (`GEBEXP_WEB`), você vê uma tela com 5 seções:
+Depois do login, a página **Início** mostra:
 
-### 19.1 Dados da empresa
-Mostra: código, nome, regime (`SIMPLES`/`REGULAR`), CNPJ fictício, usuário logado e data. Se o CNPJ não estiver cadastrado em nenhum fornecedor, mostra um padrão (`000.000.000/0001-00`).
+- **Sessão:** empresa, filial, usuário e data.
+- **Indicadores:** saldo em contas (e quantas contas), títulos em aberto (valor e quantos vencidos), guias da Derrama em aberto (valor e quantas vencidas) e produtos com estoque abaixo do mínimo.
+- **Saldo por conta:** gráfico de barras com o saldo de cada conta.
+- **Acesso rápido:** um botão para cada módulo.
 
-### 19.2 Resumo financeiro
-Exibe os números do mês corrente:
-- **Contas:** quantas contas GFN1 existem
-- **A receber:** quantos títulos GFN2 estão `ABERTO` e quanto somam
-- **A pagar:** quantos títulos GFN3 estão `ABERTO` e quanto somam
-- **Saldo:** receber menos pagar (positivo = dinheiro entrando; negativo = saindo mais)
-- **Movimentos:** quantas baixas foram registradas em GFN4
-
-### 19.3 Resumo fiscal
-Exibe os números da competência corrente (`AAAAMM`):
-- **Notas:** quantas NFs (GF3) foram emitidas no mês
-- **Base de cálculo:** soma dos valores das notas
-- **IBS e CBS:** valores dos dois impostos
-- **Débito e crédito:** totais da apuração (GF5)
-- **Saldo da derrama:** quanto falta pagar ao fisco
-- **Regime:** `SIMPLES` ou `REGULAR`
-
-### 19.4 Alertas do mentor
-Lista todos os eventos do Mentor (GE4) configurados para a empresa, mostrando qual o modo de cada um (`AVISA_E_TRAVA`, `AVISA_E_LIBERA_COM_BO`, `DESLIGADO`). Se não houver configurações, mostra "(nenhum alerta do mentor)".
-
-### 19.5 Ações rápidas
-Botões numerados de 1 a 9, correspondendo aos módulos:
-```
-[1] Nucleo     - migra GE1-GE5
-[2] Fiscal     - migra GF1-GF6, apura
-[3] Derrama    - migra GD1, gera guias
-[4] Estoque    - migra GV1-GV3, venda
-[5] Contabil   - migra GC1-GC4, lanca
-[6] Financeiro - migra GFN, fluxo
-[7] Compras    - migra, cotas, pedidos
-[8] Relatorios - mostra relatorios completos
-[9] Sair       - encerra dashboard
-```
+O botão **Atualizar** (no alto, à direita) relê os números.
 
 ---
 
 ## 20. Como usar os trackers (rastreio ponta a ponta)
 
-Os trackers permitem acompanhar o caminho completo de uma operação. São funções que você chama com um código e recebem de volta todos os registros envolvidos.
+Os trackers permitem acompanhar o caminho completo de uma operação. **Pela tela:** menu **Rastreabilidade** → escolha a origem e informe o número → **Rastrear**; o caminho aparece em árvore (cada nó mostra quantos registros achou). Para o técnico, são funções que recebem um código e devolvem todos os registros envolvidos:
 
 ### 20.1 Rastrear uma compra
 
@@ -731,7 +708,7 @@ Retorna 7 posições: apuração GF5 (origem), guia GD1 (valor/juros/multa/statu
 
 ## 21. Como gerar relatórios gerenciais
 
-Os relatórios (`src/GEBEXP_REL_BIZ.prw` e `src/GEBEXP_REL_NUC.prw`) retornam arrays com dados consolidados. Você pode chamar diretamente via terminal ou pelo menu **Config → Resumo** (`GEBGUICONF_RESUMO`).
+Os relatórios (`src/GEBEXP_REL_BIZ.prw` e `src/GEBEXP_REL_NUC.prw`) retornam arrays com dados consolidados. O técnico pode chamá-los direto; na tela, os relatórios de cada módulo ficam na aba **Relatórios** da página do módulo.
 
 ### 21.1 Relatório geral consolidado
 
@@ -763,11 +740,9 @@ Retorna array com 6 elementos, cada um sendo um array do relatório específico:
 | `GEBRELMENTOR("01")` | Configurações do mentor na empresa 01 |
 | `GEBRELCADASTROS("01")` | Quantidade de produtos, fornecedores, clientes e contas |
 
-### 21.3 Usando pelo menu terminal
+### 21.3 Pela tela
 
-1. Abra o sistema: `advplc serve src/GEBAN.prw --include src --port 9000`
-2. No menu, escolha **8 - Configurac.**
-3. Selecione **4 - AJUDA** ou **RESUMO** para ver os números consolidados.
+Os números do dia a dia estão no **Início** (capítulo 19). Os relatórios de cada módulo ficam na aba **Relatórios** da página do módulo (ex.: Financeiro → Relatório: fluxo de caixa projetado; Faturamento → Relatório: curva ABC); o resultado abre na página **Resultado**.
 
 ---
 
@@ -777,7 +752,7 @@ Retorna array com 6 elementos, cada um sendo um array do relatório específico:
 
 **O que acontece se eu usar o mesmo código de usuário em duas empresas?** O usuário é **um só**, cadastrado uma vez no catálogo compartilhado (GE2/GE2_SEC — mesma senha em qualquer empresa). O que existe por empresa é o **vínculo** (tabela GE2_EMP): sem vínculo com a empresa `02`, o usuário não entra lá mesmo com a senha certa.
 
-**Como faço para logar em uma empresa específica?** Informe empresa, usuário e senha ao chamar `GEBAN()` (capítulo 18). O sistema autentica a senha primeiro (nível de catálogo), depois confere se você tem vínculo com aquela empresa.
+**Como faço para logar em uma empresa específica?** Entre com usuário e senha e, se você estiver vinculado a mais de uma empresa, escolha-a na lista (capítulo 18). O sistema autentica a senha primeiro (nível de catálogo) e só lista as empresas em que você tem vínculo.
 
 **O que é a tabela GEX?** É uma tabela temporária, dentro do schema da empresa ativa, que guarda o contexto da sessão (empresa, filial, usuário). Quando você loga, uma linha é criada; quando desloga (`GEBEXPCLEAR`), é removida. Você nunca precisa mexer nela manualmente.
 
@@ -823,98 +798,98 @@ Faça esta verificação **por empresa** (repete para cada uma das suas empresas
 **Comandos de emergência do técnico (cola rápida):**
 
 ```bash
-advplc check src/GEBAN.prw --include src
-advplc run src/GEBAN.prw --include src
-advplc serve src/GEBAN.prw --include src --port 9000
+advplc check src/GEBTUI.prw --include src
+advplc run src/GEBWEB.prw          # API REST (porta 8090)
+advplc serve src/GEBTUI.prw --port 8081
 ```
 
 ## 24. Backoffice: estoque, financeiro, contábil, compras, faturamento e frente de loja
 
-Os módulos novos aparecem assim: **Faturamento** e **Frente de loja** no menu principal, e um item "avançado" dentro de Estoque, Financeiro, Contábil e Compras. Os relatórios abrem em grade; a primeira linha é o cabeçalho.
+Todos os módulos ficam no menu lateral. Na página de cada um, as operações estão nas abas de formulários (**Operações**, **Relatórios** e, no Financeiro, **Banco**). Os relatórios abrem na página **Resultado**; a primeira linha é o cabeçalho.
 
 **Primeiro uso (uma vez)**
-1. **Financeiro avançado > Condição de pagamento:** cadastre as condições (`30,60,90`).
-2. **Faturamento > Cliente:** cadastre os clientes, com limite de crédito, condição e tabela. Em **Preço na tabela**, informe os preços (tabela vazia = PADRAO).
-3. **Estoque avançado > Inventário:** informe a quantidade e o custo de cada produto. É assim que o estoque antigo ganha custo médio.
-4. **Frente de loja > Cadastrar caixa:** a conta do dinheiro é criada sozinha (`CAIXA<código>`). Para receber PIX, crie a conta `BANCO` em Financeiro > Nova conta, ou ajuste `LOJ_CONTA_PIX`.
+1. **Financeiro → Condição de pagamento:** cadastre as condições (`30,60,90`).
+2. **Faturamento → Cliente (novo ou alterar):** cadastre os clientes, com limite de crédito, condição e tabela. Em **Preço na tabela**, informe os preços (tabela vazia = PADRAO).
+3. **Estoque → Inventário (contagem):** informe a quantidade e o custo de cada produto. É assim que o estoque antigo ganha custo médio.
+4. **Frente de loja → aba Cadastros → Cadastrar caixa:** a conta do dinheiro é criada sozinha (`CAIXA<código>`). Para receber PIX, crie a conta `BANCO` em Financeiro → Nova conta, ou ajuste `LOJ_CONTA_PIX`.
 
 **Compras**
-1. **Compras avançado > Solicitação de compra** (itens um a um; produto vazio termina).
-2. **Gerar pedidos da solicitação:** usa o menor preço cotado e faz um pedido por fornecedor. Se preferir, monte direto em **Pedido com itens**.
-3. Pedido acima da alçada (`COM_ALCADA`) espera em **Aprovar/rejeitar pedido**.
-4. **Documento de entrada:** produto vazio = recebe todo o pendente. Informe o frete; ele entra no custo.
+1. **Compras → Solicitação de compra** (itens na grade: produto, quantidade e necessidade; **Incluir item** para cada um).
+2. **Gerar pedidos da solicitação:** usa o menor preço cotado e faz um pedido por fornecedor. Se preferir, monte direto em **Pedido de compra com itens**.
+3. Pedido acima da alçada (`COM_ALCADA`) espera em **Aprovar ou rejeitar pedido (alçada)**.
+4. **Documento de entrada:** sem itens na grade = recebe todo o pendente. Informe o frete; ele entra no custo.
 5. Relatórios: pedidos em aberto, compras por fornecedor, solicitações pendentes.
 
 **Faturamento**
 1. **Pedido de venda** (preço vazio = tabela).
 2. **Liberar:** confere crédito e estoque. Se ficar bloqueado, o motivo aparece; "forçar" exige a permissão de liberação.
-3. **Faturar:** produto vazio = todo o saldo. Emite a nota, baixa o estoque, gera os títulos e contabiliza.
-4. **Devolução:** informe a nota e os itens. O título é abatido ou vira crédito do cliente.
+3. **Faturar pedido:** sem itens na grade = todo o saldo. Emite a nota, baixa o estoque, gera os títulos e contabiliza.
+4. **Devolução de venda:** informe a nota e os itens na grade. O título é abatido ou vira crédito do cliente.
 5. Relatórios: faturamento e margem (por cliente ou produto), carteira de pedidos, curva ABC.
 
-**Financeiro avançado**
+**Financeiro**
 - **Título parcelado:** à mão, para o que não veio de compra ou venda.
 - **Baixa:** mostra o saldo e já sugere juros e multa pelo atraso; dá para mudar, dar desconto e escolher a conta.
 - **Transferência entre contas** e **movimento avulso** (tarifa, receita sem título).
 - Relatórios: títulos por faixa de atraso, extrato da conta, fluxo de caixa projetado.
 
-**Estoque avançado**
+**Estoque**
 - Movimento com custo, inventário, transferência entre armazéns e saldo/custo médio.
 - Relatórios: kardex e posição valorizada (com os itens abaixo do mínimo).
 
-**Contábil avançado**
+**Contábil**
 - Razão da conta, balancete do período e DRE.
 - As contas e os eventos de lançamento padrão estão em Plano (GC1) e na GC4.
 
 **Frente de loja (o dia do caixa)**
-1. **Abrir caixa** com o fundo de troco. A sessão fica guardada na tela.
-2. **Vender:** produtos um a um (vazio fecha o cupom), desconto em valor e pagamentos (dinheiro, PIX, débito, crédito ou fiado; pode misturar). O troco aparece no fim.
-3. **Cancelar cupom:** só com o caixa aberto.
+1. **Abrir caixa** (aba Caixa) com o fundo de troco. A situação do caixa fica sempre visível na aba Venda.
+2. **Vender** (aba Venda): adicione os produtos ao carrinho (preço e promoção já aparecem), informe desconto em valor e inclua os pagamentos (dinheiro, PIX, débito, crédito, fiado ou vale; pode misturar). Total, recebido e troco aparecem ao lado; **Finalizar venda** grava o cupom.
+3. **Cancelar cupom** (aba Caixa): só com o caixa aberto e se o cupom não teve devolução.
 4. **Sangria** (manda dinheiro para o cofre/banco) e **suprimento** (traz troco).
 5. **Fechar caixa:** informe o dinheiro contado. O sistema mostra o esperado e a diferença e lança a sobra ou a falta. Depois abre o resumo do caixa.
 
-**Frente de loja: recursos de balcão**
-- **Ler o produto:** em Vender, digite o código, o código de barras ou a etiqueta da balança. Cadastre os códigos em *Código de barras / PLU de balança*:
+**Frente de loja: recursos de balcão** (menu **Frente de loja**, abas Venda, Caixa, Orçamentos, Consultas, Cadastros, Relatórios, TEF e NFC-e e Devolução; abra o caixa na aba **Caixa** antes de vender)
+- **Ler o produto:** na aba **Venda**, digite o código, o código de barras ou a etiqueta da balança e clique em **Adicionar**. Cadastre os códigos em *Código de barras / PLU de balança* (aba Cadastros):
   - o fator é quantas unidades uma leitura vale (caixa com 12 = 12);
   - para a balança, cadastre o PLU de 5 dígitos;
   - `LOJ_BALANCA` diz se a etiqueta traz o preço (`PRECO`, padrão) ou o peso (`PESO`).
-- **Promoções:** em *Promoção*, escolha o tipo:
+- **Promoções:** em *Promoção* (aba Cadastros), escolha o tipo:
   - `PRECO`: preço promocional;
   - `LEVE`: leve N pague M;
   - `QTD`: % a partir de N unidades.
   - Informe o início e o fim. Valor 0 encerra a promoção.
   - Deixe o preço vazio na venda para a promoção valer.
-- **Vendedor e CPF:** a venda pergunta os dois (podem ficar vazios). A comissão sai no relatório *Comissão dos vendedores*.
-- **Desconto alto:** com `LOJ_DESC_MAX` definido (por exemplo, 10), um desconto acima disso pede o usuário e a senha de um supervisor com a permissão "Frente de loja - libera desconto" (Núcleo > Permissões).
+- **Vendedor e CPF:** ficam no quadro **Finalizar** da venda (podem ficar vazios). A comissão sai no relatório *Comissão dos vendedores*.
+- **Desconto alto:** com `LOJ_DESC_MAX` definido (por exemplo, 10), um desconto acima disso pede o usuário e a senha de um supervisor com a permissão "Frente de loja - libera desconto" (Núcleo → Permissão de perfil).
 - **Orçamento:**
-  1. O vendedor monta o orçamento em *Novo orçamento*.
-  2. O caixa usa *Finalizar orçamento no caixa* com o número e os pagamentos.
+  1. O vendedor monta o carrinho na aba **Venda** e clica em **Salvar como orçamento**.
+  2. O caixa informa o número no campo **Orçamento** da venda, inclui os pagamentos e finaliza.
   3. O orçamento vale 7 dias (`LOJ_ORC_DIAS`).
 - **Troca ou devolução:**
-  1. Em *Devolução / troca*, informe o cupom, os produtos e o modo: `VALE` (gera um vale-troca) ou `DINHEIRO` (sai da gaveta).
+  1. Na aba **Devolução**, informe o cupom, os produtos (grade de itens) e o modo: `VALE` (gera um vale-troca) ou `DINHEIRO` (sai da gaveta).
   2. Na compra seguinte, pague com a forma `VALE` e o número do vale.
-  3. *Saldo do vale-troca* mostra quanto ainda resta.
+  3. O saldo do vale-troca aparece na aba **Consultas**.
 - **Balcão:**
   - *Consulta de preço:* preço da tabela, preço de hoje (com a promoção) e saldo;
   - *Segunda via do cupom:* o cupom de novo, com CPF, promoções, troco e devoluções.
 - **Gerência:** *Relatório: gerencial da loja*, por dia, caixa, operador ou vendedor.
 
 **Lote, série e endereço:**
-1. Em Estoque avançado, defina o controle do produto (sem saldo) e cadastre os endereços.
+1. Em **Estoque → Operações**, defina o controle do produto (*Controle de lote/série/endereço*, sem saldo) e cadastre os endereços.
 2. Na entrada de compra, informe o lote (séries separadas por `;`), a validade e o endereço de cada item.
 3. Venda, faturamento e loja tiram sozinhos o lote que vence primeiro.
 4. Os relatórios mostram o saldo por lote e os lotes a vencer.
 
-**Fechamento do mês:** em Estoque avançado > Fechar mês, sempre o mês anterior ao atual e em ordem. Depois de fechado, nada com data até ele pode ser lançado. Para corrigir, reabra o último mês fechado.
+**Fechamento do mês:** em **Estoque → Operações → Fechar mês**, sempre o mês anterior ao atual e em ordem. Depois de fechado, nada com data até ele pode ser lançado. Para corrigir, reabra o último mês fechado.
 
-**Devolução de compra:** Compras avançado > Devolução de compra. Informe a nota de entrada, o fornecedor e os itens.
+**Devolução de compra:** **Compras → Operações → Devolução de compra**. Informe a nota de entrada e o fornecedor, e os itens na grade.
 
 **Centro de custo:**
-- Cadastre os centros e os rateios em Contábil avançado.
-- Informe o centro no movimento avulso, na despesa a pagar (Financeiro avançado), no pedido de venda e no cadastro do caixa.
+- Cadastre os centros e os rateios em **Contábil → Operações** (*Centro de custo* e *Rateio entre centros de custo*).
+- Informe o centro no movimento avulso, na despesa a pagar (Financeiro → Operações), no pedido de venda e no cadastro do caixa.
 - Relatório: resultado por centro de custo.
 
-**Banco** (Financeiro avançado > Banco):
+**Banco** (Financeiro → aba **Banco**):
 1. Configure a cobrança da conta: banco (001 BB, 033 Santander, 104 Caixa, 237 Bradesco, 341 Itaú, 756 Sicoob), agência, conta, carteira e o código do beneficiário (convênio). Escolha o layout: 240 (todos) ou 400 (só Itaú e Bradesco). No Sicoob, informe a modalidade (padrão 01).
 2. Gere os boletos dos títulos e a remessa CNAB. Antes do primeiro arquivo real, homologue com o banco.
 3. Leia o retorno, que baixa os títulos pagos.
@@ -922,7 +897,7 @@ Os módulos novos aparecem assim: **Faturamento** e **Frente de loja** no menu p
 5. Os arquivos ficam no servidor (caminho informado na tela) ou vão pela API no campo `conteudo`.
 
 **TEF:**
-- O padrão é o simulador. Troque em Frente de loja > **Configurar TEF** (precisa da permissão de configurar a empresa):
+- O padrão é o simulador. Troque em Frente de loja → aba **TEF e NFC-e** → **Configurar TEF** (precisa da permissão de configurar a empresa):
   - `HTTP`: URL e token do gateway;
   - `CIELO`: MerchantId e MerchantKey (a URL padrão é a sandbox). Serve para testes: o cartão é o de teste do parâmetro, não o do cliente.
 - A chave do lojista nunca aparece de volta na tela nem na API.
@@ -945,7 +920,7 @@ Os módulos novos aparecem assim: **Faturamento** e **Frente de loja** no menu p
 - **No financeiro:** cada guia é um título a pagar de mesmo número; pague pela Derrama ou pelo financeiro.
 - **Vencimento:** dia 20 do mês seguinte em dia útil. Ajuste com os parâmetros `DER_DIA_IBSCBS`, `DER_DIA_ICMS`, `DER_DIA_ISS` e `RET_DIA_<tributo>`.
 
-**Retenções (Compras avançado):**
+**Retenções (Compras → Operações):**
 1. Cadastre a regra em **Regra de retenção**: código, tributo (ISS, IRRF, INSS, PIS, COFINS ou CSLL) e alíquota. Ex.: `ISS5` = ISS 5%.
 2. No **Documento de entrada**, informe os códigos separados por vírgula (ex.: `ISS5,IR15`). Pela API, use o campo `retencoes` com o mesmo texto.
 3. O valor retido sai do título do fornecedor e vai para a guia do tributo no mês.
@@ -955,7 +930,7 @@ Os módulos novos aparecem assim: **Faturamento** e **Frente de loja** no menu p
 - o fiado vira um título a receber `FIA-<número>`;
 - a venda do balcão entra no `CAIXA`.
 
-**Correção do contábil antigo** (Contábil avançado → **Corrigir lançamentos antigos**; precisa da permissão de lançamento direto):
+**Correção do contábil antigo** (Contábil → Operações → **Corrigir lançamentos antigos**; precisa da permissão de lançamento direto):
 - Antes da integração, alguns pagamentos eram lançados como receita. A rotina estorna esses lançamentos e faz o certo.
 - Pode rodar quantas vezes quiser: o que já foi corrigido não é mexido de novo. A tela mostra o que foi corrigido.
 
@@ -979,7 +954,7 @@ A lista "O que falta para emitir" fica no alto da página e também em Fiscal > 
 
 **No caixa nada muda:** a venda é feita como sempre.
 - Se a SEFAZ recusar, o caixa vê o motivo e a venda não é gravada (o cartão é desfeito). Corrija o cadastro do produto e venda de novo.
-- **Internet caiu ou a SEFAZ está fora?** A venda sai "em contingência" e o cupom avisa. Quando a internet voltar, use **Frente de loja > NFC-e: transmitir as emitidas em contingência**. O prazo é de 24 horas.
+- **Internet caiu ou a SEFAZ está fora?** A venda sai "em contingência" e o cupom avisa. Quando a internet voltar, use **Frente de loja → TEF e NFC-e → NFC-e: transmitir as emitidas em contingência**. O prazo é de 24 horas.
 - **Imprimir o cupom (DANFE):** use **Frente de loja > NFC-e: DANFE do cupom**. A tela mostra o cupom e um link para abrir no navegador e imprimir; ele também está na página de configuração, em "Imprimir DANFE NFC-e".
 - **Cancelar:** é o mesmo "Cancelar cupom" de sempre, até 30 minutos depois da venda. Depois disso, faça a devolução.
 

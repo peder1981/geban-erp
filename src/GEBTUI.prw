@@ -81,12 +81,21 @@ Return .T.
     @since 21/11/2026
 /*/
 Static Function TUILogin(oApp, oPg)
+    Local oApr := PoWidget():New(oPg, "GEBAN - gestao empresarial")
     Local oW   := PoWidget():New(oPg, "Acesso")
     Local oUsu := PoInput():New(oW, "Usuario")
     Local oSen := PoPassword():New(oW, "Senha")
     Local oBtn := PoButton():New(oW, "Entrar")
+    Local aMod := {"Fiscal e NF-e", "Financeiro", "Estoque", "Contabil", "Compras", "Faturamento", "Frente de loja", "Simples Nacional"} as Array
+    Local nI   := 0 as Numeric
 
-    oW:SetCols(4)
+    // Duas colunas: apresentacao a esquerda, acesso a direita (grade de 12).
+    oApr:SetCols(7)
+    PoInfo():New(oApr, "", "Varias empresas e filiais numa unica instalacao, com permissao por usuario, empresa e modulo, e trilha de auditoria.")
+    For nI := 1 To Len(aMod)
+        PoTag():New(oApr, aMod[nI], "info"):SetCols(3)
+    Next nI
+    oW:SetCols(5)
     oBtn:Set("kind", "primary")
     oBtn:Set("icon", "an an-sign-in")
     oBtn:OnClick({|| TUIEntra(oApp, AllTrim(BOSTR(oUsu:GetValue())), AllTrim(BOSTR(oSen:GetValue())))})
@@ -128,13 +137,19 @@ Return
 /*/
 Static Function TUISenhaPg(oApp, cUsu, cTitulo, bDepois)
     Local oPg  := PoPage():New(oApp, cTitulo)
+    Local oReg := PoWidget():New(oPg, "Regras da senha")
     Local oW   := PoWidget():New(oPg, "Nova senha de " + cUsu)
     Local oS1  := PoPassword():New(oW, "Nova senha")
     Local oS2  := PoPassword():New(oW, "Confirme a nova senha")
     Local oBtn := PoButton():New(oW, "Trocar senha")
 
-    oW:SetCols(4)
-    PoInfo():New(oW, "", "Minimo de 8 caracteres, com maiuscula, minuscula, digito e caractere especial.")
+    // Duas colunas, como o login: regras a esquerda, formulario a direita.
+    oReg:SetCols(7)
+    PoInfo():New(oReg, "Tamanho", "Minimo de 8 caracteres")
+    PoInfo():New(oReg, "Composicao", "Maiuscula, minuscula, digito e caractere especial")
+    PoInfo():New(oReg, "Evite", "Sequencias (abc, 123) e o mesmo caractere 3 vezes seguidas")
+    PoInfo():New(oReg, "Validade", "90 dias; vencida, o login pede a troca")
+    oW:SetCols(5)
     oBtn:Set("kind", "primary")
     oBtn:OnClick({|| TUISenhaGrava(oApp, cUsu, BOSTR(oS1:GetValue()), BOSTR(oS2:GetValue()), bDepois)})
     oApp:Navigate(oPg)
@@ -653,6 +668,9 @@ Return { ;
     {"Estoque", 0, 0, "Vender fiado", {{"Cliente", "C", ""}, {"Valor", "N", 0}}, {|u, a| GEBRESTESTFIA(u, a)}, "201", "Fiado registrado."}, ;
     {"Estoque", 0, 0, "Juros do fiado", {{"Cliente", "C", ""}, {"Dias", "N", 30}}, {|u, a| GEBRESTESTFIJ(u, a)}, "200", "Juros calculados."}, ;
     {"Contabil", 0, 0, "Lancamento", {{"Conta a debito", "C", "", "GC1_CONTA"}, {"Conta a credito", "C", ""}, {"Valor", "N", 0}}, {|u, a| GEBRESTCTBDIR(u, a)}, "201", "Lancamento gravado."}, ;
+    {"Compras", 0, 0, "Cotacao de fornecedor", {{"Fornecedor", "C", "", "GCP1_COD"}, {"Produto", "C", ""}, {"Preco", "N", 0}}, ;
+        {|u, a| TUICotacao(a)}, "BO", "", aPed}, ;
+    {"Compras", 0, 0, "Menor preco cotado", {{"Produto", "C", ""}}, {|u, a| TUIMenorPreco(a[1])}, "BO", "", aPed}, ;
     {"Compras", 0, 0, "Novo fornecedor", {{"Codigo", "C", ""}, {"Nome", "C", ""}}, {|u, a| GEBRESTCOMFOR(u, a)}, "201", "Fornecedor criado."}, ;
     {"Compras", 0, 0, "Abrir pedido", {{"Pedido", "C", ""}, {"Fornecedor", "C", "", "GCP1_COD"}}, {|u, a| GEBRESTCOMPED(u, a)}, "201", "Pedido aberto."}, ;
     {"Compras", 0, 0, "Adicionar item", {{"Pedido", "C", "", "GCP3_NUM"}, {"Produto", "C", ""}, {"Quantidade", "N", 1}, {"Preco", "N", 0}}, {|u, a| GEBRESTCOMIT(u, a)}, "201", "Item adicionado."}, ;
@@ -697,6 +715,21 @@ Static Function TUIMunicipio(cUF, cTxt)
         cOps += aM[nI][2] + " (" + aM[nI][1] + ")"
     Next nI
 Return {.F., "municipio ambiguo, use o codigo IBGE: " + cOps}
+
+// Cotacao: GEBCMCOT devolve .T./.F. (fornecedor/produto inexistente ou preco invalido).
+Static Function TUICotacao(a)
+    If GEBCMCOT(a[1], a[2], a[3])
+        Return {.T., "cotacao de " + a[2] + " gravada: " + TUIMoeda(a[3])}
+    EndIf
+Return {.F., "fornecedor ou produto inexistente, ou preco invalido"}
+
+Static Function TUIMenorPreco(cProd)
+    Local nMel := GEBCMMEL(cProd) as Numeric
+
+    If nMel <= 0
+        Return {.F., "sem cotacao para " + cProd}
+    EndIf
+Return {.T., "menor preco cotado de " + cProd + ": " + TUIMoeda(nMel)}
 
 // Credito fiscal: GEBFCRE devolve o registro ("" = recusado).
 Static Function TUIFisCredito(a)
@@ -1280,7 +1313,11 @@ Static Function TUIItemMostra(aIt)
     For nI := 1 To Len(aIt[1])
         aRow := {cValToChar(nI)}
         For nJ := 1 To Len(aIt[1][nI])
-            aAdd(aRow, BOSTR(aIt[1][nI][nJ]))
+            If ValType(aIt[1][nI][nJ]) == "N"
+                aAdd(aRow, TUIPdvQtd(aIt[1][nI][nJ]))
+            Else
+                aAdd(aRow, BOSTR(aIt[1][nI][nJ]))
+            EndIf
         Next nJ
         aAdd(aLin, aRow)
     Next nI
@@ -1409,7 +1446,7 @@ Static Function TUICarrega(oTab, cAlias, aColOut)
             If !(cAlias == "GE1" .Or. cAlias == "GE2")
                 cWhr += " AND " + cCol + " = " + GEBDBQuote(FWxFilial(cAlias))
             EndIf
-        ElseIf !(cCol == "R_E_C_N_O_" .Or. cCol == "D_E_L_E_T_")
+        ElseIf !(cCol == "R_E_C_N_O_" .Or. cCol == "D_E_L_E_T_") .And. !TUISigilo(cAlias, cCol)
             aAdd(aCol, cCol)
             aAdd(aCols, {Lower(cCol), TUIRotulo(SubStr(cCol, At("_", cCol) + 1))})
             If aColOut != Nil
@@ -1436,6 +1473,14 @@ Static Function TUICarrega(oTab, cAlias, aColOut)
     Next nI
     oTab:SetItems(aLin)
 Return
+
+// Coluna que a grade nunca mostra: credencial (salt, hash, senha, token) e as
+// colunas SEC_* antigas da GE2 (as credenciais ficam na GE2_SEC).
+Static Function TUISigilo(cAlias, cCol)
+    If cAlias == "GE2" .And. Left(cCol, 4) == "SEC_"
+        Return .T.
+    EndIf
+Return "SALT" $ cCol .Or. "HASH" $ cCol .Or. "SENHA" $ cCol .Or. "TOKEN" $ cCol
 
 Static Function TUIRelatorio(oTab)
     Local aHit  := TCSqlQuery("SELECT GBR1_C1 AS C1, GBR1_C2 AS C2, GBR1_C3 AS C3, GBR1_C4 AS C4, GBR1_C5 AS C5, GBR1_C6 AS C6, GBR1_C7 AS C7, GBR1_C8 AS C8" + ;

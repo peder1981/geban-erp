@@ -125,13 +125,20 @@ User Function T_GEBTUI_OPS()
     Next nM
     ConOut("  formularios executados: " + cValToChar(Len(aForms)))
     // Todas as operacoes sao formularios. Queda inesperada = operacao perdida.
-    lOk := Chk(lOk, "formularios", Len(aForms) >= 138)
+    lOk := Chk(lOk, "formularios", Len(aForms) >= 140)
 
     // JSON dos formularios do DF-e: UF maiuscula, IBGE direto, CONT_UF nao vai
     aR := TUIDfeJson({|o| {.T., o:ToJson()}}, {"UF", "MUNICIPIO", "CONT_UF", "CONT_MUNICIPIO"}, {"sp", "3550308", "rj", "3304557"})
     ConOut("  dfe json: " + BOSTR(aR[2]))
     lOk := Chk(lOk, "dfe json uf e ibge", aR[1] .And. '"UF": "SP"' $ aR[2] .And. '"MUNICIPIO": "3550308"' $ aR[2] .And. '"CONT_MUNICIPIO": "3304557"' $ aR[2])
     lOk := Chk(lOk, "dfe json sem CONT_UF", !("CONT_UF" $ aR[2]))
+    lOk := Chk(lOk, "menor preco sem cotacao recusado", !TUIMenorPreco("PRODUTO_SEM_COTACAO")[1])
+
+    // Grade nunca mostra credencial
+    lOk := Chk(lOk, "sigilo GE2 SEC_SALT", TUISigilo("GE2", "SEC_SALT"))
+    lOk := Chk(lOk, "sigilo GE2_SEC SEC_HASH", TUISigilo("GE2_SEC", "SEC_HASH"))
+    lOk := Chk(lOk, "sigilo coluna comum visivel", !TUISigilo("GE2", "GE2_NOME") .And. !TUISigilo("GF1", "GF1_COD"))
+
     // Nucleo: senha divergente, permissao concedida aparece no relatorio, ciclo sem usuario
     lOk := Chk(lOk, "nucleo senhas diferentes", !TUINucUsuario("super", {"u_x", "X", "USUARIO", "Abc!2345x", "Abc!2345y", "zz", ""})[1])
     aR := TUINucPerm("super", {"OPERTST", "1", "S", "E"}, GEBTUIAREAS(), "zz")

@@ -4,7 +4,7 @@
 
 Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem seu próprio schema de dados. O acesso é controlado por usuário, empresa, filial e módulo, com regras claras e trilha de auditoria.
 
-![Seleção de filial](docs/img/02-selecao-filial.jpg)
+![Início](docs/img/03-inicio.jpg)
 
 ---
 
@@ -35,15 +35,18 @@ Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem
 
 ## Telas
 
-Capturas reais do sistema rodando (empresa de demonstração 99).
+Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral com os módulos permitidos, tabelas ao vivo em abas e cada operação num formulário de tela única. Dados das imagens: empresa de demonstração fictícia.
 
 | | |
 |---|---|
-| ![Login](docs/img/01-login.jpg) **Login**: instalação nova já traz a conta `super` — o primeiro acesso pede troca de senha | ![Troca obrigatória](docs/img/11-troca-senha.jpg) **Troca de senha obrigatória**: conduzida no próprio login |
-| ![Menu da empresa](docs/img/03-menu-empresa-99.jpg) **Menu da empresa** | ![Módulo fiscal](docs/img/04-modulo-fiscal.jpg) **Fiscal**: documentos emitidos, cancelados e inutilizados |
-| ![Financeiro](docs/img/05-modulo-financeiro.jpg) **Financeiro**: contas, novos lançamentos e baixa de títulos | ![Estoque](docs/img/06-modulo-estoque.jpg) **Estoque**: saldos, vendas, venda fiado e juros |
-| ![Contábil](docs/img/07-modulo-contabil.jpg) **Contábil**: plano, lançamentos, balancete e DRE | ![Faturamento](docs/img/08-modulo-faturamento.jpg) **Faturamento**: clientes, pedidos, liberação, faturamento e devolução |
-| ![Núcleo](docs/img/09-modulo-nucleo.jpg) **Núcleo**: empresas, unidades, filiais, usuários, permissões e agendamentos | ![Usuários](docs/img/10-nucleo-usuarios.jpg) **Usuários**: cadastro e vínculos por empresa |
+| ![Login](docs/img/01-login.jpg) **Login** — instalação nova já traz a conta `super`; o primeiro acesso pede troca de senha | ![Troca obrigatória](docs/img/11-troca-senha.jpg) **Troca de senha obrigatória**, com as regras da política ao lado |
+| ![Início](docs/img/03-inicio.jpg) **Início** — sessão, indicadores e saldo por conta | ![Frente de loja](docs/img/16-pdv.jpg) **Frente de loja** — venda numa tela: carrinho com preço e promoção, pagamentos e troco |
+| ![Fiscal](docs/img/04-modulo-fiscal.jpg) **Fiscal** — produtos, notas e Simples em abas; operações em formulários | ![Documentos eletrônicos](docs/img/18-documentos-eletronicos.jpg) **Documentos eletrônicos** — emitente, configuração, SEFAZ, NFS-e e EFD |
+| ![Financeiro](docs/img/05-modulo-financeiro.jpg) **Financeiro** — contas, títulos, baixa com juros e banco | ![Estoque](docs/img/06-modulo-estoque.jpg) **Estoque** — saldos, lotes e endereços, fechamento do mês |
+| ![Compras](docs/img/20-modulo-compras.jpg) **Compras** — fornecedores, pedidos, NF-e de fornecedores | ![Grade de itens](docs/img/17-formulario-itens.jpg) **Formulário com grade de itens** (pedido de compra) |
+| ![Contábil](docs/img/07-modulo-contabil.jpg) **Contábil** — plano, lançamentos, centros de custo, balancete e DRE | ![Faturamento](docs/img/08-modulo-faturamento.jpg) **Faturamento** — clientes, pedidos, faturamento e devolução |
+| ![Núcleo](docs/img/09-modulo-nucleo.jpg) **Núcleo** — empresas, unidades, filiais, usuários, permissões e agendamentos | ![Usuários](docs/img/10-nucleo-usuarios.jpg) **Usuários** — cadastro e vínculos por empresa |
+| ![Rastreabilidade](docs/img/19-rastreabilidade.jpg) **Rastreabilidade** — o caminho de um documento em árvore | |
 
 ## Como funciona
 
@@ -104,7 +107,7 @@ flowchart LR
 - **Rotinas disponíveis:** coleta de DF-e por NSU e apuração do Simples do mês anterior.
 - **Segurança:** só rotinas de uma lista fechada, e só o super ou o ADMIN da empresa agendam.
 
-![Menu da empresa](docs/img/03-menu-empresa-99.jpg)
+![Núcleo](docs/img/09-modulo-nucleo.jpg)
 
 ---
 
@@ -151,6 +154,8 @@ O pacote `packaging/windows/dist/geban-setup.exe` foi instalado e exercitado de 
 - PostgreSQL embarcado inicializado no primeiro boot (`initdb`), escutando só em `127.0.0.1:5432`; UI em `127.0.0.1:8081` e API em `127.0.0.1:8090` — sem alerta do Firewall e sem exposição na rede local.
 - Login completo na interface web do Windows: `super` → troca de senha obrigatória → criação da primeira empresa → menu principal com todos os módulos.
 
+Telas da validação de 09/11/2026, feita com a interface anterior (menu em diálogo); a interface atual é a da seção **Telas**. A revalidação do pacote com a interface nova está pendente.
+
 | Login | Troca de senha obrigatória | Primeira empresa | Menu |
 |---|---|---|---|
 | ![Login Windows](docs/img/12-windows-login.jpg) | ![Troca de senha Windows](docs/img/13-windows-troca-senha.jpg) | ![Primeira empresa Windows](docs/img/14-windows-primeira-empresa.jpg) | ![Menu Windows](docs/img/15-windows-menu.jpg) |
@@ -159,8 +164,8 @@ Depois:
 
 1. Crie a empresa e a filial no **Núcleo**.
 2. Cadastre os usuários e vincule cada um às empresas e filiais.
-3. Libere os módulos em **Núcleo > Permissões**.
-4. Agende as rotinas recorrentes em **Núcleo > Agendamentos**.
+3. Libere os módulos em **Núcleo → Permissão de perfil**.
+4. Agende as rotinas recorrentes em **Núcleo → Agendar rotina**.
 
 ## Testes
 
