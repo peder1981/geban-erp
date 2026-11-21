@@ -15,7 +15,7 @@
 /*/{Protheus.doc} T_GEBCTB_MASSA
     Teste de massa contabil GEBAN (Task 5 GEB_CONTABIL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Carga: 200 lancamentos (100 CTBLAN MASSA_VENDA de 10 via GC4
     + 100 GEBCDIR custo de 5 com perfil ADMIN e flag S).
     Asserts: 200 lotes GC2; 200 pernas D e 200 C em GC3;

@@ -29,6 +29,7 @@
     @param nPorta Porta TCP (default 8090)
 /*/
 User Function GEBWEB(nPorta)
+    Local cHost := "" as Character
     Local oSrv := Nil
 
     If nPorta == Nil
@@ -111,30 +112,29 @@ User Function GEBWEB(nPorta)
     oSrv:AddRoute("GET", "/api/dfe/danfe", "U_GEBWAPI_DFEDANFE")
     oSrv:AddRoute("GET", "/api/dfe/efd", "U_GEBWAPI_DFEEFD")
     // Rotas PDV (frente de loja)
-    oSrv:AddRoute("GET", "/api/pdv/caixa/lista", "U_GEBPDVCAIXALST")
-    oSrv:AddRoute("POST", "/api/pdv/caixa/abrir", "U_GEBPDVCAIXAABR")
-    oSrv:AddRoute("POST", "/api/pdv/caixa/fechar", "U_GEBPDVCAIXAFECH")
-    oSrv:AddRoute("GET", "/api/pdv/caixa/resumo/{sessao}", "U_GEBPDVCAIXARESUMO")
-    oSrv:AddRoute("POST", "/api/pdv/caixa/sangria", "U_GEBPDVSANGRIA")
-    oSrv:AddRoute("POST", "/api/pdv/cupom/novo", "U_GEBPDVCUPOMNOV")
-    oSrv:AddRoute("GET", "/api/pdv/cupom/{id}", "U_GEBPDVCUPOMGET")
-    oSrv:AddRoute("POST", "/api/pdv/cupom/{id}/cancelar", "U_GEBPDVCUPCANC")
-    oSrv:AddRoute("GET", "/api/pdv/produto/busca", "U_GEBPDVPRODUTBUSC")
-    oSrv:AddRoute("GET", "/api/pdv/relatorio/gerencial", "U_GEBPDVRELGER")
-    oSrv:AddRoute("GET", "/api/pdv/relatorio/gerencial/csv", "U_GEBPDVRELGERCSV")
-    oSrv:AddRoute("GET", "/api/pdv/relatorio/comissao", "U_GEBPDVRELCOM")
-    oSrv:AddRoute("GET", "/api/pdv/relatorio/comissao/csv", "U_GEBPDVRELCOMCSV")
-    oSrv:AddRoute("GET", "/api/pdv/perifericos", "U_GEBPDVPERIFLIST")
-    oSrv:AddRoute("POST", "/api/pdv/perifericos", "U_GEBPDVPERIFREG")
-    oSrv:AddRoute("DELETE", "/api/pdv/perifericos/{id}", "U_GEBPDVPERIFDEL")
+    oSrv:AddRoute("GET", "/api/pdv/caixa/lista", "U_GEBWAPI_PDVCAIXALST")
+    oSrv:AddRoute("POST", "/api/pdv/caixa/abrir", "U_GEBWAPI_PDVCAIXAABR")
+    oSrv:AddRoute("POST", "/api/pdv/caixa/fechar", "U_GEBWAPI_PDVCAIXAFECH")
+    oSrv:AddRoute("GET", "/api/pdv/caixa/resumo/{sessao}", "U_GEBWAPI_PDVCAIXARESUMO")
+    oSrv:AddRoute("POST", "/api/pdv/caixa/sangria", "U_GEBWAPI_PDVSANGRIA")
+    oSrv:AddRoute("POST", "/api/pdv/cupom/novo", "U_GEBWAPI_PDVCUPOMNOV")
+    oSrv:AddRoute("GET", "/api/pdv/cupom/{id}", "U_GEBWAPI_PDVCUPOMGET")
+    oSrv:AddRoute("POST", "/api/pdv/cupom/{id}/cancelar", "U_GEBWAPI_PDVCUPCANC")
+    oSrv:AddRoute("GET", "/api/pdv/produto/busca", "U_GEBWAPI_PDVPRODUTBUSC")
+    oSrv:AddRoute("GET", "/api/pdv/relatorio/gerencial", "U_GEBWAPI_PDVRELGER")
+    oSrv:AddRoute("GET", "/api/pdv/relatorio/gerencial/csv", "U_GEBWAPI_PDVRELGERCSV")
+    oSrv:AddRoute("GET", "/api/pdv/relatorio/comissao", "U_GEBWAPI_PDVRELCOM")
+    oSrv:AddRoute("GET", "/api/pdv/relatorio/comissao/csv", "U_GEBWAPI_PDVRELCOMCSV")
+    oSrv:AddRoute("GET", "/api/pdv/perifericos", "U_GEBWAPI_PDVPERIFLIST")
+    oSrv:AddRoute("POST", "/api/pdv/perifericos", "U_GEBWAPI_PDVPERIFREG")
+    oSrv:AddRoute("DELETE", "/api/pdv/perifericos/{id}", "U_GEBWAPI_PDVPERIFDEL")
     // Interface PDV
     oSrv:AddRoute("GET", "/pdv", "U_GEBPDVHTML")
     oSrv:AddRoute("GET", "/pdv/ws", "U_GEBPDVWS")
-    // Bind configuravel: all-in-one (Windows) usa 127.0.0.1 para nao
-    // expor a API na rede nem disparar o firewall do Windows; servidor
-    // central mantem 0.0.0.0 via default ou GEBAN_WEB_HOST.
-    cHost := GetEnv("GEBAN_WEB_HOST")
-    If ValType(cHost) != "C" .Or. Empty(cHost) .Or. cHost == "Nil"
+    // Bind configuravel: o all-in-one (Windows) usa 127.0.0.1 para nao expor a
+    // API na rede; o servidor central fica em 0.0.0.0 (padrao).
+    cHost := AllTrim(GetEnv("GEBAN_WEB_HOST"))
+    If Empty(cHost)
         cHost := "0.0.0.0"
     EndIf
     ConOut("GEBWEB: servindo em http://" + cHost + ":" + cValToChar(nPorta))
@@ -171,28 +171,11 @@ User Function GEBWEB_LOGINAPI(oReq)
     Local lRegTem := .F.
     Local cNome := ""
     Local lSuper := .F.
-    Local cStat := ""
 
-    If oReq == Nil .Or. oReq:EMPRESA == Nil
-        cEmp := ""
-    Else
-        cEmp := AllTrim(cValToChar(oReq:EMPRESA))
-    EndIf
-    If oReq == Nil .Or. oReq:USUARIO == Nil
-        cUsu := ""
-    Else
-        cUsu := AllTrim(cValToChar(oReq:USUARIO))
-    EndIf
-    If oReq == Nil .Or. oReq:SENHA == Nil
-        cSen := ""
-    Else
-        cSen := AllTrim(cValToChar(oReq:SENHA))
-    EndIf
-    If oReq == Nil .Or. oReq:FILIAL == Nil
-        cFilReq := ""
-    Else
-        cFilReq := Upper(AllTrim(cValToChar(oReq:FILIAL)))
-    EndIf
+    cEmp := GEBWAPIFIELD(oReq, "EMPRESA")
+    cUsu := GEBWAPIFIELD(oReq, "USUARIO")
+    cSen := GEBWAPIFIELD(oReq, "SENHA")
+    cFilReq := Upper(GEBWAPIFIELD(oReq, "FILIAL"))
 
     If cEmp == "" .Or. cUsu == "" .Or. cSen == ""
         Return {"ok", .F., "erro", "informe empresa, usuario e senha"}
@@ -202,10 +185,9 @@ User Function GEBWEB_LOGINAPI(oReq)
         Return {"ok", .F., "erro", "credenciais invalidas"}
     EndIf
 
-    cStat := GEBSECLOGIN(cUsu, cSen, "web")
-    lOk := (cStat == "OK")
+    lOk := (GEBSECLOGIN(cUsu, cSen, "web") == "OK")
     If !lOk
-        ConOut("GEBWEB_LOGINAPI: GEBSECLOGIN recusou " + cUsu + " (" + cStat + ")")
+        ConOut("GEBWEB_LOGINAPI: GEBSECLOGIN recusou " + cUsu)
     EndIf
     lSuper := GEBSECISSUPER(cUsu)
 
@@ -312,11 +294,6 @@ User Function GEBWEB_LOGINAPI(oReq)
     EndIf
 
     If !lOk
-        // TROCA_OBRIGATORIA nao e' oraculo: a senha ja foi conferida --
-        // so' falta a troca (ex.: primeiro acesso do super bootstrap).
-        If cStat == "TROCA_OBRIGATORIA"
-            Return {"ok", .F., "erro", "troca de senha obrigatoria"}
-        EndIf
         Return {"ok", .F., "erro", "credenciais invalidas"}
     EndIf
 
@@ -327,186 +304,139 @@ User Function GEBWEB_LOGINAPI(oReq)
 
 Return {"ok", .T., "usuario", cUsu, "empresa", cEmp, "filial", cFilChk, "token", cTok}
 
-// ===== WRAPPERS PDV (autenticacao via GEBWAPIAUTH) =====
+// ===== ROTAS PDV: autentica ANTES de qualquer regra de negocio =====
 Static Function GEBPDV_AUTH(oReq)
-    Local cTok  := GEBWAPIFIELD(oReq, "TOKEN")
-    Local cEmp  := GEBWAPIFIELD(oReq, "EMPRESA")
-    Local aAuth := GEBWAPIAUTH(cTok, cEmp)
+    Local aAuth := GEBWAPIAUTH(GEBWAPIFIELD(oReq, "TOKEN"), GEBWAPIFIELD(oReq, "EMPRESA"))
+
     If !aAuth[1]
         Return ""
     EndIf
 Return aAuth[2]
 
-/*/{Protheus.doc} U_GEBPDVCAIXALST
-    Wrapper de autenticacao para GEBPDVCAIXALST.
-/*/
-User Function U_GEBPDVCAIXALST(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(.T., "caixas", GEBPDVCAIXALST(cUsuario))
+User Function GEBWAPI_PDVCAIXALST(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVCAIXAABR
-    Wrapper de autenticacao para GEBPDVCAIXAABR.
-/*/
-User Function U_GEBPDVCAIXAABR(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVCAIXAABR(cUsuario, oReq)
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+Return GEBPDVCAIXALST(cUsu)
 
-/*/{Protheus.doc} U_GEBPDVCAIXAFECH
-    Wrapper de autenticacao para GEBPDVCAIXAFECH.
-/*/
-User Function U_GEBPDVCAIXAFECH(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVCAIXAFECH(cUsuario, oReq)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+User Function GEBWAPI_PDVCAIXAABR(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVCAIXARESUMO
-    Wrapper de autenticacao para GEBPDVCAIXARESUMO.
-/*/
-User Function U_GEBPDVCAIXARESUMO(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local cSessao := GEBWAPIFIELD(oReq, "SESSAO")
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(.T., "resumo_caixa", GEBPDVCAIXARESUMO(cUsuario, cSessao))
+Return GEBPDVCAIXAABR(cUsu, oReq)
 
-/*/{Protheus.doc} U_GEBPDVSANGRIA
-    Wrapper de autenticacao para GEBPDVSANGRIA.
-/*/
-User Function U_GEBPDVSANGRIA(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVSANGRIA(cUsuario, oReq)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], {})
+User Function GEBWAPI_PDVCAIXAFECH(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVCUPOMNOV
-    Wrapper de autenticacao para GEBPDVCUPOMNOV.
-/*/
-User Function U_GEBPDVCUPOMNOV(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVCUPOMNOV(cUsuario, oReq)
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+Return GEBPDVCAIXAFECH(cUsu, oReq)
 
-/*/{Protheus.doc} U_GEBPDVCUPOMGET
-    Wrapper de autenticacao para GEBPDVCUPOMGET.
-/*/
-User Function U_GEBPDVCUPOMGET(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local cCupom := GEBWAPIFIELD(oReq, "ID")
-    Local aR := GEBPDVCUPOMGET(cUsuario, cCupom)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+User Function GEBWAPI_PDVCAIXARESUMO(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVCUPCANC
-    Wrapper de autenticacao para GEBPDVCUPCANC.
-/*/
-User Function U_GEBPDVCUPCANC(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVCUPCANC(cUsuario, oReq)
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+Return GEBPDVCAIXARESUMO(cUsu, GEBWAPIFIELD(oReq, "SESSAO"))
 
-/*/{Protheus.doc} U_GEBPDVPRODUTBUSC
-    Wrapper de autenticacao para GEBPDVPRODUTBUSC.
-/*/
-User Function U_GEBPDVPRODUTBUSC(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local cCodigo := GEBWAPIFIELD(oReq, "CODIGO")
-    Local aR := GEBPDVPRODUTBUSC(cUsuario, cCodigo)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+User Function GEBWAPI_PDVSANGRIA(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVRELGER
-    Wrapper de autenticacao para GEBPDVRELGER.
-/*/
-User Function U_GEBPDVRELGER(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVRELGER(cUsuario, oReq)
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+Return GEBPDVSANGRIA(cUsu, oReq)
 
-/*/{Protheus.doc} U_GEBPDVRELGERCSV
-    Wrapper de autenticacao para GEBPDVRELGERCSV.
-/*/
-User Function U_GEBPDVRELGERCSV(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(.T., "relatorio_gerencial_csv", GEBPDVRELGERCSV(cUsuario, oReq))
+User Function GEBWAPI_PDVCUPOMNOV(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVRELCOM
-    Wrapper de autenticacao para GEBPDVRELCOM.
-/*/
-User Function U_GEBPDVRELCOM(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local aR := GEBPDVRELCOM(cUsuario, oReq)
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(aR[1], aR[2], aR)
+Return GEBPDVCUPOMNOV(cUsu, oReq)
 
-/*/{Protheus.doc} U_GEBPDVRELCOMCSV
-    Wrapper de autenticacao para GEBPDVRELCOMCSV.
-/*/
-User Function U_GEBPDVRELCOMCSV(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(.T., "comissao_csv", GEBPDVRELCOMCSV(cUsuario, oReq))
+User Function GEBWAPI_PDVCUPOMGET(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVPERIFLIST
-    Wrapper de autenticacao para GEBPDVPERIFLIST.
-/*/
-User Function U_GEBPDVPERIFLIST(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local cTipo := GEBWAPIFIELD(oReq, "TIPO")
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(.T., "perifericos", GEBPDVPERIFLIST(cUsuario, cTipo))
+Return GEBPDVCUPOMGET(cUsu, GEBWAPIFIELD(oReq, "ID"))
 
-/*/{Protheus.doc} U_GEBPDVPERIFREG
-    Wrapper de autenticacao para GEBPDVPERIFREG.
-/*/
-User Function U_GEBPDVPERIFREG(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    If cUsuario == ""
-        Return GEBWAPIDENY()
-    EndIf
-Return GEBRESTJSONRESP(.T., "periferico_registrado", GEBPDVPERIFREG(cUsuario, oReq))
+User Function GEBWAPI_PDVCUPCANC(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
 
-/*/{Protheus.doc} U_GEBPDVPERIFDEL
-    Wrapper de autenticacao para GEBPDVPERIFDEL.
-/*/
-User Function U_GEBPDVPERIFDEL(oReq)
-    Local cUsuario := GEBPDV_AUTH(oReq)
-    Local nId := Val(GEBWAPIFIELD(oReq, "ID"))
-    If cUsuario == ""
+    If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBRESTJSONRESP(.T., "periferico_removido", GEBPDVPERIFDEL(cUsuario, nId))
+Return GEBPDVCUPCANC(cUsu, oReq)
+
+User Function GEBWAPI_PDVPRODUTBUSC(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVPRODUTBUSC(cUsu, GEBWAPIFIELD(oReq, "CODIGO"))
+
+User Function GEBWAPI_PDVRELGER(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVRELGER(cUsu, oReq)
+
+User Function GEBWAPI_PDVRELGERCSV(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVRELGERCSV(cUsu, oReq)
+
+User Function GEBWAPI_PDVRELCOM(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVRELCOM(cUsu, oReq)
+
+User Function GEBWAPI_PDVRELCOMCSV(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVRELCOMCSV(cUsu, oReq)
+
+User Function GEBWAPI_PDVPERIFLIST(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVPERIFLIST(cUsu, GEBWAPIFIELD(oReq, "TIPO"))
+
+User Function GEBWAPI_PDVPERIFREG(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVPERIFREG(cUsu, oReq)
+
+User Function GEBWAPI_PDVPERIFDEL(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVPERIFDEL(cUsu, Val(GEBWAPIFIELD(oReq, "ID")))

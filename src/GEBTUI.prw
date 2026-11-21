@@ -43,152 +43,1649 @@
 #include "GEBTUIBO.prw"
 #include "GEBEXP_REL_BIZ.prw"
 #include "GEBEXP_REL_NUC.prw"
+#include "GEBEXP_TRAK.prw"
+#include "GEBTUIPDV.prw"
+
+// bTUIBrw: com o app ativo, GEBTUIBRW mostra a tabela na pagina Resultado.
+Static bTUIBrw := Nil
 
 /*/{Protheus.doc} GEBTUI
-    Interface nativa AdvPL do ERP GEBAN (padrao GesCon: sem HTML).
-    Roda sob `advplc serve src/GEBTUI.prw`: login (usuario/senha,
-    empresa e filial via menus) e menu principal com os 7 modulos,
-    cada um com browse (FWMBrowse) e acoes que chamam as mesmas
-    funcoes de negocio da API REST. Nenhuma string HTML aqui.
+    Interface do GEBAN em componentes PO-UI (PoApp): login (com troca de
+    senha obrigatoria/expirada), empresa e filial, menu lateral com os
+    modulos permitidos e uma pagina por modulo: tabelas ao vivo (PoTable)
+    e as operacoes como formularios de tela unica, que chamam as mesmas
+    funcoes de negocio da API (mesmas validacoes e permissoes).
+    Roda sob `advplc serve src/GEBTUI.prw`; cada janela e' uma sessao.
     @type Entrada serve
     @author Peder Munksgaard
-    @since 25/09/2026
+    @since 21/11/2026
 /*/
 User Function GEBTUI()
-    Local aCtx := {}
+    Local oApp := PoApp():New("GEBAN")
+    Local oPg  := Nil
+
     ConOut("GEBAN - Sistema de Gestao Empresarial")
-    If !GEBDBConecta()
-        MsgStop("Banco indisponivel.", "GEBAN")
+    If !GEBDBConecta() .Or. !GEBDBProvisionaCatalogo()
+        MsgStop("Banco ou catalogo indisponivel.", "GEBAN")
         Return .F.
     EndIf
-    If !GEBDBProvisionaCatalogo()
-        MsgStop("Catalogo indisponivel.", "GEBAN")
-        Return .F.
-    EndIf
-    aCtx := GEBTUILOGIN()
-    If Len(aCtx) < 3
-        Return .F.
-    EndIf
-    GEBTUIMENU(aCtx[1], aCtx[2], aCtx[3])
+    oPg := PoPage():New(oApp, "GEBAN - Entrar")
+    TUILogin(oApp, oPg)
+    oApp:Activate()
 Return .T.
 
-/*/{Protheus.doc} GEBTUILOGIN
-    Login nativo: usuario/senha, empresa (menu) e filial (menu).
-    super global entra direto com a matriz (garante o vinculo) e,
-    com o catalogo vazio, cria a primeira empresa na hora (bootstrap).
-    @type Login serve
+/*/{Protheus.doc} TUILogin
+    Formulario de acesso.
+    @type function
     @author Peder Munksgaard
-    @since 25/09/2026
-    @return {cEmp, cFil, cUsu} ou {} se desistir/falhar
+    @since 21/11/2026
 /*/
-User Function GEBTUILOGIN()
-    Local cUsu := ""
-    Local cSen := ""
-    Local cEmp := ""
-    Local cFil := ""
-    Local nTent := 0
-    Local lOk := .F.
-    Local aEmps := {}
-    Local aEmpCod := {}
-    Local nEmp := 0
-    Local aFils := {}
-    Local nFil := 0
-    Local cCod := ""
-    Local cNome := ""
-    Local cStat := ""
-    Local cNova := ""
-    Local cConf := ""
-    Local aTroca := {}
-    Do While nTent < 3 .And. !lOk
-        cUsu := FWGetText("Usuario:", "")
-        If Empty(cUsu)
-            Return {}
-        EndIf
-        cSen := FWGetText("Senha:", "", .T.)
-        If Empty(cSen)
-            Return {}
-        EndIf
-        cStat := GEBSECLOGIN(AllTrim(cUsu), AllTrim(cSen), "tui")
-        If cStat == "OK"
-            lOk := .T.
-        ElseIf cStat == "TROCA_OBRIGATORIA"
-            // Senha correta, troca pendente (ex.: primeiro acesso com a
-            // senha padrao do bootstrap): coleta a nova senha, grava via
-            // GEBTUITROCASENHA (que limpa SEC_FORCE) e tenta o login de
-            // novo. Nao conta como tentativa falha -- a senha estava certa.
-            cNova := FWGetText("Troca de senha obrigatoria. Nova senha:", "", .T.)
-            cConf := FWGetText("Confirme a nova senha:", "", .T.)
-            lOk := .F.
-            If !Empty(cNova) .And. cNova == cConf
-                aTroca := GEBTUITROCASENHA(AllTrim(cUsu), "", cNova, "", "")
-                If Len(aTroca) > 0 .And. aTroca[1]
-                    If GEBSECLOGIN(AllTrim(cUsu), cNova, "tui") == "OK"
-                        lOk := .T.
-                    EndIf
-                EndIf
-            EndIf
-            If !lOk
-                MsgStop("Troca de senha obrigatoria nao concluida. Tente novamente.", "GEBAN")
-            EndIf
-        Else
-            MsgStop("Credenciais invalidas.", "GEBAN")
-        EndIf
-        nTent := nTent + 1
-    EndDo
-    If !lOk
-        Return {}
+Static Function TUILogin(oApp, oPg)
+    Local oW   := PoWidget():New(oPg, "Acesso")
+    Local oUsu := PoInput():New(oW, "Usuario")
+    Local oSen := PoPassword():New(oW, "Senha")
+    Local oBtn := PoButton():New(oW, "Entrar")
+
+    oW:SetCols(4)
+    oBtn:Set("kind", "primary")
+    oBtn:Set("icon", "an an-sign-in")
+    oBtn:OnClick({|| TUIEntra(oApp, AllTrim(BOSTR(oUsu:GetValue())), AllTrim(BOSTR(oSen:GetValue())))})
+Return
+
+/*/{Protheus.doc} TUIEntra
+    Autentica. Senha certa com troca obrigatoria ou vencida leva a troca de
+    senha (antes a tela dizia "credenciais invalidas" e o usuario ficava
+    preso ate um admin mexer no cadastro).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIEntra(oApp, cUsu, cSen)
+    Local cRes := "" as Character
+
+    If Empty(cUsu) .Or. Empty(cSen)
+        oApp:Notify("Informe usuario e senha.", "warning")
+        Return
     EndIf
-    cUsu := AllTrim(cUsu)
-    aEmps := GEBTUIEMPRESAS(cUsu)
+    cRes := GEBSECLOGIN(cUsu, cSen, "tui")
+    If cRes == "TROCA_OBRIGATORIA" .Or. cRes == "SENHA_EXP"
+        TUISenhaPg(oApp, cUsu, "Defina uma nova senha para continuar", {|| TUIEntraOk(oApp, cUsu)})
+        Return
+    EndIf
+    If cRes != "OK"
+        oApp:Notify("Credenciais invalidas.", "error")
+        Return
+    EndIf
+    TUIEntraOk(oApp, cUsu)
+Return
+
+/*/{Protheus.doc} TUISenhaPg
+    Pagina de troca da propria senha (politica aplicada por GEBTUITROCASENHA).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+    @param bDepois, codeblock, roda apos trocar
+/*/
+Static Function TUISenhaPg(oApp, cUsu, cTitulo, bDepois)
+    Local oPg  := PoPage():New(oApp, cTitulo)
+    Local oW   := PoWidget():New(oPg, "Nova senha de " + cUsu)
+    Local oS1  := PoPassword():New(oW, "Nova senha")
+    Local oS2  := PoPassword():New(oW, "Confirme a nova senha")
+    Local oBtn := PoButton():New(oW, "Trocar senha")
+
+    oW:SetCols(4)
+    PoInfo():New(oW, "", "Minimo de 8 caracteres, com maiuscula, minuscula, digito e caractere especial.")
+    oBtn:Set("kind", "primary")
+    oBtn:OnClick({|| TUISenhaGrava(oApp, cUsu, BOSTR(oS1:GetValue()), BOSTR(oS2:GetValue()), bDepois)})
+    oApp:Navigate(oPg)
+Return oPg
+
+Static Function TUISenhaGrava(oApp, cUsu, cS1, cS2, bDepois)
+    Local aRes := {} as Array
+
+    If Empty(cS1) .Or. !(cS1 == cS2)
+        oApp:Notify("As senhas nao conferem.", "error")
+        Return
+    EndIf
+    aRes := GEBTUITROCASENHA(cUsu, "", cS1, "", "")
+    If !aRes[1]
+        oApp:Notify("Senha recusada: " + BOSTR(aRes[2]), "error")
+        Return
+    EndIf
+    oApp:Notify("Senha alterada.", "success")
+    If bDepois != Nil
+        Eval(bDepois)
+    EndIf
+Return
+
+/*/{Protheus.doc} TUIEntraOk
+    Usuario autenticado: empresa (o super cria a primeira com o catalogo
+    vazio) e depois filial.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIEntraOk(oApp, cUsu)
+    Local aEmps := GEBTUIEMPRESAS(cUsu) as Array
+    Local aOps  := {} as Array
+    Local oPg   := Nil
+    Local oW    := Nil
+    Local oCod  := Nil
+    Local oNome := Nil
+    Local oSel  := Nil
+    Local oBtn  := Nil
+    Local nI    := 0 as Numeric
+
     If Len(aEmps) == 0
         If !GEBSECISSUPER(cUsu)
-            MsgStop("Nenhuma empresa vinculada a este usuario. Peca ao super: Nucleo > Empresas.", "GEBAN")
-            Return {}
+            oApp:Notify("Nenhuma empresa vinculada a este usuario. Peca ao administrador.", "error")
+            Return
         EndIf
-        MsgInfo("Catalogo vazio: o super cria a primeira empresa agora.", "GEBAN")
-        cCod := FWGetText("Codigo da empresa (2 letras ou digitos):", "")
-        If Empty(cCod)
-            Return {}
-        EndIf
-        cNome := FWGetText("Nome da empresa:", "")
-        If Empty(cNome)
-            Return {}
-        EndIf
-        If !GEBDBProvisionaEmpresa(AllTrim(cCod), AllTrim(cNome))
-            MsgStop("Falha ao criar a empresa. Confira o codigo (letras, digitos e _).", "GEBAN")
-            Return {}
-        EndIf
-        aEmps := GEBTUIEMPRESAS(cUsu)
-        If Len(aEmps) == 0
-            MsgStop("Nenhuma empresa cadastrada.", "GEBAN")
-            Return {}
-        EndIf
+        oPg := PoPage():New(oApp, "Primeira empresa")
+        oW := PoWidget():New(oPg, "Catalogo vazio: crie a primeira empresa")
+        oW:SetCols(4)
+        oCod := PoInput():New(oW, "Codigo (letras, digitos e _)")
+        oNome := PoInput():New(oW, "Nome")
+        oBtn := PoButton():New(oW, "Criar empresa")
+        oBtn:Set("kind", "primary")
+        oBtn:OnClick({|| TUIPrimeira(oApp, cUsu, AllTrim(BOSTR(oCod:GetValue())), AllTrim(BOSTR(oNome:GetValue())))})
+        oApp:Navigate(oPg)
+        Return
     EndIf
-    aEmpCod := {}
-    For nEmp := 1 To Len(aEmps)
-        AAdd(aEmpCod, "icon:buildings|" + AllTrim(cValToChar(aEmps[nEmp][1])) + " - " + AllTrim(cValToChar(aEmps[nEmp][2])))
-    Next nEmp
-    nEmp := FWMenuSelect(aEmpCod, "Empresa:")
-    If nEmp <= 0 .Or. nEmp > Len(aEmps)
-        Return {}
+    If Len(aEmps) == 1
+        TUIFilial(oApp, cUsu, AllTrim(aEmps[1][1]))
+        Return
     EndIf
-    cEmp := AllTrim(cValToChar(aEmps[nEmp][1]))
-    cFil := GEBTUIFILIAL(cUsu, cEmp)
-    If cFil == Nil
-        Return {}
+    For nI := 1 To Len(aEmps)
+        aAdd(aOps, {AllTrim(aEmps[nI][1]) + " - " + AllTrim(aEmps[nI][2]), AllTrim(aEmps[nI][1])})
+    Next nI
+    oPg := PoPage():New(oApp, "Empresa")
+    oW := PoWidget():New(oPg, "Escolha a empresa")
+    oW:SetCols(4)
+    oSel := PoSelect():New(oW, "Empresa", aOps, aOps[1][2])
+    oBtn := PoButton():New(oW, "Continuar")
+    oBtn:Set("kind", "primary")
+    oBtn:OnClick({|| TUIFilial(oApp, cUsu, BOSTR(oSel:GetValue()))})
+    oApp:Navigate(oPg)
+Return
+
+Static Function TUIPrimeira(oApp, cUsu, cCod, cNome)
+    If Empty(cCod) .Or. Empty(cNome)
+        oApp:Notify("Informe codigo e nome.", "warning")
+        Return
     EndIf
+    If !GEBDBProvisionaEmpresa(cCod, cNome)
+        oApp:Notify("Falha ao criar a empresa. Confira o codigo (letras, digitos e _).", "error")
+        Return
+    EndIf
+    TUIEntraOk(oApp, cUsu)
+Return
+
+/*/{Protheus.doc} TUIFilial
+    Filial da empresa: entra direto quando ha' uma so' (ou e' o super).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIFilial(oApp, cUsu, cEmp)
+    Local aFils := GEBTUIFILIAL(cUsu, cEmp) as Array
+    Local oPg   := Nil
+    Local oW    := Nil
+    Local oSel  := Nil
+    Local oBtn  := Nil
+
+    If Len(aFils) == 0
+        oApp:Notify("Sem vinculo com esta empresa.", "error")
+        Return
+    EndIf
+    If Len(aFils) == 1
+        TUIAbre(oApp, cEmp, aFils[1][2], cUsu)
+        Return
+    EndIf
+    oPg := PoPage():New(oApp, "Filial")
+    oW := PoWidget():New(oPg, "Escolha a filial")
+    oW:SetCols(4)
+    oSel := PoSelect():New(oW, "Filial", aFils, aFils[1][2])
+    oBtn := PoButton():New(oW, "Entrar")
+    oBtn:Set("kind", "primary")
+    oBtn:OnClick({|| TUIAbre(oApp, cEmp, BOSTR(oSel:GetValue()), cUsu)})
+    oApp:Navigate(oPg)
+Return
+
+/*/{Protheus.doc} TUIAbre
+    Abre a sessao na empresa/filial e monta menu e paginas dos modulos que o
+    usuario pode ver.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
+    Local oMenu := Nil
+    Local oRes  := Nil
+    Local oResT := Nil
+    Local aNav  := {Nil} as Array
+    Local aMods := {} as Array
+    Local oPg   := Nil
+    Local oIni  := Nil
+    Local aForms := {} as Array
+    Local aAtalhos := {} as Array
+    Local nI    := 0 as Numeric
+
     If !GEBDBSetTenant(cEmp)
-        MsgStop("Empresa indisponivel.", "GEBAN")
-        Return {}
+        oApp:Notify("Empresa indisponivel.", "error")
+        Return
     EndIf
     GBAUDINIC()
     GEBMONINIC()
     If !GEBEXPCONTEXTO(cEmp, cFil, cUsu)
-        MsgStop("Sessao recusada.", "GEBAN")
-        Return {}
+        oApp:Notify("Sessao recusada.", "error")
+        Return
     EndIf
-    MsgInfo("Bem-vindo, " + cUsu + ".", "GEBAN")
-Return {cEmp, cFil, cUsu}
+
+    // Resultado de relatorio/consulta (o que antes abria FWMBrowse).
+    oRes := PoPage():New(oApp, "Resultado")
+    oRes:AddAction("Voltar", {|| oApp:Navigate(aNav[1])})
+    oResT := PoTable():New(oRes)
+    GEBTUIBRWAPP({|cAlias, cTit| oRes:Set("title", cTit), TUICarrega(oResT, cAlias, Nil), oApp:Navigate(oRes), .T.})
+
+    oMenu := PoMenu():New(oApp)
+    oIni := PoPage():New(oApp, "Inicio")
+    TUIMenuItem(oApp, oMenu, "Inicio", "an an-house", oIni, aNav)
+    aMods := TUIModulos(cEmp, cFil, cUsu)
+    aForms := TUIFormularios(cEmp, cFil)
+    For nI := 1 To Len(aMods)
+        If TUIPode(cUsu, aMods[nI][3])
+            If Len(aMods[nI]) >= 5
+                oPg := Eval(aMods[nI][5], oApp)   // pagina propria (Frente de loja)
+            Else
+                oPg := TUIModPg(oApp, aMods[nI], aForms, cUsu)
+            EndIf
+            aAdd(aAtalhos, {aMods[nI][1], aMods[nI][2], oPg})
+            TUIMenuItem(oApp, oMenu, aMods[nI][1], aMods[nI][2], oPg, aNav)
+        EndIf
+    Next nI
+    oPg := PoPage():New(oApp, "Rastreabilidade")
+    TUIRastreio(oApp, oPg)
+    TUIMenuItem(oApp, oMenu, "Rastreabilidade", "an an-path", oPg, aNav)
+    oPg := PoPage():New(oApp, "Minha senha")
+    TUIMenuItem(oApp, oMenu, "Minha senha", "an an-key", oPg, aNav)
+    TUISenhaForm(oApp, oPg, cUsu)
+    oMenu:AddItem("Sair", "an an-sign-out", {|| oApp:Close()})
+    TUIInicio(oApp, oIni, cEmp, cFil, cUsu, aAtalhos, aNav)
+    aNav[1] := oIni
+    oApp:Notify("Bem-vindo, " + cUsu + " (" + cEmp + ").", "success")
+    oApp:Navigate(oIni)
+Return
+
+// Item de menu que lembra a pagina (Voltar do Resultado). Funcao propria para
+// o bloco capturar a pagina certa, nao a variavel do laco.
+Static Function TUIMenuItem(oApp, oMenu, cRot, cIcone, oPg, aNav)
+    oMenu:AddItem(cRot, cIcone, {|| aNav[1] := oPg, oApp:Navigate(oPg)})
+Return
+
+Static Function TUISenhaForm(oApp, oPg, cUsu)
+    Local oW   := PoWidget():New(oPg, "Trocar minha senha")
+    Local oS1  := PoPassword():New(oW, "Nova senha")
+    Local oS2  := PoPassword():New(oW, "Confirme a nova senha")
+    Local oBtn := PoButton():New(oW, "Trocar senha")
+
+    oW:SetCols(4)
+    oBtn:Set("kind", "primary")
+    oBtn:OnClick({|| TUISenhaGrava(oApp, cUsu, BOSTR(oS1:GetValue()), BOSTR(oS2:GetValue()), Nil)})
+Return
+
+// Permissao do modulo: "ADMIN" = Nucleo (admin da empresa ou super).
+Static Function TUIPode(cUsu, cMenu)
+    If cMenu == "ADMIN"
+        Return GEBSECPODE(cUsu, "", .F.)
+    EndIf
+Return GEBTUIMODOK(cUsu, cMenu, .F.)
+
+/*/{Protheus.doc} TUIModulos
+    Modulos do menu: {rotulo, icone, permissao, tabelas {{alias, titulo}},
+    telas {{titulo, bloco da tela, opcoes que nao viram botao}}}. As opcoes
+    puladas sao as de grade (viram tabela), as que abrem outra tela (viram
+    aba propria) e o "< Voltar".
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIModulos(cEmp, cFil, cUsu)
+Return { ;
+    {"Fiscal", "an an-receipt", "FISCAL", {{"GF1", "Produtos"}, {"GF3", "Notas"}, {"GSN2", "Apuracoes do Simples"}, {"GSN3", "Atividades do Simples"}}}, ;
+    {"Financeiro", "an an-wallet", "FINANCEIRO", {{"GFN1", "Contas"}}}, ;
+    {"Derrama", "an an-bank", "DERRAMA", {{"GD1", "Guias"}}}, ;
+    {"Estoque", "an an-package", "ESTOQUE", {{"GV1", "Saldos"}, {"GV2", "Vendas"}}}, ;
+    {"Contabil", "an an-calculator", "CONTABIL", {{"GC1", "Plano de contas"}, {"GC2", "Lancamentos"}}}, ;
+    {"Compras", "an an-shopping-cart", "COMPRAS", {{"GCP1", "Fornecedores"}, {"GCP3", "Pedidos"}}}, ;
+    {"Faturamento", "an an-file-text", "FATURAMENTO", {{"GFT1", "Clientes"}, {"GFT3", "Pedidos de venda"}}}, ;
+    {"Frente de loja", "an an-storefront", "LOJA", {}, {|oApp| TUIPdvPg(oApp, cEmp, cFil, cUsu)}}, ;
+    {"Nucleo", "an an-gear", "ADMIN", {{"GE1", "Empresas"}, {"GEU1", "Unidades"}, {"GEF1", "Filiais"}, {"GE2", "Usuarios"}}} ;
+    }
+
+/*/{Protheus.doc} TUIModPg
+    Pagina do modulo, de cima para baixo: tabelas em abas (PoTable ao vivo;
+    clicar numa linha preenche os campos ligados dos formularios), os
+    formularios em abas por grupo. Toda operacao rele as tabelas.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIModPg(oApp, aMod, aForms, cUsu)
+    Local oPg    := PoPage():New(oApp, aMod[1])
+    Local oTabs  := Nil
+    Local aTabs  := {} as Array
+    Local aLinks := {} as Array
+    Local aGrp   := {} as Array
+    Local oFTabs := Nil
+    Local cGrp   := "" as Character
+    Local nG     := 0 as Numeric
+    Local bRel   := Nil
+    Local oT     := Nil
+    Local nI     := 0 as Numeric
+
+    bRel := {|| TUIRecarrega(aTabs)}
+    If Len(aMod[4]) > 0
+        oTabs := PoTabs():New(oPg)
+        For nI := 1 To Len(aMod[4])
+            oT := PoTable():New(PoTab():New(oTabs, aMod[4][nI][2]))
+            aAdd(aTabs, {oT, aMod[4][nI][1], {}})
+            TUISelecao(oT, aTabs[nI][3], aLinks)
+        Next nI
+    EndIf
+    // Formularios em abas por grupo (Operacoes, Banco, Relatorios), pela ordem de aparicao.
+    For nI := 1 To Len(aForms)
+        If aForms[nI][1] == aMod[1]
+            cGrp := TUIGrupo(aForms[nI][4])
+            nG := aScan(aGrp, {|x| x[1] == cGrp})
+            If nG == 0
+                If oFTabs == Nil
+                    oFTabs := PoTabs():New(oPg)
+                EndIf
+                aAdd(aGrp, {cGrp, PoTab():New(oFTabs, cGrp)})
+                nG := Len(aGrp)
+            EndIf
+            TUIForm(oApp, aGrp[nG][2], aForms[nI], cUsu, aLinks, bRel)
+        EndIf
+    Next nI
+    oPg:AddAction("Atualizar", bRel)
+    TUIRecarrega(aTabs)
+Return oPg
+
+Static Function TUIRecarrega(aTabs)
+    Local nI := 0 as Numeric
+
+    For nI := 1 To Len(aTabs)
+        TUICarrega(aTabs[nI][1], aTabs[nI][2], aTabs[nI][3])
+    Next nI
+Return
+
+// Linha clicada: copia as colunas ligadas para os campos dos formularios.
+Static Function TUISelecao(oTab, aCol, aLinks)
+    oTab:OnSelect({|o, aLin| TUIPreenche(aLin, aCol, aLinks)})
+Return
+
+Static Function TUIPreenche(aLin, aCol, aLinks)
+    Local nI := 0 as Numeric
+    Local nP := 0 as Numeric
+
+    If ValType(aLin) != "A"
+        Return
+    EndIf
+    For nI := 1 To Len(aLinks)
+        nP := aScan(aCol, aLinks[nI][2])
+        If nP > 0 .And. nP <= Len(aLin)
+            aLinks[nI][1]:SetValue(aLin[nP])
+        EndIf
+    Next nI
+Return
+
+/*/{Protheus.doc} TUIFormularios
+    Operacoes principais como formulario de uma tela so':
+    {modulo, tela, opcao substituida, titulo, campos, bloco, status de
+    sucesso, mensagem}. Campo: {rotulo, "C" | "N" | {opcoes}, padrao,
+    coluna ligada (a linha clicada na tabela preenche)}. Os blocos chamam
+    as mesmas funcoes de negocio da tela antiga e da API.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIFormularios(cEmp, cFil)
+    Local aF := TUIFormBase() as Array
+
+    aEval(TUIFormDfe(cEmp, cFil), {|x| aAdd(aF, x)})
+    aEval(TUIFormNuc(cEmp), {|x| aAdd(aF, x)})
+Return aF
+
+Static Function TUIFormBase()
+    Local cComp := Left(DToS(Date()), 6) as Character
+    Local cHoje := BOHOJE() as Character
+    Local aRP   := {{"Receber", "R"}, {"Pagar", "P"}} as Array
+    Local aFlx  := {"FINANCEIRO", "FLUXO"} as Array
+    Local aBco  := {"FINANCEIRO", "BANCO"} as Array
+    Local aEst  := {"ESTOQUE", "ESTOQ"} as Array
+    Local aCtb  := {"CONTABIL", "LANCTO"} as Array
+    Local cIni  := Left(cHoje, 6) + "01" as Character
+    Local cFech := BOPARM("EST_FECHADO", "") as Character
+    Local aSN   := {{"Nao", "N"}, {"Sim", "S"}} as Array
+    Local aPed  := {"COMPRAS", "PEDID"} as Array
+    Local aApu  := {"FISCAL", "APURA"} as Array
+    Local aFat  := {"FATURAMENTO", "FATUR"} as Array
+    Local aAnexo := {{"Anexo I", "I"}, {"Anexo II", "II"}, {"Anexo III", "III"}, {"Anexo IV", "IV"}, {"Anexo V", "V"}, {"Fator R (III ou V)", "FR"}} as Array
+Return { ;
+    {"Fiscal", 0, 0, "Novo produto", {{"Codigo", "C", ""}, {"NCM", "C", ""}, {"Descricao", "C", ""}}, {|u, a| GEBRESTPRDLSC(u, a)}, "201", "Produto criado."}, ;
+    {"Fiscal", 0, 0, "Emitir nota", {{"Chave", "C", ""}, {"Produto", "C", "", "GF1_COD"}, {"Quantidade", "N", 1}, {"Preco", "N", 0}}, {|u, a| GEBRESTNOTPOST(u, a)}, "201", "Nota emitida."}, ;
+    {"Fiscal", 0, 0, "Apurar competencia", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| GEBRESTFISAPU(u, a)}, "200", "Competencia apurada."}, ;
+    {"Financeiro", 0, 0, "Nova conta", {{"Conta", "C", ""}, {"Nome", "C", ""}}, {|u, a| GEBRESTFINCON(u, a)}, "201", "Conta criada."}, ;
+    {"Financeiro", 0, 0, "Titulo parcelado", {{"Tipo", aRP, "R"}, {"Documento", "C", ""}, {"Cliente/fornecedor", "C", ""}, {"Valor total", "N", 0}, ;
+        {"Condicao (codigo ou dias)", "C", "0"}, {"Emissao (AAAAMMDD)", "C", cHoje}}, {|u, a| GEBFXTIT(a[1], a[2], a[3], a[4], a[5], a[6], "TELA", "")}, "BO", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Baixa com juros e multa", {{"Tipo", aRP, "R"}, {"Documento (com a parcela, ex.: NF1/01)", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}, ;
+        {"Principal", "N", 0}, {"Juros", "N", 0}, {"Multa", "N", 0}, {"Desconto", "N", 0}, {"Conta", "C", "CAIXA"}}, ;
+        {|u, a| GEBFXBAI(a[1], a[2], a[4], a[5], a[6], a[7], a[8], a[3])}, "BO", "", aFlx, ;
+        {"Calcular juros e multa", {|a| TUICalcBaixa(a)}}}, ;
+    {"Financeiro", 0, 0, "Transferencia entre contas", {{"Conta de origem", "C", "", "GFN1_CONTA"}, {"Conta de destino", "C", ""}, {"Valor", "N", 0}, ;
+        {"Data (AAAAMMDD)", "C", cHoje}, {"Historico", "C", ""}}, {|u, a| GEBFXTRF(a[1], a[2], a[3], a[4], a[5])}, "BO", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Movimento avulso", {{"Conta", "C", "", "GFN1_CONTA"}, {"Tipo", {{"Saida (D)", "D"}, {"Entrada (C)", "C"}}, "D"}, {"Valor", "N", 0}, ;
+        {"Historico", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}, {"Conta contabil (vazio = padrao)", "C", ""}, {"Centro de custo ou rateio", "C", ""}}, ;
+        {|u, a| GEBFXMOV(a[1], a[2], a[3], a[4], a[5], a[6], a[7])}, "BO", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Despesa a pagar", {{"Documento", "C", ""}, {"Fornecedor", "C", ""}, {"Valor", "N", 0}, {"Condicao (codigo ou dias)", "C", "0"}, ;
+        {"Emissao (AAAAMMDD)", "C", cHoje}, {"Conta de despesa (vazio = 4.02.006)", "C", ""}, {"Centro de custo ou rateio", "C", ""}, {"Historico", "C", ""}}, ;
+        {|u, a| GEBFXDESP(a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8])}, "BO", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Condicao de pagamento", {{"Codigo", "C", ""}, {"Descricao", "C", ""}, {"Dias das parcelas (ex.: 30,60,90; 0 = a vista)", "C", "0"}}, ;
+        {|u, a| GEBFXCOND(a[1], a[2], a[3])}, "BO", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Relatorio: titulos por atraso", {{"Tipo", aRP, "R"}, {"Posicao em (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBFXPOSICAO(a[1], a[2])}, "REL", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Relatorio: extrato da conta", {{"Conta", "C", "CAIXA", "GFN1_CONTA"}, {"Inicio (AAAAMMDD)", "C", Left(cHoje, 6) + "01"}, {"Fim (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBFXEXTRATO(a[1], a[2], a[3])}, "REL", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Relatorio: fluxo de caixa projetado", {{"Inicio (AAAAMMDD)", "C", cHoje}, {"Dias", "N", 30}}, ;
+        {|u, a| GEBFXFLUXO(a[1], a[2])}, "REL", "", aFlx}, ;
+    {"Financeiro", 0, 0, "Banco: dados de cobranca da conta", {{"Conta financeira", "C", "BANCO", "GFN1_CONTA"}, ;
+        {"Banco", {{"001 Banco do Brasil", "001"}, {"033 Santander", "033"}, {"104 Caixa", "104"}, {"237 Bradesco", "237"}, {"341 Itau", "341"}, {"756 Sicoob", "756"}}, "237"}, ;
+        {"Agencia/cooperativa (4 digitos)", "C", ""}, {"DV da agencia", "C", ""}, {"Conta corrente", "C", ""}, {"DV da conta", "C", ""}, ;
+        {"Carteira (Santander: 101/104)", "C", ""}, {"Codigo do beneficiario/convenio no banco", "C", ""}, {"Beneficiario (razao social)", "C", ""}, ;
+        {"CNPJ", "C", ""}, {"Leiaute CNAB 240 ou 400 (vazio = padrao do banco)", "C", ""}, {"Modalidade (Sicoob; vazio = 01)", "C", ""}}, ;
+        {|u, a| GEBBCOCFG(a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12])}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: gerar boleto do titulo", {{"Titulo a receber (documento com a parcela)", "C", ""}, {"Conta de cobranca", "C", "BANCO"}}, ;
+        {|u, a| TUIBoleto(a)}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: gerar remessa CNAB", {{"Conta de cobranca", "C", "BANCO"}, {"Gravar em (caminho no servidor)", "C", "/tmp/remessa_BANCO.rem"}}, ;
+        {|u, a| GEBBCOREM(a[1], a[2])}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: ler retorno CNAB (baixa)", {{"Conta", "C", "BANCO"}, {"Arquivo (caminho no servidor)", "C", ""}}, ;
+        {|u, a| TUIArquivo(a[2], {|c| GEBBCORET(a[1], c)})}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: importar extrato OFX", {{"Conta", "C", "BANCO"}, {"Arquivo (caminho no servidor)", "C", ""}}, ;
+        {|u, a| TUIArquivo(a[2], {|c| GEBBCOOFX(a[1], c)})}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: conciliar automatico", {{"Conta", "C", "BANCO"}}, {|u, a| GEBBCOCONC(a[1])}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: conciliar na mao", {{"Conta", "C", "BANCO"}, {"FITID da linha do extrato", "C", ""}, {"Movimento (numero do relatorio; 0 desfaz)", "N", 0}}, ;
+        {|u, a| GEBBCOCONCMAN(a[1], a[2], a[3])}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Banco: lancar linha do extrato (tarifa)", {{"Conta", "C", "BANCO"}, {"FITID da linha do extrato", "C", ""}, {"Conta contabil (vazio = padrao)", "C", ""}, ;
+        {"Centro de custo (vazio = nenhum)", "C", ""}}, {|u, a| GEBBCOLANCA(a[1], a[2], a[3], a[4])}, "BO", "", aBco}, ;
+    {"Financeiro", 0, 0, "Relatorio: conciliacao bancaria", {{"Conta", "C", "BANCO"}, {"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBBCOREL(a[1], a[2], a[3])}, "REL", "", aBco}, ;
+    {"Estoque", 0, 0, "Saldo e custo medio", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem (vazio = todos)", "C", ""}}, {|u, a| TUISaldo(a)}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Controle de lote/serie/endereco", {{"Produto", "C", "", "GV1_PROD"}, {"Rastro", {{"Nenhum", "N"}, {"Lote", "L"}, {"Serie", "S"}}, "N"}, ;
+        {"Controla endereco", aSN, "N"}}, {|u, a| GEBESTCTL(a[1], a[2], a[3])}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Cadastrar endereco", {{"Armazem", "C", "01"}, {"Endereco (ex.: A-01-03)", "C", ""}, {"Descricao", "C", ""}}, ;
+        {|u, a| GEBESTENDER(a[1], a[2], a[3])}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Mudar lote de endereco", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem", "C", "01"}, {"Lote/serie (vazio se nao controla)", "C", ""}, ;
+        {"Endereco de origem", "C", ""}, {"Endereco de destino", "C", ""}, {"Quantidade", "N", 0}}, ;
+        {|u, a| GEBESTENDTRF(a[1], a[2], a[3], a[4], a[5], a[6], BOHOJE())}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Fechar mes", {{"Competencia (AAAAMM)", "C", BOMESADD(Left(cHoje, 6), -1)}}, {|u, a| GEBESTFECHA(a[1])}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Reabrir ultimo mes fechado", {{"Competencia (AAAAMM)", "C", cFech}}, {|u, a| GEBESTREABRE(a[1])}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Relatorio: kardex", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem (vazio = todos)", "C", ""}, {"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBESTKARDEX(a[1], a[2], a[3], a[4])}, "REL", "", aEst}, ;
+    {"Estoque", 0, 0, "Relatorio: posicao valorizada", {{"Armazem (vazio = todos)", "C", ""}}, {|u, a| GEBESTPOS(a[1])}, "REL", "", aEst}, ;
+    {"Estoque", 0, 0, "Relatorio: saldo por lote/endereco", {{"Produto (vazio = todos)", "C", "", "GV1_PROD"}, {"Armazem (vazio = todos)", "C", ""}}, ;
+        {|u, a| GEBESTLOTES(a[1], a[2], BOHOJE())}, "REL", "", aEst}, ;
+    {"Estoque", 0, 0, "Relatorio: lotes a vencer", {{"Vencendo em ate (dias)", "N", 30}}, {|u, a| GEBESTVENCER(a[1], BOHOJE())}, "REL", "", aEst}, ;
+    {"Estoque", 0, 0, "Relatorio: fechamento do mes", {{"Competencia (AAAAMM)", "C", cFech}}, {|u, a| GEBESTFECHREL(a[1])}, "REL", "", aEst}, ;
+    {"Contabil", 0, 0, "Centro de custo", {{"Codigo do centro", "C", ""}, {"Descricao", "C", ""}, {"Bloqueado", aSN, "N"}}, ;
+        {|u, a| GEBCTXCC(a[1], a[2], a[3])}, "BO", "", aCtb}, ;
+    {"Contabil", 0, 0, "Corrigir lancamentos antigos (estorno e lancamento certo)", {}, {|u, a| GEBCTXCORRIGE()}, "REL", "", {"CONTABIL", "DIR"}}, ;
+    {"Contabil", 0, 0, "Relatorio: razao da conta", {{"Conta (ex.: 1.01.001)", "C", "", "GC1_CONTA"}, {"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBCTXRAZAO(a[1], a[2], a[3])}, "REL", "", aCtb}, ;
+    {"Contabil", 0, 0, "Relatorio: balancete do periodo", {{"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}, {"Centro de custo (vazio = todos)", "C", ""}}, ;
+        {|u, a| GEBCTXBALAN(a[1], a[2], a[3])}, "REL", "", aCtb}, ;
+    {"Contabil", 0, 0, "Relatorio: DRE do periodo", {{"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}, {"Centro de custo (vazio = todos)", "C", ""}}, ;
+        {|u, a| GEBCTXDRE(a[1], a[2], a[3])}, "REL", "", aCtb}, ;
+    {"Contabil", 0, 0, "Relatorio: resultado por centro de custo", {{"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBCTXCCRES(a[1], a[2])}, "REL", "", aCtb}, ;
+    {"Compras", 0, 0, "Gerar pedidos da solicitacao (menor preco)", {{"Solicitacao", "C", ""}, {"Condicao de pagamento", "C", ""}, {"Armazem de entrega", "C", "01"}, ;
+        {"Data (AAAAMMDD)", "C", cHoje}}, {|u, a| GEBCPXGERA(a[1], a[2], a[3], a[4])}, "BO", "", aPed}, ;
+    {"Compras", 0, 0, "Aprovar ou rejeitar pedido (alcada)", {{"Pedido", "C", "", "GCP3_NUM"}, {"Decisao", {{"Aprovar", "S"}, {"Rejeitar", "N"}}, "S"}}, ;
+        {|u, a| GEBCPXAPR(a[1], u, a[2] == "S")}, "BO", "", {"COMPRAS", "APROVA"}}, ;
+    {"Compras", 0, 0, "Regra de retencao (ISS, IRRF, INSS, PIS, COFINS, CSLL)", {{"Codigo da retencao", "C", ""}, ;
+        {"Tributo", {"ISS", "IRRF", "INSS", "PIS", "COFINS", "CSLL"}, "ISS"}, {"Aliquota %", "N", 0}, {"Descricao", "C", ""}}, ;
+        {|u, a| GEBRETCAD(a[1], a[2], a[3], a[4])}, "BO", "", aApu}, ;
+    {"Compras", 0, 0, "NF-e: buscar na SEFAZ", {}, {|u, a| GEBDFEDISTBUSCA()}, "BO", "", aPed}, ;
+    {"Compras", 0, 0, "NF-e: manifestar", {{"Chave da NF-e recebida", "C", ""}, ;
+        {"Evento", {{"Ciencia", "CIENCIA"}, {"Confirmacao", "CONFIRMACAO"}, {"Desconhecimento", "DESCONHECIMENTO"}, {"Nao realizada", "NAO_REALIZADA"}}, "CIENCIA"}, ;
+        {"Justificativa (so' nao realizada; minimo 15 letras)", "C", ""}}, {|u, a| TUIManif(a)}, "BO", "", aPed}, ;
+    {"Compras", 0, 0, "NF-e: produto do fornecedor = produto do GEBAN", {{"Fornecedor (codigo no GEBAN)", "C", "", "GCP1_COD"}, {"Codigo do produto na nota", "C", ""}, ;
+        {"Produto no GEBAN", "C", ""}, {"Fator (unidades do GEBAN por unidade da nota)", "N", 1}}, {|u, a| GEBDFEDEPARA(a[1], a[2], a[3], a[4])}, "BO", "", aPed}, ;
+    {"Compras", 0, 0, "NF-e: importar como entrada", {{"Chave da NF-e recebida", "C", ""}, {"Pedido de compra (vazio = gera da nota)", "C", "", "GCP3_NUM"}, ;
+        {"Data (AAAAMMDD)", "C", cHoje}}, {|u, a| GEBDFEIMPORTA(a[1], a[2], a[3])}, "BO", "", aPed}, ;
+    {"Compras", 0, 0, "Relatorio: pedidos em aberto", {}, {|u, a| GEBCPXABERTOS()}, "REL", "", aPed}, ;
+    {"Compras", 0, 0, "Relatorio: compras por fornecedor", {{"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a| GEBCPXPORFORN(a[1], a[2])}, "REL", "", aPed}, ;
+    {"Compras", 0, 0, "Relatorio: solicitacoes pendentes", {}, {|u, a| GEBCPXSCPEND()}, "REL", "", aPed}, ;
+    {"Compras", 0, 0, "Relatorio: retencoes do mes", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| GEBRETREL(a[1])}, "REL", "", aApu}, ;
+    {"Compras", 0, 0, "Relatorio: NF-e recebidas", {{"Situacao", {{"Todas", ""}, {"Autorizada", "AUTORIZADA"}, {"Cancelada", "CANCELADA"}}, ""}}, ;
+        {|u, a| GEBDFERECEBIDAS(a[1])}, "REL", "", aPed}, ;
+    {"Faturamento", 0, 0, "Cliente (novo ou alterar)", {{"Codigo", "C", "", "GFT1_COD"}, {"Nome", "C", "", "GFT1_NOME"}, {"CNPJ/CPF", "C", "", "GFT1_DOC"}, ;
+        {"UF", "C", "", "GFT1_UF"}, {"Limite de credito (0 = sem limite)", "N", 0}, {"Condicao padrao", "C", "", "GFT1_COND"}, {"Tabela de preco (vazio = PADRAO)", "C", "", "GFT1_TABELA"}}, ;
+        {|u, a| GEBFATCLI(a[1], a[2], a[3], a[4], a[5], a[6], a[7])}, "BO", "", aFat}, ;
+    {"Faturamento", 0, 0, "Preco na tabela", {{"Tabela (vazio = PADRAO)", "C", ""}, {"Produto", "C", ""}, {"Preco", "N", 0}}, ;
+        {|u, a| GEBFATPRC(a[1], a[2], a[3])}, "BO", "", aFat}, ;
+    {"Faturamento", 0, 0, "Liberar pedido (credito/estoque)", {{"Pedido", "C", ""}, {"Forcar mesmo bloqueado", aSN, "N"}}, ;
+        {|u, a| TUILibera(u, a)}, "BO", "", aFat}, ;
+    {"Faturamento", 0, 0, "Cancelar pedido", {{"Pedido", "C", ""}}, {|u, a| GEBFATCAN(a[1])}, "BO", "", aFat}, ;
+    {"Faturamento", 0, 0, "Relatorio: faturamento e margem", {{"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}, ;
+        {"Agrupar por", {{"Cliente", "CLIENTE"}, {"Produto", "PRODUTO"}}, "CLIENTE"}}, {|u, a| GEBFATREL(a[1], a[2], a[3])}, "REL", "", aFat}, ;
+    {"Faturamento", 0, 0, "Relatorio: carteira de pedidos", {}, {|u, a| GEBFATCARTEIRA()}, "REL", "", aFat}, ;
+    {"Faturamento", 0, 0, "Relatorio: curva ABC", {{"Inicio (AAAAMMDD)", "C", cIni}, {"Fim (AAAAMMDD)", "C", cHoje}}, {|u, a| GEBFATABC(a[1], a[2])}, "REL", "", aFat}, ;
+    {"Fiscal", 0, 0, "Lancar credito", {{"Competencia (AAAAMM)", "C", cComp}, {"Origem", "C", ""}, {"Valor", "N", 0}, {"Tipo", "C", ""}}, ;
+        {|u, a| TUIFisCredito(a)}, "BO", "", {"FISCAL", "APURA"}}, ;
+    {"Fiscal", 0, 0, "Aliquota da NCM (IBS/CBS)", {{"NCM", "C", ""}, {"IBS %", "N", 0}, {"CBS %", "N", 0}, ;
+        {"Vigencia inicio (AAAAMMDD)", "C", DToS(Date())}, {"Vigencia fim (AAAAMMDD)", "C", "20991231"}}, ;
+        {|u, a| TUIRestBO(GEBRESTALISC(u, {a[1], cValToChar(a[2]), cValToChar(a[3]), a[4], a[5]}))}, "BO", "", {"FISCAL", "PRODUT"}}, ;
+    {"Fiscal", 0, 0, "Simples: configurar anexo padrao", {{"Anexo", aAnexo, Upper(AllTrim(GEBCFG("SN_ANEXO")))}, ;
+        {"Inicio de atividade (AAAAMM; vazio se tem mais de 12 meses)", "C", AllTrim(GEBCFG("SN_INICIO"))}}, {|u, a| GEBSNCFG(a[1], a[2])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Simples: atividade (codigo e anexo)", {{"Codigo da atividade (ate 10 caracteres)", "C", ""}, {"Descricao", "C", ""}, {"Anexo", aAnexo, "III"}}, ;
+        {|u, a| GEBSNATV(a[1], a[2], a[3])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Simples: produto (atividade, ST, monofasico)", {{"Produto", "C", "", "GF1_COD"}, {"Atividade (vazio = anexo padrao)", "C", ""}, ;
+        {"ICMS por substituicao tributaria", aSN, "N"}, {"PIS/COFINS monofasico", aSN, "N"}}, {|u, a| GEBSNPRD(a[1], a[2], a[3], a[4])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Simples: nota de exportacao", {{"Chave da nota", "C", "", "GF3_CHAVE"}, {"Exportacao", {{"Sim", "S"}, {"Nao", "N"}}, "S"}}, ;
+        {|u, a| GEBSNEXP(a[1], a[2])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Simples: folha e receita externa do mes", {{"Competencia (AAAAMM)", "C", cComp}, ;
+        {"Folha do mes (salarios + pro-labore + encargos)", "N", 0}, {"Receita do mes fora do GEBAN", "N", 0}, {"Atividade da receita (vazio = anexo padrao)", "C", ""}}, ;
+        {|u, a| GEBSNFOL(a[1], a[2], a[3], a[4])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Simples: feriado municipal/estadual", {{"Data do feriado (AAAAMMDD)", "C", ""}, {"Descricao", "C", ""}}, ;
+        {|u, a| GEBSNFER(a[1], a[2])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Simples: apurar mes (DAS)", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| TUISNApura(a[1])}, "BO", "", aApu}, ;
+    {"Fiscal", 0, 0, "Relatorio: extrato da apuracao do Simples", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| GEBSNEXTRATO(a[1])}, "REL", "GSN6", aApu}, ;
+    {"Fiscal", 0, 0, "Relatorio: acompanhamento anual do Simples", {{"Ano (AAAA)", "C", Left(DToS(Date()), 4)}}, {|u, a| GEBSNANUAL(a[1])}, "REL", "GSN6", aApu}, ;
+    {"Estoque", 0, 0, "Movimento com custo (entrada/saida)", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem", "C", "01"}, ;
+        {"Tipo", {{"Entrada", "E"}, {"Saida", "S"}}, "E"}, {"Quantidade", "N", 0}, {"Custo unitario (entrada)", "N", 0}, {"Documento", "C", ""}, ;
+        {"Data (AAAAMMDD)", "C", cHoje}, {"Lote/series separadas por ; (vazio se nao controla)", "C", ""}, {"Validade (AAAAMMDD)", "C", ""}, ;
+        {"Endereco (vazio se nao controla)", "C", ""}}, ;
+        {|u, a| GEBESTMOV(a[1], a[2], a[3], a[4], a[5], "TELA", a[6], a[7], GEBESTDET(a[8], a[9], a[10], a[4]))}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Inventario (contagem)", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem", "C", "01"}, {"Quantidade contada", "N", 0}, ;
+        {"Custo se o produto nao tem custo medio", "N", 0}, {"Documento", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}, ;
+        {"Lote/series separadas por ; (vazio se nao controla)", "C", ""}, {"Validade (AAAAMMDD)", "C", ""}, {"Endereco (vazio se nao controla)", "C", ""}}, ;
+        {|u, a| TUIInventario(a)}, "BO", "", aEst}, ;
+    {"Estoque", 0, 0, "Transferencia entre armazens", {{"Produto", "C", "", "GV1_PROD"}, {"Armazem de origem", "C", "01"}, {"Armazem de destino", "C", ""}, ;
+        {"Quantidade", "N", 0}, {"Documento", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}, {"Lote/series separadas por ; (vazio se nao controla)", "C", ""}, ;
+        {"Validade (AAAAMMDD)", "C", ""}, {"Endereco de origem (vazio se nao controla)", "C", ""}, {"Endereco de destino (vazio = o mesmo)", "C", ""}}, ;
+        {|u, a| GEBESTTRF(a[1], a[2], a[3], a[4], a[5], a[6], GEBESTDET(a[7], a[8], a[9], a[4]), a[10])}, "BO", "", aEst}, ;
+    {"Contabil", 0, 0, "Rateio entre centros de custo", {{"Codigo do rateio", "C", ""}}, {|u, a, it| GEBCTXRAT(a[1], it)}, "BO", "", aCtb, Nil, ;
+        {{"Centro de custo", "C", ""}, {"Percentual", "N", 0}}}, ;
+    {"Compras", 0, 0, "Solicitacao de compra", {}, {|u, a, it| GEBCPXSC("", it, u)}, "BO", "", aPed, Nil, ;
+        {{"Produto", "C", ""}, {"Quantidade", "N", 0}, {"Necessidade (AAAAMMDD; vazio = hoje)", "C", ""}}}, ;
+    {"Compras", 0, 0, "Pedido de compra com itens", {{"Fornecedor", "C", "", "GCP1_COD"}, {"Condicao de pagamento", "C", ""}, {"Armazem de entrega", "C", "01"}}, ;
+        {|u, a, it| GEBCPXPED("", a[1], it, a[2], a[3], BOHOJE())}, "BO", "", aPed, Nil, ;
+        {{"Produto", "C", ""}, {"Quantidade", "N", 0}, {"Preco", "N", 0}}}, ;
+    {"Compras", 0, 0, "Documento de entrada", {{"Nota fiscal", "C", ""}, {"Pedido", "C", "", "GCP3_NUM"}, {"Frete", "N", 0}, {"Data (AAAAMMDD)", "C", cHoje}, ;
+        {"Retencoes (codigos separados por virgula)", "C", ""}, {"Chave da NF-e do fornecedor (44 digitos)", "C", ""}}, ;
+        {|u, a, it| GEBCPXENT(a[1], a[2], it, a[3], a[4], a[5], a[6])}, "BO", "", aPed, Nil, ;
+        {{"Produto recebido (sem itens = todo o pendente)", "C", ""}, {"Quantidade", "N", 0}, {"Preco (0 = do pedido)", "N", 0}, ;
+         {"Lote/series", "C", ""}, {"Validade (AAAAMMDD)", "C", ""}, {"Endereco", "C", ""}}}, ;
+    {"Compras", 0, 0, "Devolucao de compra", {{"Nota fiscal de entrada", "C", ""}, {"Fornecedor", "C", "", "GCP1_COD"}, {"Data (AAAAMMDD)", "C", cHoje}, ;
+        {"Chave da NF-e do fornecedor (vazio = a da entrada)", "C", ""}}, ;
+        {|u, a, it| GEBCPXDEV(a[1], a[2], it, a[3], a[4])}, "BO", "", aPed, Nil, ;
+        {{"Produto devolvido", "C", ""}, {"Quantidade", "N", 0}}}, ;
+    {"Faturamento", 0, 0, "Pedido de venda", {{"Cliente", "C", "", "GFT1_COD"}, {"Condicao (vazio = do cliente)", "C", ""}, {"Desconto % no pedido", "N", 0}, ;
+        {"Armazem", "C", "01"}, {"Centro de custo (vazio = nenhum)", "C", ""}}, ;
+        {|u, a, it| GEBFATPED("", a[1], it, a[2], a[3], a[4], BOHOJE(), a[5])}, "BO", "", aFat, Nil, ;
+        {{"Produto", "C", ""}, {"Quantidade", "N", 0}, {"Preco (0 = tabela)", "N", 0}}}, ;
+    {"Faturamento", 0, 0, "Faturar pedido (documento de saida)", {{"Pedido", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}}, ;
+        {|u, a, it| GEBFATFAT(a[1], it, a[2], "")}, "BO", "", aFat, Nil, ;
+        {{"Produto a faturar (sem itens = todo o saldo)", "C", ""}, {"Quantidade", "N", 0}}}, ;
+    {"Faturamento", 0, 0, "Devolucao de venda", {{"Nota", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}, ;
+        {"Chave da NF-e de devolucao do cliente (so' contribuinte; vazio = o GEBAN emite)", "C", ""}}, ;
+        {|u, a, it| GEBFATDEV(a[1], it, a[2], a[3])}, "BO", "", aFat, Nil, ;
+        {{"Produto devolvido", "C", ""}, {"Quantidade", "N", 0}}}, ;
+    {"Financeiro", 0, 0, "Baixar titulo", {{"Tipo", {"PAGAR", "RECEBER"}, "RECEBER"}, {"Documento", "C", ""}, {"Valor", "N", 0}}, {|u, a| GEBRESTFINBAI(u, a)}, "200", "Titulo baixado."}, ;
+    {"Derrama", 0, 0, "Gerar guia", {{"Competencia (AAAAMM)", "C", cComp}}, {|u, a| GEBRESTDERGER(u, a)}, "201", "Guia gerada."}, ;
+    {"Derrama", 0, 0, "Baixar guia", {{"Guia", "C", "", "GD1_GUIA"}}, {|u, a| GEBRESTDERBAI(u, a)}, "200", "Guia baixada."}, ;
+    {"Derrama", 0, 0, "Parcelar guia", {{"Guia", "C", "", "GD1_GUIA"}, {"Parcelas", "N", 2}}, {|u, a| GEBRESTDERPAR(u, a)}, "200", "Guia parcelada."}, ;
+    {"Derrama", 0, 0, "Calcular juros", {{"Guia", "C", "", "GD1_GUIA"}, {"Dias de atraso", "N", 30}}, {|u, a| GEBRESTDERJUR(u, a)}, "200", "Juros calculados."}, ;
+    {"Derrama", 0, 0, "Protestar guia", {{"Guia", "C", "", "GD1_GUIA"}}, {|u, a| GEBRESTDERPRO(u, a)}, "200", "Guia protestada."}, ;
+    {"Estoque", 0, 0, "Vender", {{"Venda", "C", ""}, {"Produto", "C", "", "GV1_PROD"}, {"Quantidade", "N", 1}, {"Preco", "N", 0}}, {|u, a| GEBRESTESTVEN(u, a)}, "201", "Venda registrada."}, ;
+    {"Estoque", 0, 0, "Vender fiado", {{"Cliente", "C", ""}, {"Valor", "N", 0}}, {|u, a| GEBRESTESTFIA(u, a)}, "201", "Fiado registrado."}, ;
+    {"Estoque", 0, 0, "Juros do fiado", {{"Cliente", "C", ""}, {"Dias", "N", 30}}, {|u, a| GEBRESTESTFIJ(u, a)}, "200", "Juros calculados."}, ;
+    {"Contabil", 0, 0, "Lancamento", {{"Conta a debito", "C", "", "GC1_CONTA"}, {"Conta a credito", "C", ""}, {"Valor", "N", 0}}, {|u, a| GEBRESTCTBDIR(u, a)}, "201", "Lancamento gravado."}, ;
+    {"Compras", 0, 0, "Novo fornecedor", {{"Codigo", "C", ""}, {"Nome", "C", ""}}, {|u, a| GEBRESTCOMFOR(u, a)}, "201", "Fornecedor criado."}, ;
+    {"Compras", 0, 0, "Abrir pedido", {{"Pedido", "C", ""}, {"Fornecedor", "C", "", "GCP1_COD"}}, {|u, a| GEBRESTCOMPED(u, a)}, "201", "Pedido aberto."}, ;
+    {"Compras", 0, 0, "Adicionar item", {{"Pedido", "C", "", "GCP3_NUM"}, {"Produto", "C", ""}, {"Quantidade", "N", 1}, {"Preco", "N", 0}}, {|u, a| GEBRESTCOMIT(u, a)}, "201", "Item adicionado."}, ;
+    {"Compras", 0, 0, "Dar entrada", {{"Nota fiscal", "C", ""}, {"Pedido", "C", "", "GCP3_NUM"}}, {|u, a| GEBRESTCOMENT(u, a)}, "201", "Entrada registrada."} ;
+    }
+
+// Inventario: o lote/endereco vale para a diferenca entre contado e saldo.
+Static Function TUIInventario(a)
+    Local aSld := GEBESTSLD(a[1], a[2]) as Array
+Return GEBESTAJU(a[1], a[2], a[3], a[4], a[5], a[6], GEBESTDET(a[7], a[8], a[9], Abs(a[3] - aSld[1])))
+
+/*/{Protheus.doc} TUIMunicipio
+    Codigo IBGE do municipio a partir do codigo (7 digitos) ou do nome na UF.
+    Nome ambiguo e' recusado com as opcoes. {lOk, codigo ou mensagem}.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIMunicipio(cUF, cTxt)
+    Local aM   := {} as Array
+    Local cOps := "" as Character
+    Local nI   := 0 as Numeric
+
+    cTxt := AllTrim(cTxt)
+    If Len(cTxt) == 7 .And. StrZero(Val(cTxt), 7) == cTxt
+        Return {.T., cTxt}
+    EndIf
+    If Empty(cTxt) .Or. Empty(cUF)
+        Return {.F., "informe a UF e o municipio"}
+    EndIf
+    aM := GEBDFEMUNBUSCA(cTxt, Upper(cUF))
+    If Len(aM) == 1
+        Return {.T., aM[1][1]}
+    EndIf
+    If Len(aM) == 0
+        Return {.F., "nenhum municipio de " + Upper(cUF) + " com '" + cTxt + "'"}
+    EndIf
+    For nI := 1 To Min(Len(aM), 5)
+        If nI > 1
+            cOps += "; "
+        EndIf
+        cOps += aM[nI][2] + " (" + aM[nI][1] + ")"
+    Next nI
+Return {.F., "municipio ambiguo, use o codigo IBGE: " + cOps}
+
+// Credito fiscal: GEBFCRE devolve o registro ("" = recusado).
+Static Function TUIFisCredito(a)
+    Local cReg := GEBFCRE(a[1], a[2], a[3], a[4]) as Character
+
+    If Empty(cReg)
+        Return {.F., "credito recusado"}
+    EndIf
+Return {.T., "credito " + cReg}
+
+// Resposta REST {cStatus, cJson} como {lOk, cMsg} (2xx = ok).
+Static Function TUIRestBO(aRes)
+    If Left(cValToChar(aRes[1]), 1) == "2"
+        Return {.T., "gravado"}
+    EndIf
+Return {.F., GEBTUIMOTIVO(aRes)}
+
+// Apuracao do Simples com o resumo (anexo, faixa, RBT12, aliquota efetiva, DAS).
+Static Function TUISNApura(cComp)
+    Local aR   := GEBSNAPU(cComp) as Array
+    Local cMsg := "" as Character
+
+    If !aR[1]
+        Return aR
+    EndIf
+    cMsg := "Anexo " + aR[3][1] + ", faixa " + cValToChar(aR[3][3]) + " | RBT12 " + TUIMoeda(aR[3][2]) + ;
+        " | aliquota efetiva " + AllTrim(Str(aR[3][4], 20, 4)) + "% | DAS " + TUIMoeda(aR[3][5]) + ;
+        " vence " + Right(aR[3][6], 2) + "/" + SubStr(aR[3][6], 5, 2) + "/" + Left(aR[3][6], 4)
+    If !Empty(aR[3][7])
+        cMsg += " | ATENCAO: " + aR[3][7]
+    EndIf
+Return {.T., cMsg}
+
+/*/{Protheus.doc} TUIFormDfe
+    Formularios de Fiscal > Documentos eletronicos (NF-e, NFC-e, NFS-e, EFD).
+    Os padroes vem da configuracao atual (lida ao entrar). Campo de municipio
+    aceita nome ou codigo IBGE (TUIMunicipio).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIFormDfe(cEmp, cFil)
+    Local oE    := GEBDFEEMITLE()
+    Local aDfe  := {"FISCAL", "DFE"} as Array
+    Local aSN   := {{"Nao", "N"}, {"Sim", "S"}} as Array
+    Local cHoje := BOHOJE() as Character
+    Local cUrl  := BOPARM("GEBAN_URL", "https://SEU-DOMINIO") as Character
+    Local aEnd  := {{"Logradouro", "C", ""}, {"Numero", "C", ""}, {"Complemento", "C", ""}, {"Bairro", "C", ""}, {"UF", "C", ""}, ;
+                    {"Municipio (nome ou codigo IBGE)", "C", ""}, {"CEP", "C", ""}, {"Telefone", "C", ""}, {"E-mail", "C", ""}} as Array
+    Local aPart := {} as Array
+
+    aPart := {{"Tipo", {{"Cliente", "C"}, {"Fornecedor", "F"}}, "C"}, {"Codigo do cliente/fornecedor", "C", ""}, {"CPF ou CNPJ", "C", ""}, ;
+        {"Contribuinte", {{"1 contribuinte (com IE)", "1"}, {"2 isento", "2"}, {"9 nao contribuinte", "9"}}, "1"}, ;
+        {"Inscricao estadual (vazio se nao contribuinte)", "C", ""}, {"Nome/razao social (vazio = o do cadastro)", "C", ""}}
+    aEval(aEnd, {|x| aAdd(aPart, x)})
+Return { ;
+    {"Fiscal", 0, 0, "DF-e: o que falta para emitir (roteiro)", {{"Testar a comunicacao com a SEFAZ agora", aSN, "N"}}, ;
+        {|u, a| GEBDFEROTEIRO(a[1] == "S"), {.T., ""}}, "REL", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: emitente (CNPJ, IE, regime, endereco)", { ;
+        {"CNPJ", "C", TBOJ(oE, "CNPJ")}, {"Inscricao estadual", "C", TBOJ(oE, "IE")}, {"Razao social", "C", TBOJ(oE, "XNOME")}, ;
+        {"Nome fantasia", "C", TBOJ(oE, "XFANT")}, {"Regime", {{"1 Simples", "1"}, {"4 MEI", "4"}, {"2 Simples com excesso", "2"}, {"3 normal", "3"}}, TBOJ(oE, "CRT")}, ;
+        {"Inscricao municipal (vazio = nao tem)", "C", TBOJ(oE, "IM")}, {"CNAE (vazio = nao informa)", "C", TBOJ(oE, "CNAE")}, ;
+        {"Logradouro", "C", TBOJ(oE, "XLGR")}, {"Numero", "C", TBOJ(oE, "NRO")}, {"Complemento", "C", TBOJ(oE, "XCPL")}, {"Bairro", "C", TBOJ(oE, "XBAIRRO")}, ;
+        {"UF", "C", TBOJ(oE, "UF")}, {"Municipio (nome ou codigo IBGE)", "C", TBOJ(oE, "CMUN")}, {"CEP", "C", TBOJ(oE, "CEP")}, ;
+        {"Telefone", "C", TBOJ(oE, "FONE")}, {"E-mail", "C", TBOJ(oE, "EMAIL")}}, ;
+        {|u, a| TUIDfeJson({|o| GEBDFEEMIT(o)}, {"CNPJ", "IE", "RAZAO", "FANTASIA", "CRT", "IM", "CNAE", "LOGRADOURO", "NUMERO", "COMPLEMENTO", ;
+            "BAIRRO", "UF", "MUNICIPIO", "CEP", "FONE", "EMAIL"}, a)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: certificado digital A1", {}, {|u, a| TUICertificado(cUrl)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: configuracao (ambiente, NFC-e, serie, CSC, padroes)", { ;
+        {"Ambiente", {{"2 homologacao", "2"}, {"1 producao", "1"}}, BOPARM("DFE_AMBIENTE", "2")}, ;
+        {"NFC-e na frente de loja", aSN, BOPARM("DFE_NFCE", "N")}, {"Serie da NFC-e", "C", BOPARM("DFE_SERIE_65", "1")}, ;
+        {"NF-e no faturamento e nas devolucoes", aSN, BOPARM("DFE_NFE", "N")}, {"Serie da NF-e", "C", BOPARM("DFE_SERIE_55", "1")}, ;
+        {"Forma de pagamento da NF-e de venda (15 boleto, 99 outros...)", "C", BOPARM("DFE_NFE_TPAG", "15")}, ;
+        {"NFS-e (servicos, padrao nacional)", aSN, BOPARM("DFE_NFSE", "N")}, {"Serie da DPS", "C", BOPARM("DFE_SERIE_NFSE", "1")}, ;
+        {"Proximo numero da NFC-e (vazio = segue a numeracao)", "C", ""}, {"CFOP padrao", "C", BOPARM("DFE_CFOP", "5102")}, ;
+        {"CSOSN padrao (Simples)", "C", BOPARM("DFE_CSOSN", "102")}, {"Unidade padrao", "C", BOPARM("DFE_UNIDADE", "UN")}, ;
+        {"ID do CSC (so' QR Code versao 2)", "C", BOPARM("DFE_CSC_ID", "")}, {"Codigo CSC (vazio = mantem o atual)", "P", ""}, ;
+        {"Responsavel tecnico: CNPJ (vazio = nao informa)", "C", BOPARM("DFE_RT_CNPJ", "")}, {"Responsavel tecnico: contato", "C", BOPARM("DFE_RT_CONTATO", "")}, ;
+        {"Responsavel tecnico: e-mail", "C", BOPARM("DFE_RT_EMAIL", "")}, {"Responsavel tecnico: telefone", "C", BOPARM("DFE_RT_FONE", "")}}, ;
+        {|u, a| TUIDfeConfig(a)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: perfil fiscal de produto", {{"Produto", "C", "", "GF1_COD"}, {"Unidade (vazio = padrao)", "C", ""}, ;
+        {"GTIN/EAN (vazio = do codigo de barras da loja)", "C", ""}, {"CFOP (vazio = padrao)", "C", ""}, {"CSOSN (Simples; vazio = padrao)", "C", ""}, ;
+        {"CST do ICMS (regime normal; vazio = padrao)", "C", ""}, {"Aliquota do ICMS % (regime normal)", "N", 0}, {"CEST (vazio = nao tem)", "C", ""}, ;
+        {"Origem 0 a 8 (vazio = padrao)", "C", ""}, {"CST do PIS (vazio = padrao)", "C", ""}, {"CST da COFINS (vazio = padrao)", "C", ""}}, ;
+        {|u, a| TUIDfeJson({|o| GEBDFEPRODFIS(o)}, {"PRODUTO", "UNIDADE", "GTIN", "CFOP", "CSOSN", "CST", "ALIQ_ICMS", "CEST", "ORIGEM", "PIS_CST", "COFINS_CST"}, a)}, ;
+        "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: status do servico da SEFAZ", {}, {|u, a| GEBDFESTATSVC("65")}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: transmitir NFC-e em contingencia", {}, {|u, a| GEBDFETRANSMITE()}, "BO", "", {"LOJA", "CAIXA"}}, ;
+    {"Fiscal", 0, 0, "DF-e: consultar documento na SEFAZ", {{"Chave de acesso", "C", ""}}, {|u, a| GEBDFECONSULTAR(a[1], .T.)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: cancelar documento", {{"Chave de acesso", "C", ""}, {"Justificativa (minimo 15 letras)", "C", ""}}, ;
+        {|u, a| GEBDFECANCELA(a[1], a[2])}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: inutilizar faixa de numeros", {{"Modelo", {{"65 NFC-e", "65"}, {"55 NF-e", "55"}}, "65"}, ;
+        {"Serie", "N", Val(BOPARM("DFE_SERIE_65", "1"))}, {"Numero inicial", "N", 0}, {"Numero final", "N", 0}, {"Justificativa (minimo 15 letras)", "C", ""}}, ;
+        {|u, a| GEBDFEINUTILIZA(a[1], a[2], a[3], a[4], a[5])}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: inutilizar numeros das notas rejeitadas", {{"Justificativa (minimo 15 letras)", "C", "Numero rejeitado pela SEFAZ e nao utilizado"}}, ;
+        {|u, a| GEBDFEINUTPEND(a[1])}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: cadastro fiscal de cliente ou fornecedor (NF-e)", aPart, ;
+        {|u, a| TUIDfeJson({|o| GEBDFEPART(o)}, {"TIPO", "CODIGO", "DOC", "CONTRIBUINTE", "IE", "NOME", "LOGRADOURO", "NUMERO", "COMPLEMENTO", ;
+            "BAIRRO", "UF", "MUNICIPIO", "CEP", "FONE", "EMAIL"}, a)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: carta de correcao (NF-e)", {{"Chave de acesso da NF-e", "C", ""}, ;
+        {"Correcao (15 a 1000 letras; nao corrige valores, impostos, quantidades, datas nem as partes)", "C", ""}}, ;
+        {|u, a| GEBDFECCE(a[1], a[2])}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: resolver NF-e/NFS-e sem resposta da SEFAZ", {}, ;
+        {|u, a| {.T., "NF-e: " + BOSTR(GEBDFERESOLVE()[2]) + " | NFS-e: " + BOSTR(GEBDFENFSERESOLVE()[2])}}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: DANFE/DANFSe de um documento (link)", {{"Chave de acesso", "C", ""}}, ;
+        {|u, a| {.T., "Abra no navegador: " + cUrl + "/api/dfe/danfe?empresa=" + cEmp + "&chave=" + GEBDFEDIG(a[1]) + "&token=" + GEBSECTOKEN(u, cEmp, cFil, "danfe")}}, ;
+        "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: servico fiscal (NFS-e)", {{"Codigo do servico", "C", ""}, {"Descricao", "C", ""}, ;
+        {"Codigo de tributacao nacional (6 digitos, ex.: 010101)", "C", ""}, {"Codigo de tributacao municipal (3 digitos; vazio = nao tem)", "C", ""}, ;
+        {"NBS (9 digitos; vazio = nao informa)", "C", ""}, {"Aliquota do ISS % (so' quando o tomador retem)", "N", 0}}, ;
+        {|u, a| TUIDfeJson({|o| GEBDFESERV(o)}, {"CODIGO", "DESCRICAO", "TRIB_NACIONAL", "TRIB_MUNICIPAL", "NBS", "ALIQ_ISS"}, a)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: faturar servico (NFS-e)", {{"Cliente", "C", "", "GFT1_COD"}, {"Servico", "C", ""}, {"Valor", "N", 0}, ;
+        {"Descricao complementar", "C", ""}, {"Condicao de pagamento (vazio = a vista)", "C", ""}, {"Data (AAAAMMDD)", "C", cHoje}, ;
+        {"ISS retido pelo tomador", aSN, "N"}, {"Desconto", "N", 0}}, ;
+        {|u, a| GEBFATSERV(a[1], a[2], a[3], a[4], a[5], a[6], a[7] == "S", a[8])}, "BO", "", {"FATURAMENTO", "FATUR"}}, ;
+    {"Fiscal", 0, 0, "DF-e: cancelar NFS-e", {{"Chave da NFS-e (50 digitos)", "C", ""}, ;
+        {"Motivo", {{"1 erro na emissao", "1"}, {"2 servico nao prestado", "2"}, {"9 outros", "9"}}, "1"}, {"Justificativa (minimo 15 letras)", "C", ""}}, ;
+        {|u, a| GEBDFENFSECANC(a[1], a[2], a[3])}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: SPED Fiscal (EFD ICMS/IPI) da competencia", {{"Competencia (AAAAMM)", "C", Left(BOMESADD(Left(cHoje, 6), -1), 6)}, ;
+        {"Finalidade", {{"0 original", "0"}, {"1 substituto", "1"}}, "0"}}, ;
+        {|u, a| TUIEfd(GEBDFEEFD(a[1], a[2]), cUrl)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "DF-e: configuracao da EFD (contabilista, receitas, vencimento)", { ;
+        {"Perfil de apresentacao (A, B ou C, conforme a UF)", {{"A", "A"}, {"B", "B"}, {"C", "C"}}, BOPARM("DFE_EFD_PERFIL", "A")}, ;
+        {"Atividade", {{"0 industrial ou equiparado", "0"}, {"1 outros", "1"}}, BOPARM("DFE_EFD_ATIV", "1")}, ;
+        {"Codigo de receita do ICMS proprio (UF)", "C", BOPARM("DFE_EFD_COD_REC", "")}, {"Codigo de receita do ICMS ST", "C", BOPARM("DFE_EFD_COD_REC_ST", "")}, ;
+        {"Codigo de receita do DIFAL", "C", BOPARM("DFE_EFD_COD_REC_DIFAL", "")}, {"Codigo de receita do FCP", "C", BOPARM("DFE_EFD_COD_REC_FCP", "")}, ;
+        {"Dia do vencimento do ICMS no mes seguinte", "C", BOPARM("DFE_EFD_DIA_VENC", "20")}, ;
+        {"Saldo credor de ICMS antes do 1o arquivo (0 se nao ha)", "C", BOPARM("DFE_EFD_SLD_CRED_INI", "0")}, ;
+        {"Contabilista: nome", "C", BOPARM("DFE_EFD_CONT_NOME", "")}, {"Contabilista: CPF", "C", BOPARM("DFE_EFD_CONT_CPF", "")}, ;
+        {"Contabilista: CRC", "C", BOPARM("DFE_EFD_CONT_CRC", "")}, {"Escritorio de contabilidade: CNPJ (vazio = nao tem)", "C", BOPARM("DFE_EFD_CONT_CNPJ", "")}, ;
+        {"Contabilista: e-mail", "C", BOPARM("DFE_EFD_CONT_EMAIL", "")}, {"Contabilista: telefone", "C", BOPARM("DFE_EFD_CONT_FONE", "")}, ;
+        {"Contabilista: CEP", "C", BOPARM("DFE_EFD_CONT_CEP", "")}, {"Contabilista: logradouro", "C", BOPARM("DFE_EFD_CONT_END", "")}, ;
+        {"Contabilista: numero", "C", BOPARM("DFE_EFD_CONT_NUM", "")}, {"Contabilista: bairro", "C", BOPARM("DFE_EFD_CONT_BAIRRO", "")}, ;
+        {"Contabilista: UF", "C", ""}, {"Contabilista: municipio (nome ou codigo IBGE)", "C", BOPARM("DFE_EFD_CONT_MUN", "")}}, ;
+        {|u, a| TUIDfeJson({|o| GEBDFECONFIG(o)}, {"EFD_PERFIL", "EFD_ATIVIDADE", "EFD_COD_REC", "EFD_COD_REC_ST", "EFD_COD_REC_DIFAL", "EFD_COD_REC_FCP", ;
+            "EFD_DIA_VENC", "EFD_SALDO_CREDOR_INICIAL", "CONT_NOME", "CONT_CPF", "CONT_CRC", "CONT_CNPJ", "CONT_EMAIL", "CONT_FONE", "CONT_CEP", ;
+            "CONT_END", "CONT_NUM", "CONT_BAIRRO", "CONT_UF", "CONT_MUNICIPIO"}, a)}, "BO", "", aDfe}, ;
+    {"Fiscal", 0, 0, "Relatorio: documentos eletronicos", {{"Inicio (AAAAMMDD)", "C", Left(cHoje, 6) + "01"}, {"Fim (AAAAMMDD)", "C", cHoje}, ;
+        {"Situacao (vazio = todas)", "C", ""}}, {|u, a| TUIDfeDocs(a)}, "REL", "", aDfe} }
+
+/*/{Protheus.doc} TUIDfeJson
+    Monta o JsonObject {chave: valor} na ordem dos campos e chama o bloco.
+    MUNICIPIO (e CONT_MUNICIPIO) com nome vira codigo IBGE pela UF do
+    mesmo formulario; CONT_UF so' serve para isso e nao e' enviado.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIDfeJson(bFaz, aChaves, a)
+    Local o  := JsonObject():New()
+    Local aM := {} as Array
+    Local nI := 0 as Numeric
+    Local nU := 0 as Numeric
+
+    For nI := 1 To Len(aChaves)
+        If ValType(a[nI]) == "C"
+            o[aChaves[nI]] := AllTrim(a[nI])
+        Else
+            o[aChaves[nI]] := a[nI]
+        EndIf
+    Next nI
+    For nI := 1 To Len(aChaves)
+        If aChaves[nI] == "MUNICIPIO" .Or. aChaves[nI] == "CONT_MUNICIPIO"
+            If aChaves[nI] == "MUNICIPIO"
+                nU := aScan(aChaves, "UF")
+            Else
+                nU := aScan(aChaves, "CONT_UF")
+            EndIf
+            If !Empty(o[aChaves[nI]])
+                aM := TUIMunicipio(o[aChaves[nU]], o[aChaves[nI]])
+                If !aM[1]
+                    Return aM
+                EndIf
+                o[aChaves[nI]] := aM[2]
+            EndIf
+        EndIf
+    Next nI
+    If aScan(aChaves, "UF") > 0
+        o["UF"] := Upper(o["UF"])
+    EndIf
+    o:DelName("CONT_UF")
+Return Eval(bFaz, o)
+
+// Configuracao do DF-e: o CSC em branco mantem o gravado.
+Static Function TUIDfeConfig(a)
+    If Empty(a[14])
+        a[14] := BOPARM("DFE_CSC", "")
+    EndIf
+Return TUIDfeJson({|o| GEBDFECONFIG(o)}, {"AMBIENTE", "NFCE", "SERIE_NFCE", "NFE", "SERIE_NFE", "NFE_TPAG", "NFSE", "SERIE_NFSE", "PROXIMO_NFCE", ;
+    "CFOP", "CSOSN", "UNIDADE", "CSC_ID", "CSC", "RT_CNPJ", "RT_CONTATO", "RT_EMAIL", "RT_FONE"}, a)
+
+Static Function TUICertificado(cUrl)
+    Local aR   := GEBDFECERTLE() as Array
+    Local cMsg := "Nenhum certificado instalado." as Character
+
+    If Len(aR) > 0
+        cMsg := "Instalado: " + aR[1] + " (CNPJ " + aR[2] + "), valido ate " + Right(aR[3], 2) + "/" + SubStr(aR[3], 5, 2) + "/" + Left(aR[3], 4) + "."
+    EndIf
+Return {.T., cMsg + " Para enviar o .pfx abra " + cUrl + "/api/dfe/configurar (mesma empresa, usuario e senha)."}
+
+Static Function TUIEfd(aR, cUrl)
+    If aR[1]
+        Return {.T., aR[2] + ". Baixe o arquivo em " + cUrl + "/api/dfe/configurar (secao SPED Fiscal) e valide no PVA."}
+    EndIf
+Return aR
+
+Static Function TUIDfeDocs(a)
+    Local aR := GEBDFEDOCS(a[1], a[2], a[3]) as Array
+
+    If aR[1]
+        BOMIG()
+    EndIf
+Return aR
+
+/*/{Protheus.doc} TUIFormNuc
+    Formularios do Nucleo (administracao): empresas, unidades, filiais,
+    usuarios, permissoes, ciclo do usuario e agendamentos. As regras de quem
+    pode (super/ADMIN) ficam nas funcoes de negocio chamadas.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIFormNuc(cEmp)
+    Local aAreas := GEBTUIAREAS() as Array
+    Local aRot   := GEBSCHROTINAS() as Array
+    Local aOpA   := {} as Array
+    Local aOpR   := {} as Array
+    Local cRot1  := "" as Character
+    Local nI     := 0 as Numeric
+
+    If Len(aRot) > 0
+        cRot1 := aRot[1][1]
+    EndIf
+    For nI := 1 To Len(aAreas)
+        aAdd(aOpA, {aAreas[nI][3], cValToChar(nI)})
+    Next nI
+    For nI := 1 To Len(aRot)
+        aAdd(aOpR, {aRot[nI][1] + " - " + aRot[nI][2], aRot[nI][1]})
+    Next nI
+Return { ;
+    {"Nucleo", 0, 0, "Nova empresa", {{"Codigo", "C", ""}, {"Nome", "C", ""}}, {|u, a| TUIRestBO(GEBRESTEMPLSC(u, {a[1], a[2]}))}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Nova unidade", {{"Codigo UU (2 digitos)", "C", ""}, {"Nome", "C", ""}}, {|u, a| TUIRestBO(GEBRESTUNILSC(u, {a[1], a[2]}))}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Nova filial", {{"Codigo EEUUFF", "C", ""}, {"Nome", "C", ""}}, {|u, a| TUIRestBO(GEBRESTFILSC(u, {a[1], a[2]}))}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Novo usuario", {{"Codigo (letras, numeros e _)", "C", ""}, {"Nome", "C", ""}, {"Perfil", "C", "USUARIO"}, ;
+        {"Senha (min 8, maiuscula, minuscula, numero e simbolo)", "P", ""}, {"Confirme a senha", "P", ""}, {"Empresa", "C", cEmp}, {"Filial (vazio = matriz)", "C", ""}}, ;
+        {|u, a| TUINucUsuario(u, a)}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Vincular usuario a empresa", {{"Usuario", "C", "", "GE2_COD"}, {"Empresa", "C", cEmp}, {"Filial (vazio = matriz)", "C", ""}}, ;
+        {|u, a| TUIRestBO(GEBRESTVINCSC(u, {a[1], a[2], a[3]}))}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Alterar usuario (senha, nome, perfil)", {{"Usuario (vazio = voce)", "C", "", "GE2_COD"}, {"Nova senha (vazio = mantem)", "P", ""}, ;
+        {"Confirme a senha", "P", ""}, {"Nome (vazio = mantem)", "C", ""}, {"Perfil (vazio = mantem)", "C", ""}}, ;
+        {|u, a| TUINucAltera(u, a)}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Permissao de perfil", {{"Perfil (ex.: USUARIO, OPERADOR)", "C", ""}, {"Area", aOpA, "1"}, ;
+        {"Acao", {{"Conceder", "S"}, {"Revogar", "N"}}, "S"}, {"Escopo", {{"Esta empresa", "E"}, {"Todas as empresas (so' super)", "*"}}, "E"}}, ;
+        {|u, a| TUINucPerm(u, a, aAreas, cEmp)}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Ciclo do usuario", {{"Usuario", "C", "", "GE2_COD"}, {"Acao", {{"Bloquear", "1"}, {"Desbloquear", "2"}, {"Definir validade", "3"}, ;
+        {"Eliminar acessos", "4"}, {"Excluir", "5"}, {"Forcar troca de senha", "6"}, {"Conta de servico: ignorar troca periodica", "7"}, ;
+        {"Conta de servico: voltar a trocar", "8"}}, "1"}, {"Validade (AAAAMMDD; vazio = sem validade)", "C", ""}}, ;
+        {|u, a| TUINucCiclo(u, a)}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Agendar rotina", {{"Rotina", aOpR, cRot1}, {"Horario HHMM", "C", "0230"}, ;
+        {"Dia (D = diario, M01..M28 = dia do mes)", "C", "D"}}, {|u, a| GEBSCHAGENDA(u, a[1], AllTrim(a[2]), Upper(AllTrim(a[3])), "S")}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Desativar agendamento", {{"Rotina", aOpR, cRot1}}, {|u, a| GEBSCHDESATIVA(u, a[1])}, "BO", "", Nil}, ;
+    {"Nucleo", 0, 0, "Relatorio: permissoes do perfil", {{"Perfil", "C", ""}, {"Escopo", {{"Esta empresa", "E"}, {"Todas as empresas", "*"}}, "E"}}, ;
+        {|u, a| TUINucPermRel(a, cEmp)}, "REL", "", Nil}, ;
+    {"Nucleo", 0, 0, "Relatorio: agendamentos", {}, {|u, a| TUINucAgendaRel()}, "REL", "", Nil} }
+
+Static Function TUINucUsuario(u, a)
+    If !(a[4] == a[5])
+        Return {.F., "senhas diferentes"}
+    EndIf
+Return TUIRestBO(GEBRESTURLSC(u, {a[1], a[2], a[3], a[4], a[6], a[7]}))
+
+Static Function TUINucAltera(u, a)
+    Local aR := {} as Array
+
+    If !(a[2] == a[3])
+        Return {.F., "senhas diferentes"}
+    EndIf
+    aR := GEBTUITROCASENHA(u, a[1], a[2], a[4], a[5])
+    If aR[1]
+        Return {.T., "usuario atualizado"}
+    EndIf
+Return {.F., TUIMotivoUsu(BOSTR(aR[2]))}
+
+Static Function TUIMotivoUsu(cCod)
+    If cCod == "nada_a_alterar"
+        Return "nada a alterar"
+    EndIf
+    If cCod == "somente_super"
+        Return "somente o super altera a conta super"
+    EndIf
+    If cCod == "usuario_inexistente"
+        Return "usuario inexistente"
+    EndIf
+Return cCod
+
+Static Function TUINucEsc(cEsc, cEmp)
+    If cEsc == "*"
+        Return "*"
+    EndIf
+Return Lower(AllTrim(cEmp))
+
+Static Function TUINucPerm(u, a, aAreas, cEmp)
+    Local nA := Val(a[2]) as Numeric
+    Local aR := {} as Array
+
+    If Empty(a[1])
+        Return {.F., "informe o perfil"}
+    EndIf
+    aR := GEBTUIPERMSETEMP(u, TUINucEsc(a[4], cEmp), a[1], aAreas[nA][1], aAreas[nA][2], a[3] == "S")
+    If !aR[1]
+        Return aR
+    EndIf
+    If a[3] == "S"
+        Return {.T., aAreas[nA][3] + " concedido a " + Upper(a[1])}
+    EndIf
+Return {.T., aAreas[nA][3] + " revogado de " + Upper(a[1])}
+
+Static Function TUINucCiclo(u, a)
+    Local cAlvo := AllTrim(a[1]) as Character
+    Local aR    := {} as Array
+
+    If Empty(cAlvo)
+        Return {.F., "informe o usuario"}
+    EndIf
+    Do Case
+    Case a[2] == "1"
+        aR := GEBSECBLOQUEIA(u, cAlvo, .T.)
+    Case a[2] == "2"
+        aR := GEBSECBLOQUEIA(u, cAlvo, .F.)
+    Case a[2] == "3"
+        aR := GEBSECVALIDADE(u, cAlvo, AllTrim(a[3]))
+    Case a[2] == "4"
+        aR := GEBSECELIMINAACESSOS(u, cAlvo)
+    Case a[2] == "5"
+        aR := GEBSECEXCLUI(u, cAlvo)
+    Case a[2] == "6"
+        aR := GEBSECFORCATROCA(u, cAlvo, .T.)
+    OtherWise
+        aR := GEBSECIGNORAEXP(u, cAlvo, a[2] == "7")
+    EndCase
+    If aR[1]
+        Return {.T., "feito: " + cAlvo}
+    EndIf
+Return {.F., BOSTR(aR[2])}
+
+Static Function TUINucPermRel(a, cEmp)
+    Local aL   := {} as Array
+    Local aRel := {{"Menu", "Item", "Situacao", "Origem"}} as Array
+    Local nI   := 0 as Numeric
+
+    If Empty(a[1])
+        Return {.F., "informe o perfil"}
+    EndIf
+    aL := GEBSECRBACLISTEMP(Upper(AllTrim(a[1])), TUINucEsc(a[2], cEmp))
+    For nI := 1 To Len(aL)
+        If aL[nI][3]
+            aAdd(aRel, {BOSTR(aL[nI][1]), BOSTR(aL[nI][2]), "permitido", BOSTR(aL[nI][4])})
+        Else
+            aAdd(aRel, {BOSTR(aL[nI][1]), BOSTR(aL[nI][2]), "negado", BOSTR(aL[nI][4])})
+        EndIf
+    Next nI
+    BOREL(aRel)
+Return {.T., ""}
+
+Static Function TUINucAgendaRel()
+    Local aJ   := TCSqlQuery("SELECT SCH_ROTINA, SCH_HORA, SCH_DIA, SCH_ATIVO, SCH_ULTEXEC, SCH_STATUS FROM SCH_JOB WHERE D_E_L_E_T_ = ' ' ORDER BY SCH_ROTINA") as Array
+    Local aRel := {{"Rotina", "Horario", "Dia", "Ativo", "Ultima execucao", "Situacao"}} as Array
+    Local nI   := 0 as Numeric
+
+    For nI := 1 To Len(aJ)
+        aAdd(aRel, {BOSTR(aJ[nI]:SCH_ROTINA), BOSTR(aJ[nI]:SCH_HORA), BOSTR(aJ[nI]:SCH_DIA), BOSTR(aJ[nI]:SCH_ATIVO), BOSTR(aJ[nI]:SCH_ULTEXEC), BOSTR(aJ[nI]:SCH_STATUS)})
+    Next nI
+    BOREL(aRel)
+Return {.T., ""}
+
+// Grupo (aba) do formulario pelo prefixo do titulo.
+Static Function TUIGrupo(cTit)
+    If Left(cTit, 10) == "Relatorio:"
+        Return "Relatorios"
+    EndIf
+    If Left(cTit, 6) == "Banco:"
+        Return "Banco"
+    EndIf
+    If Left(cTit, 8) == "Simples:"
+        Return "Simples Nacional"
+    EndIf
+    If Left(cTit, 5) == "DF-e:"
+        Return "Documentos eletronicos"
+    EndIf
+    If Left(cTit, 5) == "NF-e:"
+        Return "NF-e de fornecedores"
+    EndIf
+Return "Operacoes"
+
+// Saldo e custo medio (antes um MsgInfo).
+Static Function TUISaldo(a)
+    Local aR := GEBESTSLD(a[1], a[2]) as Array
+Return {.T., "Produto " + a[1] + ": quantidade " + BONUM(aR[1], 4) + ", custo medio " + BONUM(aR[2], 4) + ", valor " + BONUM(aR[3], 2)}
+
+// Manifestacao: a justificativa so' vale para NAO_REALIZADA.
+Static Function TUIManif(a)
+    If a[2] == "NAO_REALIZADA"
+        Return GEBDFEMANIF(a[1], a[2], a[3])
+    EndIf
+Return GEBDFEMANIF(a[1], a[2], "")
+
+// Liberacao forcada exige a permissao FATURAMENTO/LIBERA.
+Static Function TUILibera(u, a)
+    If a[2] == "S"
+        If !GEBSECRBAC(u, "FATURAMENTO", "LIBERA")
+            Return {.F., "sem permissao FATURAMENTO/LIBERA para forcar"}
+        EndIf
+    EndIf
+Return GEBFATLIB(a[1], a[2] == "S")
+
+// Boleto: devolve a linha digitavel na mensagem.
+Static Function TUIBoleto(a)
+    Local aR := GEBBCOBOL(a[1], a[2]) as Array
+
+    If !aR[1]
+        Return aR
+    EndIf
+Return {.T., "Linha digitavel: " + aR[3][1] + " | nosso numero " + aR[3][3] + " | vencimento " + aR[3][4]}
+
+// Arquivo do servidor (CNAB/OFX) lido e entregue ao bloco.
+Static Function TUIArquivo(cArq, bProc)
+    Local cTxt := MemoRead(cArq) as Character
+
+    If BOSTR(cTxt) == ""
+        Return {.F., "arquivo vazio ou nao encontrado: " + cArq}
+    EndIf
+Return Eval(bProc, cTxt)
+
+// Calcular da baixa: saldo, juros e multa do titulo na data (preenche os campos 4 a 6).
+Static Function TUICalcBaixa(aVal)
+    Local aC := GEBFXCALC(aVal[1], aVal[2], aVal[3]) as Array
+
+    If !aC[1]
+        Return {.F., aC[2], {}}
+    EndIf
+Return {.T., "", {{4, aC[3][1]}, {5, aC[3][3]}, {6, aC[3][4]}}}
+
+/*/{Protheus.doc} TUIForm
+    Desenha um formulario (PoWidget com os campos e o botao) e liga as
+    colunas da tabela aos campos.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIForm(oApp, oPg, aF, cUsu, aLinks, bDepois)
+    Local oW     := PoWidget():New(oPg, aF[4])
+    Local aCps   := {} as Array
+    Local aIt    := Nil
+    Local oB     := Nil
+    Local nI     := 0 as Numeric
+    Local lItens := .F. as Logical
+
+    If Len(aF) >= 11
+        lItens := (aF[11] != Nil)
+    EndIf
+    If lItens
+        oW:SetCols(12)
+    Else
+        oW:SetCols(4)
+    EndIf
+    For nI := 1 To Len(aF[5])
+        aAdd(aCps, TUICampo(oW, aF[5][nI], aLinks, lItens))
+    Next nI
+    If lItens
+        aIt := TUIFormItens(oApp, oW, aF[11])
+    EndIf
+    oB := PoButton():New(oW, "Confirmar", {|| TUIExecuta(oApp, aF, aCps, cUsu, bDepois, aIt)})
+    oB:Set("kind", "primary")
+    If Len(aF) >= 10
+        If aF[10] != Nil
+            oB := PoButton():New(oW, aF[10][1], {|| TUICalcula(oApp, aF[10][2], aCps)})
+            oB:Set("kind", "secondary")
+        EndIf
+    EndIf
+Return
+
+/*/{Protheus.doc} TUICampo
+    Um campo do formulario: {rotulo, "C" | "N" | "P" (senha) | {opcoes}, padrao,
+    coluna ligada}. Devolve {objeto, tipo}.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUICampo(oPai, aC, aLinks, lLargo)
+    Local oC := Nil
+
+    If ValType(aC[2]) == "A"
+        oC := PoSelect():New(oPai, aC[1], aC[2], aC[3])
+    ElseIf aC[2] == "N"
+        oC := PoNumber():New(oPai, aC[1], aC[3])
+    ElseIf aC[2] == "P"
+        oC := PoPassword():New(oPai, aC[1])
+    Else
+        oC := PoInput():New(oPai, aC[1])
+        If !Empty(aC[3])
+            oC:SetValue(aC[3])
+        EndIf
+    EndIf
+    If lLargo
+        oC:SetCols(3)
+    EndIf
+    If Len(aC) >= 4
+        aAdd(aLinks, {oC, aC[4]})
+    EndIf
+Return {oC, aC[2]}
+
+/*/{Protheus.doc} TUIFormItens
+    Grade de itens do formulario (cabecalho + itens): campos do item, botao
+    de incluir, tabela e remocao. Devolve {itens, tabela, campos, selecionado}.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIFormItens(oApp, oW, aSpec)
+    Local aIt  := {{}, Nil, {}, 0} as Array
+    Local aCol := {{"n", "#"}} as Array
+    Local oB   := Nil
+    Local nI   := 0 as Numeric
+
+    PoDivider():New(oW, "Itens")
+    For nI := 1 To Len(aSpec)
+        aAdd(aIt[3], TUICampo(oW, aSpec[nI], {}, .T.))
+        aAdd(aCol, {"c" + cValToChar(nI), aSpec[nI][1]})
+    Next nI
+    oB := PoButton():New(oW, "Incluir item", {|| TUIItemInclui(oApp, aIt)})
+    oB:Set("kind", "secondary")
+    oB:Set("icon", "an an-plus")
+    oB:SetCols(3)
+    aIt[2] := PoTable():New(oW)
+    aIt[2]:SetColumns(aCol)
+    aIt[2]:OnSelect({|o, aLin| aIt[4] := Val(BOSTR(aLin[1]))})
+    oB := PoButton():New(oW, "Remover item selecionado", {|| TUIItemRemove(oApp, aIt)})
+    oB:Set("kind", "tertiary")
+    oB:Set("icon", "an an-trash")
+    oB:SetCols(4)
+Return aIt
+
+Static Function TUIItemInclui(oApp, aIt)
+    Local aVal := TUIValores(aIt[3]) as Array
+    Local nI   := 0 as Numeric
+
+    If Empty(BOSTR(aVal[1]))
+        oApp:Notify("Preencha o item antes de incluir.", "warning")
+        Return
+    EndIf
+    aAdd(aIt[1], aVal)
+    For nI := 1 To Len(aIt[3])
+        If ValType(aIt[3][nI][2]) == "C"
+            If aIt[3][nI][2] == "N"
+                aIt[3][nI][1]:SetValue(0)
+                Loop
+            EndIf
+            aIt[3][nI][1]:SetValue("")
+        EndIf
+    Next nI
+    TUIItemMostra(aIt)
+Return
+
+Static Function TUIItemRemove(oApp, aIt)
+    If aIt[4] < 1 .Or. aIt[4] > Len(aIt[1])
+        oApp:Notify("Selecione um item na tabela.", "warning")
+        Return
+    EndIf
+    aDel(aIt[1], aIt[4])
+    aSize(aIt[1], Len(aIt[1]) - 1)
+    aIt[4] := 0
+    TUIItemMostra(aIt)
+Return
+
+Static Function TUIItemMostra(aIt)
+    Local aLin := {} as Array
+    Local aRow := {} as Array
+    Local nI   := 0 as Numeric
+    Local nJ   := 0 as Numeric
+
+    For nI := 1 To Len(aIt[1])
+        aRow := {cValToChar(nI)}
+        For nJ := 1 To Len(aIt[1][nI])
+            aAdd(aRow, BOSTR(aIt[1][nI][nJ]))
+        Next nJ
+        aAdd(aLin, aRow)
+    Next nI
+    aIt[2]:SetItems(aLin)
+Return
+
+// Botao auxiliar do formulario: o bloco devolve {lOk, cMsg, {{nCampo, xValor}...}}.
+Static Function TUICalcula(oApp, bCalc, aCps)
+    Local aR := Eval(bCalc, TUIValores(aCps)) as Array
+    Local nI := 0 as Numeric
+
+    If !aR[1]
+        oApp:Notify(BOSTR(aR[2]), "error")
+        Return
+    EndIf
+    For nI := 1 To Len(aR[3])
+        aCps[aR[3][nI][1]][1]:SetValue(aR[3][nI][2])
+    Next nI
+Return
+
+Static Function TUIExecuta(oApp, aF, aCps, cUsu, bDepois, aIt)
+    Local aRes := {} as Array
+    Local lOk  := .F. as Logical
+    Local cMsg := "" as Character
+
+    If Len(aF) >= 9
+        If aF[9] != Nil
+            If !GEBSECRBAC(cUsu, aF[9][1], aF[9][2])
+                oApp:Notify("Sem permissao para " + aF[9][1] + "/" + aF[9][2] + ". Peca ao administrador.", "error")
+                Return
+            EndIf
+        EndIf
+    EndIf
+    If aIt == Nil
+        aRes := Eval(aF[6], cUsu, TUIValores(aCps))
+    Else
+        aRes := Eval(aF[6], cUsu, TUIValores(aCps), aIt[1])
+    EndIf
+    If aF[7] == "BO" .Or. aF[7] == "REL"
+        lOk := aRes[1]
+        cMsg := BOSTR(aRes[2])
+    Else
+        lOk := (aRes[1] == aF[7])
+        cMsg := aF[8]
+        If !lOk
+            cMsg := GEBTUIMOTIVO(aRes)
+        EndIf
+    EndIf
+    If !lOk
+        oApp:Notify(aF[4] + " recusado: " + cMsg, "error")
+        Return
+    EndIf
+    If aF[7] == "REL"
+        // aF[8] = tabela do resultado (padrao GBR1; o Simples Nacional usa GSN6)
+        If Empty(aF[8])
+            GEBTUIBRW("GBR1", aF[4])
+        Else
+            GEBTUIBRW(aF[8], aF[4])
+        EndIf
+        Return
+    EndIf
+    oApp:Notify(cMsg, "success")
+    If aIt != Nil
+        aSize(aIt[1], 0)
+        TUIItemMostra(aIt)
+    EndIf
+    Eval(bDepois)
+Return
+
+// Valores dos campos na ordem: "N" vira numero, o resto texto aparado.
+Static Function TUIValores(aCps)
+    Local aVal := {} as Array
+    Local nI   := 0 as Numeric
+
+    For nI := 1 To Len(aCps)
+        // Ifs aninhados: o .And. do AdvPP avalia os dois lados (o tipo pode ser array).
+        If ValType(aCps[nI][2]) == "C"
+            If aCps[nI][2] == "N"
+                aAdd(aVal, BOVAL(aCps[nI][1]:GetValue()))
+                Loop
+            EndIf
+        EndIf
+        aAdd(aVal, AllTrim(BOSTR(aCps[nI][1]:GetValue())))
+    Next nI
+Return aVal
+
+/*/{Protheus.doc} TUICarrega
+    Le uma tabela da empresa para um PoTable (ate 500 linhas, mais recentes
+    primeiro; filtra a filial da sessao quando a tabela tem filial). GBR1
+    (relatorio) usa a primeira linha como cabecalho.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUICarrega(oTab, cAlias, aColOut)
+    Local aCol  := {} as Array
+    Local aCols := {} as Array
+    Local aLin  := {} as Array
+    Local aHit  := {} as Array
+    Local aRow  := {} as Array
+    Local cSel  := "" as Character
+    Local cWhr  := " WHERE D_E_L_E_T_ = ' '" as Character
+    Local cCol  := "" as Character
+    Local nI    := 0 as Numeric
+    Local nJ    := 0 as Numeric
+
+    If aColOut != Nil
+        aSize(aColOut, 0)
+    EndIf
+    If !GEBDBTableExists(cAlias)
+        oTab:SetColumns({{"aviso", "Aviso"}})
+        oTab:SetItems({{"Tabela " + cAlias + " ainda nao existe nesta empresa."}})
+        Return
+    EndIf
+    If cAlias == "GBR1"
+        Return TUIRelatorio(oTab)
+    EndIf
+    // ponytail: a primeira tabela com esse nome no search_path; GE1/GE2 so' existem em public
+    aHit := TCSqlQuery("SELECT column_name AS C FROM information_schema.columns WHERE table_name = " + GEBDBQuote(Lower(cAlias)) + ;
+        " AND table_schema = (SELECT table_schema FROM information_schema.tables WHERE table_name = " + GEBDBQuote(Lower(cAlias)) + ;
+        " AND table_schema = ANY (current_schemas(false)) ORDER BY array_position(current_schemas(false), table_schema::name) LIMIT 1)" + ;
+        " ORDER BY ordinal_position")
+    For nI := 1 To Len(aHit)
+        cCol := Upper(AllTrim(BOSTR(aHit[nI]:C)))
+        If cCol == Upper(cAlias) + "_FILIAL"
+            If !(cAlias == "GE1" .Or. cAlias == "GE2")
+                cWhr += " AND " + cCol + " = " + GEBDBQuote(FWxFilial(cAlias))
+            EndIf
+        ElseIf !(cCol == "R_E_C_N_O_" .Or. cCol == "D_E_L_E_T_")
+            aAdd(aCol, cCol)
+            aAdd(aCols, {Lower(cCol), TUIRotulo(SubStr(cCol, At("_", cCol) + 1))})
+            If aColOut != Nil
+                aAdd(aColOut, cCol)
+            EndIf
+            If !Empty(cSel)
+                cSel += ", "
+            EndIf
+            cSel += cCol
+        EndIf
+    Next nI
+    oTab:SetColumns(aCols)
+    If Empty(cSel)
+        oTab:SetItems({})
+        Return
+    EndIf
+    aHit := TCSqlQuery("SELECT " + cSel + " FROM " + cAlias + cWhr + " ORDER BY R_E_C_N_O_ DESC LIMIT 500")
+    For nI := 1 To Len(aHit)
+        aRow := {}
+        For nJ := 1 To Len(aCol)
+            aAdd(aRow, AllTrim(BOSTR(aHit[nI][aCol[nJ]])))
+        Next nJ
+        aAdd(aLin, aRow)
+    Next nI
+    oTab:SetItems(aLin)
+Return
+
+Static Function TUIRelatorio(oTab)
+    Local aHit  := TCSqlQuery("SELECT GBR1_C1 AS C1, GBR1_C2 AS C2, GBR1_C3 AS C3, GBR1_C4 AS C4, GBR1_C5 AS C5, GBR1_C6 AS C6, GBR1_C7 AS C7, GBR1_C8 AS C8" + ;
+        " FROM GBR1 WHERE D_E_L_E_T_ = ' ' AND GBR1_FILIAL = " + GEBDBQuote(FWxFilial("GBR1")) + " ORDER BY GBR1_ORDEM") as Array
+    Local aCols := {} as Array
+    Local aLin  := {} as Array
+    Local aRow  := {} as Array
+    Local nI    := 0 as Numeric
+    Local nJ    := 0 as Numeric
+
+    If Len(aHit) == 0
+        oTab:SetColumns({{"aviso", "Aviso"}})
+        oTab:SetItems({{"Relatorio vazio."}})
+        Return
+    EndIf
+    For nJ := 1 To 8
+        If !Empty(BOSTR(aHit[1]["C" + cValToChar(nJ)]))
+            aAdd(aCols, {"c" + cValToChar(nJ), TUIRotulo(StrTran(AllTrim(BOSTR(aHit[1]["C" + cValToChar(nJ)])), "_", " "))})
+        EndIf
+    Next nJ
+    For nI := 2 To Len(aHit)
+        aRow := {}
+        For nJ := 1 To Len(aCols)
+            aAdd(aRow, AllTrim(BOSTR(aHit[nI][Upper(aCols[nJ][1])])))
+        Next nJ
+        aAdd(aLin, aRow)
+    Next nI
+    oTab:SetColumns(aCols)
+    oTab:SetItems(aLin)
+Return
+
+/*/{Protheus.doc} TUIRotulo
+    Rotulo legivel de coluna ("GD1_COMP" -> sufixo "COMP" -> "Competencia").
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIRotulo(cSuf)
+    Local aMapa := {{"COD", "Codigo"}, {"DESC", "Descricao"}, {"NOME", "Nome"}, {"CONTA", "Conta"}, {"SALDO", "Saldo"}, ;
+        {"VALOR", "Valor"}, {"TOTAL", "Total"}, {"STATUS", "Situacao"}, {"COMP", "Competencia"}, {"GUIA", "Guia"}, ;
+        {"PROD", "Produto"}, {"QTD", "Quantidade"}, {"MIN", "Minimo"}, {"EMIS", "Emissao"}, {"FORN", "Fornecedor"}, ;
+        {"NUM", "Numero"}, {"DOC", "Documento"}, {"VENC", "Vencimento"}, {"COND", "Condicao"}, {"PRECO", "Preco"}, ;
+        {"DATA", "Data"}, {"HORA", "Hora"}, {"USUARIO", "Usuario"}, {"PERFIL", "Perfil"}, {"EMPRESA", "Empresa"}} as Array
+    Local nP := aScan(aMapa, {|x| x[1] == Upper(AllTrim(cSuf))}) as Numeric
+
+    If nP > 0
+        Return aMapa[nP][2]
+    EndIf
+    If Upper(cSuf) == cSuf .And. Len(cSuf) <= 4
+        Return cSuf
+    EndIf
+Return Upper(Left(cSuf, 1)) + Lower(SubStr(cSuf, 2))
+
+// Valor em reais no formato brasileiro (R$ 1.234.567,50).
+Static Function TUIMoeda(nVal)
+Return "R$ " + AllTrim(Transform(nVal, "@E 999,999,999,999.99"))
+
+/*/{Protheus.doc} TUIInicio
+    Pagina inicial: sessao, indicadores do dia (saldo em contas, titulos e
+    guias em aberto, estoque abaixo do minimo), grafico de saldo por conta e
+    atalhos para os modulos. "Atualizar" rele tudo.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIInicio(oApp, oPg, cEmp, cFil, cUsu, aAtalhos, aNav)
+    Local oWs   := PoWidget():New(oPg, "Sessao")
+    Local aKpi  := {} as Array
+    Local oWg   := Nil
+    Local oCh   := Nil
+    Local nI    := 0 as Numeric
+
+    oWs:SetCols(12)
+    TUIInfo(oWs, "Empresa", cEmp, 3)
+    If Empty(cFil)
+        TUIInfo(oWs, "Filial", "Matriz", 3)
+    Else
+        TUIInfo(oWs, "Filial", cFil, 3)
+    EndIf
+    TUIInfo(oWs, "Usuario", cUsu, 3)
+    TUIInfo(oWs, "Data", DToC(Date()), 3)
+    aAdd(aKpi, TUIKpi(oPg, "Saldo em contas"))
+    aAdd(aKpi, TUIKpi(oPg, "Titulos em aberto"))
+    aAdd(aKpi, TUIKpi(oPg, "Guias da Derrama"))
+    aAdd(aKpi, TUIKpi(oPg, "Estoque abaixo do minimo"))
+    oWg := PoWidget():New(oPg, "Saldo por conta")
+    oWg:SetCols(12)
+    oCh := PoChart():New(oWg, "Saldo por conta", "bar")
+    If Len(aAtalhos) > 0
+        PoDivider():New(oPg, "Acesso rapido")
+        For nI := 1 To Len(aAtalhos)
+            TUIAtalho(oApp, oPg, aAtalhos[nI], aNav)
+        Next nI
+    EndIf
+    TUIIndicadores(aKpi, oCh)
+    oPg:AddAction("Atualizar", {|| TUIIndicadores(aKpi, oCh)})
+Return
+
+Static Function TUIInfo(oPai, cRot, cVal, nCols)
+    Local oI := PoInfo():New(oPai, cRot, cVal)
+
+    oI:SetCols(nCols)
+Return oI
+
+Static Function TUIKpi(oPg, cTitulo)
+    Local oW := PoWidget():New(oPg, cTitulo)
+    Local oV := PoInfo():New(oW, "", "-")
+    Local oD := PoInfo():New(oW, "", "")
+
+    oW:SetCols(3)
+Return {oV, oD}
+
+Static Function TUIAtalho(oApp, oPg, aAt, aNav)
+    Local oB := PoButton():New(oPg, aAt[1], {|| aNav[1] := aAt[3], oApp:Navigate(aAt[3])})
+
+    oB:Set("icon", aAt[2])
+    oB:Set("kind", "secondary")
+    oB:SetCols(2)
+Return
+
+/*/{Protheus.doc} TUIIndicadores
+    Le os indicadores da empresa (cada tabela so' se existir).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIIndicadores(aKpi, oCh)
+    Local aHit := {} as Array
+    Local aCat := {} as Array
+    Local aVal := {} as Array
+    Local cHoje := DToS(Date()) as Character
+    Local nI   := 0 as Numeric
+
+    If GEBDBTableExists("GFN1")
+        aHit := TCSqlQuery("SELECT GFN1_CONTA AS C, GFN1_NOME AS N, GFN1_SALDO AS S FROM GFN1 WHERE D_E_L_E_T_ = ' ' AND GFN1_FILIAL = " + ;
+            GEBDBQuote(FWxFilial("GFN1")) + " ORDER BY GFN1_SALDO DESC LIMIT 12")
+        For nI := 1 To Len(aHit)
+            aAdd(aCat, AllTrim(BOSTR(aHit[nI]:C)))
+            aAdd(aVal, BOVAL(aHit[nI]:S))
+        Next nI
+        aHit := TCSqlQuery("SELECT COALESCE(SUM(GFN1_SALDO), 0) AS T, COUNT(*) AS Q FROM GFN1 WHERE D_E_L_E_T_ = ' ' AND GFN1_FILIAL = " + GEBDBQuote(FWxFilial("GFN1")))
+        TUIKpiSet(aKpi[1], TUIMoeda(BOVAL(aHit[1]:T)), BOSTR(BOVAL(aHit[1]:Q)) + " conta(s)")
+    EndIf
+    oCh:SetCategories(aCat)
+    oCh:SetSeries({{"Saldo", aVal}})
+    If GEBDBTableExists("GFN3")
+        aHit := TCSqlQuery("SELECT COUNT(*) AS Q, COALESCE(SUM(GFN3_SALDO), 0) AS T, COALESCE(SUM(CASE WHEN GFN3_VENC < " + GEBDBQuote(cHoje) + ;
+            " THEN 1 ELSE 0 END), 0) AS V FROM GFN3 WHERE D_E_L_E_T_ = ' ' AND GFN3_SALDO > 0 AND GFN3_FILIAL = " + GEBDBQuote(FWxFilial("GFN3")))
+        TUIKpiSet(aKpi[2], BOSTR(BOVAL(aHit[1]:Q)) + " titulo(s)", TUIMoeda(BOVAL(aHit[1]:T)) + "; " + BOSTR(BOVAL(aHit[1]:V)) + " vencido(s)")
+    EndIf
+    If GEBDBTableExists("GD1")
+        aHit := TCSqlQuery("SELECT COUNT(*) AS Q, COALESCE(SUM(GD1_TOTAL), 0) AS T, COALESCE(SUM(CASE WHEN GD1_STATUS = 'VENCIDA' THEN 1 ELSE 0 END), 0) AS V" + ;
+            " FROM GD1 WHERE D_E_L_E_T_ = ' ' AND GD1_STATUS IN ('ABERTA', 'VENCIDA') AND GD1_FILIAL = " + GEBDBQuote(FWxFilial("GD1")))
+        TUIKpiSet(aKpi[3], BOSTR(BOVAL(aHit[1]:Q)) + " em aberto", TUIMoeda(BOVAL(aHit[1]:T)) + "; " + BOSTR(BOVAL(aHit[1]:V)) + " vencida(s)")
+    EndIf
+    If GEBDBTableExists("GV1")
+        aHit := TCSqlQuery("SELECT COUNT(*) AS Q FROM GV1 WHERE D_E_L_E_T_ = ' ' AND GV1_SALDO < GV1_MIN AND GV1_FILIAL = " + GEBDBQuote(FWxFilial("GV1")))
+        TUIKpiSet(aKpi[4], BOSTR(BOVAL(aHit[1]:Q)) + " produto(s)", "saldo menor que o minimo")
+    EndIf
+Return
+
+Static Function TUIKpiSet(aK, cVal, cDet)
+    aK[1]:SetValue(cVal)
+    aK[2]:SetValue(cDet)
+Return
+
+/*/{Protheus.doc} TUIRastreio
+    Rastreabilidade ponta a ponta (GEBEXP_TRAK): compra, venda, nota ou guia,
+    mostrada como arvore de etapas.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function TUIRastreio(oApp, oPg)
+    Local oW   := PoWidget():New(oPg, "Rastrear documento")
+    Local oTip := PoSelect():New(oW, "Origem", {{"Pedido de compra", "C"}, {"Venda", "V"}, {"Nota fiscal (chave)", "N"}, {"Guia da Derrama", "D"}}, "C")
+    Local oDoc := PoInput():New(oW, "Documento")
+    Local oB   := PoButton():New(oW, "Rastrear")
+    Local oWa  := PoWidget():New(oPg, "Caminho do documento")
+    Local oArv := PoTree():New(oWa)
+
+    oW:SetCols(4)
+    oWa:SetCols(8)
+    oB:Set("kind", "primary")
+    oB:Set("icon", "an an-path")
+    oB:OnClick({|| TUIRastreia(oApp, oArv, BOSTR(oTip:GetValue()), AllTrim(BOSTR(oDoc:GetValue())))})
+Return
+
+Static Function TUIRastreia(oApp, oArv, cTipo, cDoc)
+    Local aRet   := {} as Array
+    Local aNomes := {} as Array
+    Local aItens := {} as Array
+    Local aFilho := {} as Array
+    Local nI     := 0 as Numeric
+    Local nJ     := 0 as Numeric
+
+    If Empty(cDoc)
+        oApp:Notify("Informe o documento.", "warning")
+        Return
+    EndIf
+    If cTipo == "C"
+        aRet := GEBTRAKCOMPRA(cDoc)
+        aNomes := {"Pedido", "Itens", "Entrada", "Estoque", "Contas a pagar", "Lancamentos"}
+    ElseIf cTipo == "V"
+        aRet := GEBTRAKVENDA(cDoc)
+        aNomes := {"Venda", "Itens", "Estoque", "Contas a receber", "Lancamentos"}
+    ElseIf cTipo == "N"
+        aRet := GEBTRAKNOTAFISCAL(cDoc)
+        aNomes := {"Nota", "Itens", "Calculo", "Contas a receber", "Apuracao", "Guia"}
+    Else
+        aRet := GEBTRAKDERRAMA(cDoc)
+        aNomes := {"Apuracao", "Guia", "Parcelas", "Cobranca", "Contas a pagar", "Baixa", "Lancamentos"}
+    EndIf
+    For nI := 1 To Min(Len(aRet), Len(aNomes))
+        aFilho := {}
+        If ValType(aRet[nI]) == "A"
+            For nJ := 1 To Len(aRet[nI])
+                aAdd(aFilho, {TUILinha(aRet[nI][nJ]), cValToChar(nI) + "." + cValToChar(nJ)})
+            Next nJ
+        EndIf
+        aAdd(aItens, {aNomes[nI] + " (" + cValToChar(Len(aFilho)) + ")", cValToChar(nI), aFilho})
+    Next nI
+    oArv:SetItems(aItens)
+Return
+
+// Registro de uma etapa como texto ("a | b | c").
+Static Function TUILinha(xReg)
+    Local cOut := "" as Character
+    Local nI   := 0 as Numeric
+
+    If ValType(xReg) != "A"
+        Return AllTrim(BOSTR(xReg))
+    EndIf
+    For nI := 1 To Len(xReg)
+        If nI > 1
+            cOut += " | "
+        EndIf
+        cOut += AllTrim(BOSTR(xReg[nI]))
+    Next nI
+Return cOut
+
+/*/{Protheus.doc} GEBTUIBRWAPP
+    Desvia GEBTUIBRW para um bloco {|cAlias, cTitulo| ...} (Nil = FWMBrowse).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+User Function GEBTUIBRWAPP(bBloco)
+    bTUIBrw := bBloco
+Return .T.
 
 /*/{Protheus.doc} GEBTUIEMPRESAS
     Lista empresas do catalogo para o menu (pares {cod, nome}).
@@ -220,76 +1717,47 @@ User Function GEBTUIEMPRESAS(cUsu)
 Return aOut
 
 /*/{Protheus.doc} GEBTUIFILIAL
-    Escolhe a filial do usuario na empresa (menu; super entra direto).
-    @type Helper
+    Filiais do usuario na empresa, {{rotulo, codigo}} ("" = matriz). Super
+    entra na matriz sem gravar vinculo.
+    @type Consulta
     @author Peder Munksgaard
     @since 25/09/2026
-    @return Codigo da filial, "" matriz, Nil se desistir
 /*/
 User Function GEBTUIFILIAL(cUsu, cEmp)
-    Local aArea := GetArea()
     Local aVinc := {}
-    Local aDisp := {}
-    Local nI := 0
-    Local nJ := 0
-    Local cFil := ""
+    Local aReg  := {}
+    Local aOut  := {}
+    Local cFil  := ""
     Local cNome := ""
-    Local aReg := {}
-    Local nOp := 0
-    // Super entra em qualquer empresa sem gravar vinculo (antes criava GE2_EMP
-    // como efeito colateral da leitura). Vinculo, se preciso, e' explicito.
+    Local nI    := 0
+    Local nJ    := 0
+
     If GEBSECISSUPER(cUsu)
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return ""
+        Return {{"Matriz", ""}}
+    EndIf
+    If !GEBDBSchemaValido(cEmp)
+        Return {}
     EndIf
     aVinc := TCSqlQuery("SELECT DISTINCT GE2_EMP_FILIAL FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsu) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(Lower(cEmp)) + " AND D_E_L_E_T_ = ' '")
-    If Len(aVinc) == 0
-        MsgStop("Sem vinculo com esta empresa.", "GEBAN")
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return Nil
+    // GEF1 e' do tenant e a sessao ainda nao trocou de empresa: schema explicito (cEmp validado acima).
+    If Len(aVinc) > 1
+        aReg := TCSqlQuery("SELECT GEF1_COD, GEF1_NOME FROM emp_" + Lower(AllTrim(cEmp)) + ".GEF1 WHERE D_E_L_E_T_ = ' '")
     EndIf
-    If Len(aVinc) == 1
-        cFil := Upper(AllTrim(cValToChar(aVinc[1]:GE2_EMP_FILIAL)))
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return cFil
-    EndIf
-    // GEF1 e' do tenant: a sessao ainda nao trocou para a empresa (isso acontece depois),
-    // entao a consulta usa o schema da empresa explicitamente (cEmp validado antes).
-    If !GEBDBSchemaValido(cEmp)
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return Nil
-    EndIf
-    aReg := TCSqlQuery("SELECT GEF1_COD, GEF1_NOME FROM emp_" + Lower(AllTrim(cEmp)) + ".GEF1 WHERE D_E_L_E_T_ = ' '")
     For nI := 1 To Len(aVinc)
-        cFil := Upper(AllTrim(cValToChar(aVinc[nI]:GE2_EMP_FILIAL)))
-        cNome := cFil
-        If cFil == ""
-            cNome := "Matriz"
+        cFil := Upper(AllTrim(BOSTR(aVinc[nI]:GE2_EMP_FILIAL)))
+        cNome := "Matriz"
+        If !Empty(cFil)
+            cNome := cFil
         EndIf
         For nJ := 1 To Len(aReg)
-            If Upper(AllTrim(cValToChar(aReg[nJ]:GEF1_COD))) == cFil
-                cNome := cValToChar(aReg[nJ]:GEF1_NOME)
+            If Upper(AllTrim(BOSTR(aReg[nJ]:GEF1_COD))) == cFil
+                cNome := BOSTR(aReg[nJ]:GEF1_NOME)
                 Exit
             EndIf
         Next nJ
-        AAdd(aDisp, "icon:storefront|" + cFil + " - " + cNome)
+        aAdd(aOut, {cFil + " - " + cNome, cFil})
     Next nI
-    nOp := FWMenuSelect(aDisp, "Filial:")
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-    If nOp <= 0 .Or. nOp > Len(aVinc)
-        Return Nil
-    EndIf
-Return Upper(AllTrim(cValToChar(aVinc[nOp]:GE2_EMP_FILIAL)))
+Return aOut
 
 /*/{Protheus.doc} GEBTUIBRW
     Abre browse FWMBrowse da tabela (padrao GesCon).
@@ -300,6 +1768,9 @@ Return Upper(AllTrim(cValToChar(aVinc[nOp]:GE2_EMP_FILIAL)))
 User Function GEBTUIBRW(cAlias, cTitle)
     Local aArea := GetArea()
     Local oBrowse := Nil
+    If bTUIBrw != Nil
+        Return Eval(bTUIBrw, cAlias, cTitle)
+    EndIf
     If !GEBDBTableExists(cAlias)
         ConOut("GEBTUIBRW: tabela " + cAlias + " fora do search_path")
         MsgStop("Tabela " + cAlias + " indisponivel.", "GEBAN")
@@ -323,802 +1794,6 @@ User Function GEBTUIBRW(cAlias, cTitle)
     If Len(aArea) > 0
         RestArea(aArea)
     EndIf
-Return .T.
-
-/*/{Protheus.doc} GEBTUIMENU
-    Menu principal: 7 modulos + Sair (loop ate sair).
-    @type Menu
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUIMENU(cEmp, cFil, cUsu)
-    Local aOps := {"icon:receipt|Fiscal", "icon:wallet|Financeiro", "icon:bank|Derrama", "icon:package|Estoque", "icon:calculator|Contabil", "icon:shopping-cart|Compras", "icon:file-text|Faturamento", "icon:storefront|Frente de loja", "icon:gear|Nucleo", "icon:sign-out|< Sair"}
-    Local nOp := 0
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "GEBAN " + cEmp + ":")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 10
-            Exit
-        EndIf
-        If nOp == 1
-            If GEBTUIMODOK(cUsu, "FISCAL", .T.)
-                GEBTUIFISCAL(cEmp, cFil, cUsu)
-            EndIf
-        Else
-            If nOp == 2
-                If GEBTUIMODOK(cUsu, "FINANCEIRO", .T.)
-                    GEBTUIFIN(cEmp, cFil, cUsu)
-                EndIf
-            Else
-                If nOp == 3
-                    If GEBTUIMODOK(cUsu, "DERRAMA", .T.)
-                        GEBTUIDER(cEmp, cFil, cUsu)
-                    EndIf
-                Else
-                    If nOp == 4
-                        If GEBTUIMODOK(cUsu, "ESTOQUE", .T.)
-                            GEBTUIEST(cEmp, cFil, cUsu)
-                        EndIf
-                    Else
-                        If nOp == 5
-                            If GEBTUIMODOK(cUsu, "CONTABIL", .T.)
-                                GEBTUICTB(cEmp, cFil, cUsu)
-                            EndIf
-                        Else
-                            If nOp == 6
-                                If GEBTUIMODOK(cUsu, "COMPRAS", .T.)
-                                    GEBTUICOM(cEmp, cFil, cUsu)
-                                EndIf
-                            ElseIf nOp == 7
-                                If GEBTUIMODOK(cUsu, "FATURAMENTO", .T.)
-                                    GEBTUIFAT(cEmp, cFil, cUsu)
-                                EndIf
-                            ElseIf nOp == 8
-                                If GEBTUIMODOK(cUsu, "LOJA", .T.)
-                                    GEBTUILOJ(cEmp, cFil, cUsu)
-                                EndIf
-                            Else
-                                GEBTUINUC(cEmp, cFil, cUsu)
-                            EndIf
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-    MsgInfo("Sessao encerrada.", "GEBAN")
-Return .T.
-
-/*/{Protheus.doc} GEBTUIFISCAL
-    Tela do modulo Fiscal (browse + operacoes).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUIFISCAL(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Produtos", "icon:clipboard|Notas", "icon:plus|+ Novo produto", "icon:check-circle|Emitir nota", "icon:check-circle|Apurar competencia", "icon:check-circle|Lancar credito", "icon:plus|+ Nova aliquota (NCM)", "icon:calculator|Simples Nacional", "icon:gear|Documentos eletronicos (NF-e/NFC-e)", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local cCod := ""
-    Local cNCM := ""
-    Local cDes := ""
-    Local cCha := ""
-    Local cProd := ""
-    Local nQtd := 0
-    Local nPre := 0
-    Local cComp := ""
-    Local cOri := ""
-    Local nVal := 0
-    Local cTip := ""
-    Local cReg := ""
-    Local aRes := {}
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Fiscal:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 10
-            Exit
-        EndIf
-        If nOp == 9
-            GEBTUIDFE(cEmp, cFil, cUsu)
-            Loop
-        EndIf
-        // Permissao por acao (mesmo mapa da API): produtos, notas, apuracao.
-        If !GEBTUIACAOOK(cUsu, "FISCAL", GEBTUIFISITEM(nOp))
-            Loop
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GF1", "Produtos")
-        Else
-            If nOp == 2
-                GEBTUIBRW("GF3", "Notas")
-            Else
-                If nOp == 3
-                    cCod := FWGetText("Codigo:", "")
-                    cNCM := FWGetText("NCM:", "")
-                    cDes := FWGetText("Descricao:", "")
-                    aRes := GEBRESTPRDLSC(cUsu, {cCod, cNCM, cDes})
-                    If aRes[1] == "201"
-                        MsgInfo("Produto criado.", "Fiscal")
-                    Else
-                        MsgStop("Produto recusado: " + GEBTUIMOTIVO(aRes), "Fiscal")
-                    EndIf
-                Else
-                    If nOp == 4
-                        cCha := FWGetText("Chave:", "")
-                        cProd := FWGetText("Produto:", "")
-                        nQtd := Val(FWGetText("Quantidade:", ""))
-                        nPre := Val(FWGetText("Preco:", ""))
-                        aRes := GEBRESTNOTPOST(cUsu, {cCha, cProd, nQtd, nPre})
-                        If aRes[1] == "201"
-                            MsgInfo("Nota emitida.", "Fiscal")
-                        Else
-                            MsgStop("Nota recusada: " + GEBTUIMOTIVO(aRes), "Fiscal")
-                        EndIf
-                    Else
-                        If nOp == 5
-                            cComp := FWGetText("Competencia AAAAMM:", "")
-                            aRes := GEBRESTFISAPU(cUsu, {cComp})
-                            If aRes[1] == "200"
-                                MsgInfo("Competencia apurada.", "Fiscal")
-                            Else
-                                MsgStop("Apuracao recusada: " + GEBTUIMOTIVO(aRes), "Fiscal")
-                            EndIf
-                        ElseIf nOp == 8
-                            GEBTUISN(cUsu)
-                        ElseIf nOp == 6
-                            cComp := FWGetText("Competencia AAAAMM:", "")
-                            cOri := FWGetText("Origem:", "")
-                            nVal := Val(FWGetText("Valor:", ""))
-                            cTip := FWGetText("Tipo:", "")
-                            cReg := GEBFCRE(cComp, cOri, nVal, cTip)
-                            If cReg == ""
-                                MsgStop("Credito recusado.", "Fiscal")
-                            Else
-                                MsgInfo("Credito " + cReg + ".", "Fiscal")
-                            EndIf
-                        Else
-                            // Sem aliquota vigente a NCM tributa a zero (docs/02, sec. 3):
-                            // antes nao havia como cadastrar aliquota pela tela.
-                            cCod := FWGetText("NCM:", "")
-                            cOri := FWGetText("IBS % (ex.: 10):", "")
-                            cTip := FWGetText("CBS % (ex.: 5):", "")
-                            cComp := FWGetText("Vigencia inicio AAAAMMDD:", DToS(Date()))
-                            cReg := FWGetText("Vigencia fim AAAAMMDD:", "20991231")
-                            aRes := GEBRESTALISC(cUsu, {cCod, cOri, cTip, cComp, cReg})
-                            If Left(cValToChar(aRes[1]), 1) == "2"
-                                MsgInfo("Aliquota da NCM " + cCod + " cadastrada.", "Fiscal")
-                            Else
-                                MsgStop("Aliquota recusada: " + GEBTUIMOTIVO(aRes), "Fiscal")
-                            EndIf
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUISN
-    Submenu Simples Nacional (Fiscal > Simples Nacional): cadastros,
-    apuracao e relatorios (extrato e anual, em grade via GSN6). Mesma
-    permissao da API /fiscal/simples/* (FISCAL/APURA). Regras em GEBSN.prw.
-    @type Tela
-    @author Peder Munksgaard
-    @since 18/10/2026
-/*/
-User Function GEBTUISN(cUsu)
-    Local aOps := {"icon:gear|Configurar anexo padrao", "icon:plus|Atividade (codigo e anexo)", "icon:plus|Produto: atividade, ST, monofasico", ;
-        "icon:plus|Nota de exportacao", "icon:plus|Folha e receita externa do mes", "icon:plus|Feriado (municipal/estadual)", ;
-        "icon:check-circle|Apurar mes (DAS)", "icon:clipboard|Relatorio: extrato da apuracao", "icon:clipboard|Relatorio: acompanhamento anual", ;
-        "icon:clipboard|Apuracoes", "icon:clipboard|Atividades", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local cComp := ""
-    Local cAux := ""
-    Local cAux2 := ""
-    Local cAux3 := ""
-    Local aRes := {}
-    Local aSN := {}
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Simples Nacional:")
-        If nOp == Nil .Or. nOp <= 0 .Or. nOp == 12
-            Exit
-        EndIf
-        aSN := {}
-        If nOp == 1
-            cAux := FWGetText("Anexo padrao (I, II, III, IV, V ou FR = Fator R):", Upper(AllTrim(GEBCFG("SN_ANEXO"))))
-            cComp := FWGetText("Inicio de atividade AAAAMM (vazio se tem mais de 12 meses):", AllTrim(GEBCFG("SN_INICIO")))
-            aSN := GEBSNCFG(cAux, cComp)
-        ElseIf nOp == 2
-            cAux := FWGetText("Codigo da atividade (ate 10 caracteres):", "")
-            cAux2 := FWGetText("Descricao:", "")
-            aSN := GEBSNATV(cAux, cAux2, FWGetText("Anexo (I, II, III, IV, V ou FR):", ""))
-        ElseIf nOp == 3
-            cAux := FWGetText("Produto (codigo):", "")
-            cAux2 := FWGetText("Atividade (vazio = anexo padrao):", "")
-            cAux3 := FWGetText("ICMS por substituicao tributaria? S/N:", "N")
-            aSN := GEBSNPRD(cAux, cAux2, cAux3, FWGetText("PIS/COFINS monofasico? S/N:", "N"))
-        ElseIf nOp == 4
-            cAux := FWGetText("Chave da nota:", "")
-            aSN := GEBSNEXP(cAux, FWGetText("Exportacao? S/N:", "S"))
-        ElseIf nOp == 5
-            cComp := FWGetText("Competencia AAAAMM:", "")
-            cAux := FWGetText("Folha do mes (salarios + pro-labore + encargos; 0 se for so' receita de atividade):", "0")
-            cAux2 := FWGetText("Receita do mes fora do GEBAN:", "0")
-            aSN := GEBSNFOL(cComp, Val(cAux), Val(cAux2), FWGetText("Atividade da receita (vazio = anexo padrao):", ""))
-        ElseIf nOp == 6
-            cAux := FWGetText("Data do feriado AAAAMMDD:", "")
-            aSN := GEBSNFER(cAux, FWGetText("Descricao:", ""))
-        ElseIf nOp == 7
-            cComp := FWGetText("Competencia AAAAMM:", "")
-            aRes := GEBSNAPU(cComp)
-            If aRes[1]
-                cAux := "Anexo " + aRes[3][1] + ", faixa " + cValToChar(aRes[3][3]) + ;
-                    " | RBT12: " + AllTrim(Str(aRes[3][2], 20, 2)) + ;
-                    " | Aliquota efetiva: " + AllTrim(Str(aRes[3][4], 20, 4)) + "%" + ;
-                    " | DAS: " + AllTrim(Str(aRes[3][5], 20, 2)) + " vence " + ;
-                    Right(aRes[3][6], 2) + "/" + SubStr(aRes[3][6], 5, 2) + "/" + Left(aRes[3][6], 4) + " (contas a pagar DAS-" + cComp + ")"
-                If !(aRes[3][7] == "")
-                    cAux := cAux + " | ATENCAO: " + aRes[3][7]
-                EndIf
-                MsgInfo(cAux, "Simples Nacional")
-            Else
-                MsgStop("Apuracao recusada: " + aRes[2], "Simples Nacional")
-            EndIf
-        ElseIf nOp == 8 .Or. nOp == 9
-            If nOp == 8
-                aRes := GEBSNEXTRATO(FWGetText("Competencia AAAAMM:", ""))
-            Else
-                aRes := GEBSNANUAL(FWGetText("Ano AAAA:", Left(DToS(Date()), 4)))
-            EndIf
-            If aRes[1]
-                GEBTUIBRW("GSN6", aOps[nOp])
-            Else
-                MsgStop("Relatorio recusado: " + aRes[2], "Simples Nacional")
-            EndIf
-        ElseIf nOp == 10
-            GEBSNMIG()
-            GEBTUIBRW("GSN2", "Apuracoes do Simples Nacional")
-        Else
-            GEBSNMIG()
-            GEBTUIBRW("GSN3", "Atividades do Simples Nacional")
-        EndIf
-        If Len(aSN) >= 2
-            If aSN[1]
-                MsgInfo(aSN[2], "Simples Nacional")
-            Else
-                MsgStop("Recusado: " + aSN[2], "Simples Nacional")
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUIFIN
-    Tela do modulo Financeiro (browse + operacoes).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUIFIN(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Contas", "icon:plus|+ Nova conta", "icon:check-circle|Baixar titulo", "icon:gear|Financeiro avancado (titulos, baixas, relatorios)", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local aRes := {}
-    Local cConta := ""
-    Local cNome := ""
-    Local cTipo := ""
-    Local cDoc := ""
-    Local nValor := 0
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Financeiro:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 5
-            Exit
-        EndIf
-        If nOp == 4
-            GEBTUIBOFIN(cUsu)
-            Loop
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GFN1", "Contas")
-        Else
-            If nOp == 2
-                cConta := FWGetText("Conta:", "")
-                cNome := FWGetText("Nome:", "")
-                aRes := GEBRESTFINCON(cUsu, {cConta, cNome})
-                If aRes[1] == "201"
-                    MsgInfo("Conta criada.", "Financeiro")
-                Else
-                    MsgStop("Conta recusada: " + GEBTUIMOTIVO(aRes), "Financeiro")
-                EndIf
-            Else
-                cTipo := FWGetText("Tipo PAGAR/RECEBER:", "")
-                cDoc := FWGetText("Documento:", "")
-                nValor := Val(FWGetText("Valor:", ""))
-                aRes := GEBRESTFINBAI(cUsu, {cTipo, cDoc, nValor})
-                If aRes[1] == "200"
-                    MsgInfo("Titulo baixado.", "Financeiro")
-                Else
-                    MsgStop("Baixa recusada: " + GEBTUIMOTIVO(aRes), "Financeiro")
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUIDER
-    Tela do modulo Derrama (browse + operacoes).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUIDER(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Guias", "icon:plus|+ Gerar guia", "icon:check-circle|Baixar guia", "icon:check-circle|Parcelar guia", "icon:chart-bar|Calcular juros", "icon:check-circle|Protestar guia", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local aRes := {}
-    Local cComp := ""
-    Local cGuia := ""
-    Local nParc := 0
-    Local nDias := 0
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Derrama:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 7
-            Exit
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GD1", "Guias")
-        Else
-            If nOp == 2
-                cComp := FWGetText("Competencia AAAAMM:", "")
-                aRes := GEBRESTDERGER(cUsu, {cComp})
-                If aRes[1] == "201"
-                    MsgInfo("Guia gerada.", "Derrama")
-                Else
-                    MsgStop("Geracao recusada: " + GEBTUIMOTIVO(aRes), "Derrama")
-                EndIf
-            Else
-                If nOp == 3
-                    cGuia := FWGetText("Guia:", "")
-                    aRes := GEBRESTDERBAI(cUsu, {cGuia})
-                    If aRes[1] == "200"
-                        MsgInfo("Guia baixada.", "Derrama")
-                    Else
-                        MsgStop("Baixa recusada: " + GEBTUIMOTIVO(aRes), "Derrama")
-                    EndIf
-                Else
-                    If nOp == 4
-                        cGuia := FWGetText("Guia:", "")
-                        nParc := Val(FWGetText("Parcelas:", ""))
-                        aRes := GEBRESTDERPAR(cUsu, {cGuia, nParc})
-                        If aRes[1] == "200"
-                            MsgInfo("Guia parcelada.", "Derrama")
-                        Else
-                            MsgStop("Parcelamento recusado: " + GEBTUIMOTIVO(aRes), "Derrama")
-                        EndIf
-                    Else
-                        If nOp == 5
-                            cGuia := FWGetText("Guia:", "")
-                            nDias := Val(FWGetText("Dias:", ""))
-                            aRes := GEBRESTDERJUR(cUsu, {cGuia, nDias})
-                            If aRes[1] == "200"
-                                MsgInfo("Juros calculados.", "Derrama")
-                            Else
-                                MsgStop("Calculo recusado: " + GEBTUIMOTIVO(aRes), "Derrama")
-                            EndIf
-                        Else
-                            cGuia := FWGetText("Guia:", "")
-                            aRes := GEBRESTDERPRO(cUsu, {cGuia})
-                            If aRes[1] == "200"
-                                MsgInfo("Guia protestada.", "Derrama")
-                            Else
-                                MsgStop("Protesto recusado: " + GEBTUIMOTIVO(aRes), "Derrama")
-                            EndIf
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUIEST
-    Tela do modulo Estoque (browse + operacoes).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUIEST(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Saldos", "icon:clipboard|Vendas", "icon:check-circle|Vender", "icon:check-circle|Vender fiado", "icon:chart-bar|Juros fiado", "icon:gear|Estoque avancado (custo, inventario, kardex)", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local aRes := {}
-    Local cVenda := ""
-    Local cProd := ""
-    Local nQtd := 0
-    Local nPre := 0
-    Local cCli := ""
-    Local nVal := 0
-    Local nDias := 0
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Estoque:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 7
-            Exit
-        EndIf
-        If nOp == 6
-            GEBTUIBOEST(cUsu)
-            Loop
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GV1", "Saldos")
-        Else
-            If nOp == 2
-                GEBTUIBRW("GV2", "Vendas")
-            Else
-                If nOp == 3
-                    cVenda := FWGetText("Venda:", "")
-                    cProd := FWGetText("Produto:", "")
-                    nQtd := Val(FWGetText("Quantidade:", ""))
-                    nPre := Val(FWGetText("Preco:", ""))
-                    aRes := GEBRESTESTVEN(cUsu, {cVenda, cProd, nQtd, nPre})
-                    If aRes[1] == "201"
-                        MsgInfo("Venda registrada.", "Estoque")
-                    Else
-                        MsgStop("Venda recusada: " + GEBTUIMOTIVO(aRes), "Estoque")
-                    EndIf
-                Else
-                    If nOp == 4
-                        cCli := FWGetText("Cliente:", "")
-                        nVal := Val(FWGetText("Valor:", ""))
-                        aRes := GEBRESTESTFIA(cUsu, {cCli, nVal})
-                        If aRes[1] == "201"
-                            MsgInfo("Fiado registrado.", "Estoque")
-                        Else
-                            MsgStop("Fiado recusado: " + GEBTUIMOTIVO(aRes), "Estoque")
-                        EndIf
-                    Else
-                        cCli := FWGetText("Cliente:", "")
-                        nDias := Val(FWGetText("Dias:", ""))
-                        aRes := GEBRESTESTFIJ(cUsu, {cCli, nDias})
-                        If aRes[1] == "200"
-                            MsgInfo("Juros calculados.", "Estoque")
-                        Else
-                            MsgStop("Calculo recusado: " + GEBTUIMOTIVO(aRes), "Estoque")
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUICTB
-    Tela do modulo Contabil (browse + operacoes).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUICTB(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Plano", "icon:clipboard|Lancamentos", "icon:check-circle|Lancar", "icon:chart-bar|Ver balancete", "icon:chart-bar|Ver DRE", "icon:gear|Contabil avancado (razao, balancete, DRE)", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local aRes := {}
-    Local cDeb := ""
-    Local cCred := ""
-    Local nVal := 0
-    Local cComp := ""
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Contabil:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 7
-            Exit
-        EndIf
-        If nOp == 6
-            GEBTUIBOCTB(cUsu)
-            Loop
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GC1", "Plano de contas")
-        Else
-            If nOp == 2
-                GEBTUIBRW("GC2", "Lancamentos")
-            Else
-                If nOp == 3
-                    cDeb := FWGetText("Debito:", "")
-                    cCred := FWGetText("Credito:", "")
-                    nVal := Val(FWGetText("Valor:", ""))
-                    aRes := GEBRESTCTBDIR(cUsu, {cDeb, cCred, nVal})
-                    If aRes[1] == "201"
-                        MsgInfo("Lancamento gravado.", "Contabil")
-                    Else
-                        MsgStop("Lancamento recusado: " + GEBTUIMOTIVO(aRes), "Contabil")
-                    EndIf
-                Else
-                    cComp := FWGetText("Competencia AAAAMM:", "")
-                    If nOp == 4
-                        aRes := GEBRESTCTBBAL(cUsu, cComp)
-                    Else
-                        aRes := GEBRESTCTBDRE(cUsu, cComp)
-                    EndIf
-                    If aRes[1] == "200"
-                        MsgInfo("Relatorio gerado.", "Contabil")
-                    Else
-                        MsgStop("Relatorio recusado: " + GEBTUIMOTIVO(aRes), "Contabil")
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUICOM
-    Tela do modulo Compras (browse + operacoes).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUICOM(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Fornecedores", "icon:clipboard|Pedidos", "icon:plus|+ Novo fornecedor", "icon:check-circle|Abrir pedido", "icon:check-circle|Adicionar item", "icon:check-circle|Dar entrada", "icon:gear|Compras avancado (solicitacao, alcada, entrada)", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local aRes := {}
-    Local cCod := ""
-    Local cNome := ""
-    Local cPed := ""
-    Local cForn := ""
-    Local cProd := ""
-    Local nQtd := 0
-    Local nPre := 0
-    Local cNF := ""
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Compras:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 8
-            Exit
-        EndIf
-        If nOp == 7
-            GEBTUIBOCOM(cUsu)
-            Loop
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GCP1", "Fornecedores")
-        Else
-            If nOp == 2
-                GEBTUIBRW("GCP3", "Pedidos")
-            Else
-                If nOp == 3
-                    cCod := FWGetText("Codigo:", "")
-                    cNome := FWGetText("Nome:", "")
-                    aRes := GEBRESTCOMFOR(cUsu, {cCod, cNome})
-                    If aRes[1] == "201"
-                        MsgInfo("Fornecedor criado.", "Compras")
-                    Else
-                        MsgStop("Cadastro recusado: " + GEBTUIMOTIVO(aRes), "Compras")
-                    EndIf
-                Else
-                    If nOp == 4
-                        cPed := FWGetText("Pedido:", "")
-                        cForn := FWGetText("Fornecedor:", "")
-                        aRes := GEBRESTCOMPED(cUsu, {cPed, cForn})
-                        If aRes[1] == "201"
-                            MsgInfo("Pedido aberto.", "Compras")
-                        Else
-                            MsgStop("Pedido recusado: " + GEBTUIMOTIVO(aRes), "Compras")
-                        EndIf
-                    Else
-                        If nOp == 5
-                            cPed := FWGetText("Pedido:", "")
-                            cProd := FWGetText("Produto:", "")
-                            nQtd := Val(FWGetText("Quantidade:", ""))
-                            nPre := Val(FWGetText("Preco:", ""))
-                            aRes := GEBRESTCOMIT(cUsu, {cPed, cProd, nQtd, nPre})
-                            If aRes[1] == "201"
-                                MsgInfo("Item adicionado.", "Compras")
-                            Else
-                                MsgStop("Item recusado: " + GEBTUIMOTIVO(aRes), "Compras")
-                            EndIf
-                        Else
-                            cNF := FWGetText("NF:", "")
-                            cPed := FWGetText("Pedido:", "")
-                            aRes := GEBRESTCOMENT(cUsu, {cNF, cPed})
-                            If aRes[1] == "201"
-                                MsgInfo("Entrada registrada.", "Compras")
-                            Else
-                                MsgStop("Entrada recusada: " + GEBTUIMOTIVO(aRes), "Compras")
-                            EndIf
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUINUC
-    Tela do modulo Nucleo em ordem de cascata: empresas, unidades,
-    filiais, usuarios, criacoes, vinculo e troca de senha (browse + cadastros).
-    @type Tela
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBTUINUC(cEmp, cFil, cUsu)
-    Local aOps := {"icon:clipboard|Empresas", "icon:buildings|Unidades", "icon:clipboard|Filiais", "icon:users|Usuarios", "icon:plus|+ Nova empresa", "icon:plus|+ Nova unidade", "icon:plus|+ Nova filial", "icon:plus|+ Novo usuario", "icon:users|Vincular usuario", "icon:key|Trocar senha", "icon:lock|Permissoes (super)", "icon:user-check|Ciclo do usuario", "icon:clock|Agendamentos", "icon:arrow-left|< Voltar"}
-    Local nOp := 0
-    Local aRes := {}
-    Local cCod := ""
-    Local cNome := ""
-    Local cPerfil := ""
-    Local cSenha := ""
-    Local cEmps := ""
-    Local cFilN := ""
-    Local cAlvo := ""
-    Local lOk := .F.
-    Local aPol := {}
-    Local aUsr := {}
-    Local cSen2 := ""
-    Local cAtuNome := ""
-    Local cAtuPerfil := ""
-    Local aPf := {}
-    Local lSemVinc := .F.
-    // Nucleo e' administracao: so' ADMIN da empresa ou super. Os demais
-    // so' trocam a propria senha.
-    If !GEBSECPODE(cUsu, "", .F.)
-        cSenha := FWGetText("Nucleo e' restrito a administradores. Nova senha para " + cUsu + " (vazio = voltar):", "", .T.)
-        If !Empty(cSenha)
-            If cSenha != FWGetText("Confirme a senha:", "", .T.)
-                MsgStop("Senhas diferentes.", "Nucleo")
-            Else
-                aRes := GEBTUITROCASENHA(cUsu, "", cSenha, "", "")
-                If aRes[1]
-                    MsgInfo("Senha alterada.", "Nucleo")
-                Else
-                    MsgStop("Troca recusada: " + cValToChar(aRes[2]), "Nucleo")
-                EndIf
-            EndIf
-        EndIf
-        Return .T.
-    EndIf
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Nucleo:")
-        If nOp == Nil
-            Exit
-        EndIf
-        If nOp <= 0 .Or. nOp == 14
-            Exit
-        EndIf
-        If nOp == 11
-            GEBTUIPERMS(cUsu)
-            Loop
-        EndIf
-        If nOp == 12
-            GEBTUICICLO(cUsu)
-            Loop
-        EndIf
-        If nOp == 13
-            GEBTUIAGENDA(cUsu)
-            Loop
-        EndIf
-        If nOp == 1
-            GEBTUIBRW("GE1", "Empresas")
-        Else
-            If nOp == 2
-                GEBTUIBRW("GEU1", "Unidades")
-            Else
-                If nOp == 3
-                    GEBTUIBRW("GEF1", "Filiais")
-                Else
-                    If nOp == 4
-                        GEBTUIBRW("GE2", "Usuarios")
-                    Else
-                        If nOp == 5
-                            cCod := FWGetText("Codigo:", "")
-                            cNome := FWGetText("Nome:", "")
-                            aRes := GEBRESTEMPLSC(cUsu, {cCod, cNome})
-                            If aRes[1] == "201"
-                                MsgInfo("Empresa criada.", "Nucleo")
-                            Else
-                                MsgStop("Criacao recusada: " + GEBTUIMOTIVO(aRes), "Nucleo")
-                            EndIf
-                        Else
-                            If nOp == 6
-                                cCod := FWGetText("Codigo UU (2 digitos):", "")
-                                cNome := FWGetText("Nome:", "")
-                                aRes := GEBRESTUNILSC(cUsu, {cCod, cNome})
-                                If aRes[1] == "201"
-                                    MsgInfo("Unidade criada.", "Nucleo")
-                                Else
-                                    MsgStop("Criacao recusada: " + GEBTUIMOTIVO(aRes), "Nucleo")
-                                EndIf
-                            Else
-                                If nOp == 7
-                                    cCod := FWGetText("Codigo EEUUFF:", "")
-                                    cNome := FWGetText("Nome:", "")
-                                    aRes := GEBRESTFILSC(cUsu, {cCod, cNome})
-                                    If aRes[1] == "201"
-                                        MsgInfo("Filial criada.", "Nucleo")
-                                    Else
-                                        MsgStop("Criacao recusada: " + GEBTUIMOTIVO(aRes), "Nucleo")
-                                    EndIf
-                                Else
-                                    If nOp == 8
-                                        cCod := FWGetText("Codigo (letras, numeros e _ ; sem ponto/espaco):", "")
-                                        cNome := FWGetText("Nome:", "")
-                                        cPerfil := FWGetText("Perfil:", "USUARIO")
-                                        cSenha := FWGetText("Senha (min 8, maiuscula, minuscula, numero e simbolo; sem 123/abc):", "", .T.)
-                                        cEmps := FWGetText("Empresas (codigo):", cEmp)
-                                        cFilN := FWGetText("Filial (vazio=matriz):", "")
-                                        aRes := GEBRESTURLSC(cUsu, {cCod, cNome, cPerfil, cSenha, cEmps, cFilN})
-                                        If aRes[1] == "201"
-                                            MsgInfo("Usuario criado.", "Nucleo")
-                                        Else
-                                            MsgStop("Criacao recusada: " + GEBTUIMOTIVO(aRes), "Nucleo")
-                                        EndIf
-                                    Else
-                                        If nOp == 9
-                                            cAlvo := FWGetText("Usuario:", "")
-                                            cEmps := FWGetText("Empresa:", cEmp)
-                                            cFilN := FWGetText("Filial (vazio=matriz):", "")
-                                            aRes := GEBRESTVINCSC(cUsu, {cAlvo, cEmps, cFilN})
-                                            If aRes[1] == "201"
-                                                MsgInfo("Usuario vinculado.", "Nucleo")
-                                            Else
-                                                MsgStop("Vinculo recusado: " + GEBTUIMOTIVO(aRes), "Nucleo")
-                                            EndIf
-                                        Else
-                                            cAlvo := FWGetText("Usuario (vazio=voce):", "")
-                                            cSenha := FWGetText("Nova senha (vazio=mantem):", "", .T.)
-                                            cSen2 := ""
-                                            If !Empty(cSenha)
-                                                cSen2 := FWGetText("Confirme a senha:", "", .T.)
-                                            EndIf
-                                            If !Empty(cSenha)
-                                                If cSenha != cSen2
-                                                    MsgStop("Senhas diferentes.", "Nucleo")
-                                                    cSenha := Nil
-                                                    cSen2 := Nil
-                                                EndIf
-                                            EndIf
-                                            If cSenha != Nil
-                                                cNome := FWGetText("Nome (vazio=mantem):", "")
-                                                cPerfil := FWGetText("Perfil (vazio=mantem):", "")
-                                                aRes := GEBTUITROCASENHA(cUsu, cAlvo, cSenha, cNome, cPerfil)
-                                                If aRes[1]
-                                                    MsgInfo("Usuario atualizado.", "Nucleo")
-                                                Else
-                                                    If cValToChar(aRes[2]) == "nada_a_alterar"
-                                                        MsgInfo("Nada a alterar.", "Nucleo")
-                                                    Else
-                                                        If cValToChar(aRes[2]) == "somente_super"
-                                                            MsgStop("Somente o super altera a conta super.", "Nucleo")
-                                                        Else
-                                                            If cValToChar(aRes[2]) == "usuario_inexistente"
-                                                                MsgStop("Usuario inexistente.", "Nucleo")
-                                                            Else
-                                                                MsgStop("Operacao recusada: " + cValToChar(aRes[2]), "Nucleo")
-                                                            EndIf
-                                                        EndIf
-                                                    EndIf
-                                                EndIf
-                                            EndIf
-                                        EndIf
-                                EndIf
-                                EndIf
-                            EndIf
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    EndDo
 Return .T.
 
 /*/{Protheus.doc} GEBTUITROCASENHA
@@ -1363,15 +2038,6 @@ Return {{"FISCAL", "PRODUT", "Fiscal - produtos"}, {"FISCAL", "NOTAS", "Fiscal -
     {"FISCAL", "DFE", "Fiscal - documentos eletronicos: emitente, certificado, cancelamento, inutilizacao"}}
 
 // Item do Fiscal para cada opcao do menu Fiscal (1..7).
-Static Function GEBTUIFISITEM(nOp)
-    If nOp == 1 .Or. nOp == 3
-        Return "PRODUT"
-    EndIf
-    If nOp == 2 .Or. nOp == 4
-        Return "NOTAS"
-    EndIf
-Return "APURA"
-
 /*/{Protheus.doc} GEBTUIMODOK
     .T. se o usuario pode entrar no modulo (tem permissao em ao menos um item
     dele). ADMIN e super: tudo (regra padrao de GEBSECRBAC). lAvisa mostra o
@@ -1391,14 +2057,6 @@ User Function GEBTUIMODOK(cUsu, cMenu, lAvisa)
     If lAvisa != Nil .And. lAvisa
         MsgStop("Sem permissao para " + cMenu + ". Peca ao super: Nucleo > Permissoes.", "GEBAN")
     EndIf
-Return .F.
-
-// GEBTUIACAOOK -> checa um item e avisa na tela quando nega.
-Static Function GEBTUIACAOOK(cUsu, cMenu, cItem)
-    If GEBSECRBAC(cUsu, cMenu, cItem)
-        Return .T.
-    EndIf
-    MsgStop("Sem permissao para " + cMenu + "/" + cItem + ". Peca ao super: Nucleo > Permissoes.", "GEBAN")
 Return .F.
 
 /*/{Protheus.doc} GEBTUIPERMSETEMP
@@ -1464,191 +2122,3 @@ User Function GEBTUIPERMSET(cUsuLog, cPerfil, cMenu, cItem, lPermite)
     EndIf
 Return GEBTUIPERMSETEMP(cUsuLog, "*", cPerfil, cMenu, cItem, lPermite)
 
-/*/{Protheus.doc} GEBTUIPERMS
-    Tela Nucleo > Permissoes. Super: escolhe a empresa ou todas. ADMIN da empresa: so' a propria.
-    @type Tela
-    @author Peder Munksgaard
-    @since 07/11/2026
-/*/
-User Function GEBTUIPERMS(cUsu)
-    Local aAreas  := GEBTUIAREAS()
-    Local aLbl    := {}
-    Local aOps    := {"icon:eye|Ver permissoes de um perfil", "icon:check-circle|Conceder area", "icon:x-circle|Revogar area", "icon:arrow-left|< Voltar"}
-    Local nOp     := 0
-    Local nArea   := 0
-    Local nEsc    := 0
-    Local cEmpT   := Lower(AllTrim(cValToChar(GEBDBTenantAtual())))
-    Local cEmpS   := ""
-    Local cPerfil := ""
-    Local aLst    := {}
-    Local cTxt    := ""
-    Local aRes    := {}
-    Local nI      := 0
-
-    If !GEBSECPODE(cUsu, "", .F.)
-        MsgStop("So o ADMIN da empresa ou o super alteram permissoes.", "Nucleo")
-        Return .F.
-    EndIf
-    For nI := 1 To Len(aAreas)
-        AAdd(aLbl, aAreas[nI][3])
-    Next nI
-
-    cEmpS := cEmpT
-    If GEBSECISSUPER(cUsu)
-        nEsc := FWMenuSelect({"icon:buildings|Esta empresa (" + cEmpT + ")", "icon:globe|Todas as empresas (*)"}, "Escopo das permissoes:")
-        If nEsc == Nil .Or. nEsc <= 0
-            Return .T.
-        EndIf
-        If nEsc == 2
-            cEmpS := "*"
-        EndIf
-    EndIf
-
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Permissoes (" + cEmpS + "):")
-        If nOp == Nil .Or. nOp <= 0 .Or. nOp == 4
-            Exit
-        EndIf
-        cPerfil := Upper(AllTrim(cValToChar(FWGetText("Perfil (ex.: USUARIO, OPERADOR):", ""))))
-        If cPerfil == ""
-            Loop
-        EndIf
-        If nOp == 1
-            aLst := GEBSECRBACLISTEMP(cPerfil, cEmpS)
-            cTxt := ""
-            For nI := 1 To Len(aLst)
-                cTxt := cTxt + cValToChar(aLst[nI][1]) + "/" + cValToChar(aLst[nI][2]) + ": "
-                If aLst[nI][3]
-                    cTxt := cTxt + "permitido"
-                Else
-                    cTxt := cTxt + "negado"
-                EndIf
-                cTxt := cTxt + " (" + cValToChar(aLst[nI][4]) + ")" + Chr(10)
-            Next nI
-            If cTxt == ""
-                cTxt := "Nenhuma permissao: o perfil nao entra em nenhum modulo nesta escolha."
-            EndIf
-            MsgInfo(cTxt, "Perfil " + cPerfil)
-        Else
-            nArea := FWMenuSelect(aLbl, "Area:")
-            If nArea == Nil .Or. nArea <= 0 .Or. nArea > Len(aAreas)
-                Loop
-            EndIf
-            aRes := GEBTUIPERMSETEMP(cUsu, cEmpS, cPerfil, aAreas[nArea][1], aAreas[nArea][2], (nOp == 2))
-            If aRes[1]
-                If nOp == 2
-                    MsgInfo(aAreas[nArea][3] + " concedido a " + cPerfil + " em " + cEmpS + ".", "Nucleo")
-                Else
-                    MsgInfo(aAreas[nArea][3] + " revogado de " + cPerfil + " em " + cEmpS + ".", "Nucleo")
-                EndIf
-            Else
-                MsgStop("Recusado: " + cValToChar(aRes[2]), "Nucleo")
-            EndIf
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUICICLO
-    Nucleo > Ciclo do usuario: bloquear, validade, eliminar acessos, excluir, troca obrigatoria
-    e conta de servico. Regras em src/GEBSEC_CICLO.prw (super tudo; ADMIN so' os da propria empresa).
-    @type Tela
-    @since 07/11/2026
-/*/
-Static Function GEBTUICICLO(cUsu)
-    Local aOps  := {"icon:lock|Bloquear usuario (super)", "icon:unlock|Desbloquear usuario (super)", "icon:calendar|Validade do acesso (super)", "icon:user-minus|Eliminar acessos", "icon:trash|Excluir usuario que nunca acessou (super)", "icon:refresh|Forcar troca de senha no proximo logon", "icon:clock|Conta de servico: ignorar troca periodica (super)", "icon:arrow-left|< Voltar"}
-    Local nOp   := 0
-    Local cAlvo := ""
-    Local cData := ""
-    Local cLig  := ""
-    Local aRes  := {}
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Ciclo do usuario:")
-        If nOp == Nil .Or. nOp <= 0 .Or. nOp == 8
-            Exit
-        EndIf
-        cAlvo := AllTrim(FWGetText("Usuario:", ""))
-        If cAlvo == ""
-            Loop
-        EndIf
-        If nOp == 1
-            aRes := GEBSECBLOQUEIA(cUsu, cAlvo, .T.)
-        ElseIf nOp == 2
-            aRes := GEBSECBLOQUEIA(cUsu, cAlvo, .F.)
-        ElseIf nOp == 3
-            cData := AllTrim(FWGetText("Validade AAAAMMDD (vazio = sem validade):", ""))
-            aRes := GEBSECVALIDADE(cUsu, cAlvo, cData)
-        ElseIf nOp == 4
-            aRes := GEBSECELIMINAACESSOS(cUsu, cAlvo)
-        ElseIf nOp == 5
-            aRes := GEBSECEXCLUI(cUsu, cAlvo)
-        ElseIf nOp == 6
-            aRes := GEBSECFORCATROCA(cUsu, cAlvo, .T.)
-        Else
-            cLig := Upper(AllTrim(FWGetText("Ignorar troca periodica? S/N:", "S")))
-            aRes := GEBSECIGNORAEXP(cUsu, cAlvo, (cLig == "S"))
-        EndIf
-        If aRes[1]
-            MsgInfo("Feito: " + cAlvo, "Nucleo")
-        Else
-            MsgStop("Recusado: " + cValToChar(aRes[2]), "Nucleo")
-        EndIf
-    EndDo
-Return .T.
-
-/*/{Protheus.doc} GEBTUIAGENDA
-    Nucleo > Agendamentos: agendar, alterar, desativar e listar rotinas da empresa (src/GEBSCH.prw).
-    @type Tela
-    @since 07/11/2026
-/*/
-Static Function GEBTUIAGENDA(cUsu)
-    Local aOps  := {"icon:plus|Agendar ou alterar rotina", "icon:x-circle|Desativar rotina", "icon:list|Ver agendamentos", "icon:info|Rotinas disponiveis", "icon:arrow-left|< Voltar"}
-    Local nOp   := 0
-    Local cRot  := ""
-    Local cHora := ""
-    Local cDia  := ""
-    Local aL    := {}
-    Local aJ    := {}
-    Local cTxt  := ""
-    Local aRes  := {}
-    Local nI    := 0
-    Do While .T.
-        nOp := FWMenuSelect(aOps, "Agendamentos:")
-        If nOp == Nil .Or. nOp <= 0 .Or. nOp == 5
-            Exit
-        EndIf
-        If nOp == 1
-            cRot := AllTrim(FWGetText("Rotina (DFE_DIST ou SN_APU):", ""))
-            cHora := AllTrim(FWGetText("Horario HHMM (ex.: 0230):", "0230"))
-            cDia := AllTrim(FWGetText("Dia: D (diario) ou M01..M28 (dia do mes):", "D"))
-            aRes := GEBSCHAGENDA(cUsu, cRot, cHora, Upper(cDia), "S")
-            If aRes[1]
-                MsgInfo("Agendamento salvo: " + cRot + " " + cHora + " " + Upper(cDia), "Agendamentos")
-            Else
-                MsgStop("Recusado: " + cValToChar(aRes[2]), "Agendamentos")
-            EndIf
-        ElseIf nOp == 2
-            cRot := AllTrim(FWGetText("Rotina a desativar:", ""))
-            aRes := GEBSCHDESATIVA(cUsu, cRot)
-            If !aRes[1]
-                MsgStop("Recusado: " + cValToChar(aRes[2]), "Agendamentos")
-            EndIf
-        ElseIf nOp == 3
-            aJ := TCSqlQuery("SELECT SCH_ROTINA, SCH_HORA, SCH_DIA, SCH_ATIVO, SCH_ULTEXEC, SCH_STATUS FROM SCH_JOB WHERE D_E_L_E_T_ = ' ' ORDER BY SCH_ROTINA")
-            cTxt := ""
-            For nI := 1 To Len(aJ)
-                cTxt := cTxt + AllTrim(cValToChar(aJ[nI]:SCH_ROTINA)) + " " + AllTrim(cValToChar(aJ[nI]:SCH_HORA)) + " " + AllTrim(cValToChar(aJ[nI]:SCH_DIA)) + " ativo=" + AllTrim(cValToChar(aJ[nI]:SCH_ATIVO)) + " ultima=" + AllTrim(cValToChar(aJ[nI]:SCH_ULTEXEC)) + " " + AllTrim(cValToChar(aJ[nI]:SCH_STATUS)) + Chr(10)
-            Next nI
-            If cTxt == ""
-                cTxt := "Nenhum agendamento nesta empresa."
-            EndIf
-            MsgInfo(cTxt, "Agendamentos")
-        Else
-            aL := GEBSCHROTINAS()
-            cTxt := ""
-            For nI := 1 To Len(aL)
-                cTxt := cTxt + aL[nI][1] + ": " + aL[nI][2] + Chr(10)
-            Next nI
-            MsgInfo(cTxt, "Rotinas disponiveis")
-        EndIf
-    EndDo
-Return .T.

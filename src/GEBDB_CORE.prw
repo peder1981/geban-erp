@@ -91,7 +91,7 @@ Return lOk
 // casas, dinheiro com 2 (arredondando ao centavo o que o float gravou).
 // Idempotente: sem coluna REAL, nao faz nada. Passa por float8: o cast
 // direto real->numeric do Postgres arredonda a 6 digitos (12345,67 -> 12345,7).
-// Migracao: rodar uma vez por empresa (ver o runbook interno), nao a cada login.
+// Migracao: rodar uma vez por empresa (ver docs/07-runbook.md), nao a cada login.
 User Function GEBDBMoedaFix()
     Local aCols := TCSqlQuery("SELECT table_name AS T, column_name AS C FROM information_schema.columns WHERE table_schema = current_schema() AND data_type = 'real' ORDER BY 1, 2")
     Local nI := 0

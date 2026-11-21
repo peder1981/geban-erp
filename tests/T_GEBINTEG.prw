@@ -58,7 +58,7 @@
 #include "../src/GEBSN.prw"
 
 /*/{Protheus.doc} T_GEBINTEG
-    Integracao entre os modulos (documentacao interna).
+    Integracao entre os modulos (docs/superpowers/specs/2026-10-19-integracao-modulos-design.md).
     Valores calculados a mao (IBS 10% + CBS 5% = 15% na NCM N1):
     - Apuracao 202610 (regime REGULAR): cupom de 10 (1,50) + cupom
       cancelado de 20 (fora) + nota NS000001 de 100 (15,00) - devolucao de

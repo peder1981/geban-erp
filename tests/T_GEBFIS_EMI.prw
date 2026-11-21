@@ -56,7 +56,7 @@
 /*/{Protheus.doc} T_GEBFIS_EMI
     Teste da emissao fiscal ONLINE_FILA + split (Task 3 GEB_FISCAL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG()+GEBFMIG() OK; seed GF1/GF2 + GE4 EMISSAO
     ONLINE_FILA => GEBFEMI() retorna AUTORIZADA + round-trip GF3/GF4;
     GE4 EMISSAO SO_FILA => GEBFEMI() retorna EM_FILA + round-trip GE5;

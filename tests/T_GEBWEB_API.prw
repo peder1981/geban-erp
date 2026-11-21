@@ -171,6 +171,9 @@ User Function T_GEBWEB_API()
         ConOut("FAIL: GEBCMIG")
     EndIf
     If !GEBCMMIG()
+        lOk := .F.
+        ConOut("FAIL: GEBCMMIG")
+    EndIf
     If !GEFFILMIG()
         lOk := .F.
         ConOut("FAIL: GEFFILMIG")
@@ -178,9 +181,6 @@ User Function T_GEBWEB_API()
     If !GEUNIMIG()
         lOk := .F.
         ConOut("FAIL: GEUNIMIG")
-    EndIf
-        lOk := .F.
-        ConOut("FAIL: GEBCMMIG")
     EndIf
     TCSqlExec("INSERT INTO GD1 (D_E_L_E_T_, GD1_FILIAL, GD1_GUIA, GD1_COMP, GD1_VALOR, GD1_JUROS, GD1_MULTA, GD1_TOTAL, GD1_STATUS) VALUES (' ', '" + FWxFilial("GE1") + "', 'WAPIG01', '202609', 100, 0, 0, 100, 'ABERTA')")
     TCSqlExec("INSERT INTO GV1 (D_E_L_E_T_, GV1_FILIAL, GV1_PROD, GV1_SALDO, GV1_MIN) VALUES (' ', '" + FWxFilial("GE1") + "', 'WAPI01', 10, 2)")

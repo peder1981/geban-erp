@@ -13,7 +13,7 @@
 /*/{Protheus.doc} T_GEBCTB_BAL
     Teste do balancete GEBBAL e da DRE GEBDRE (Task 4 GEB_CONTABIL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG + GEBCMIG OK; venda 1000 + custo 400 via
     CTBLAN com params GC4; GEBBAL retorna as 3 contas com
     debito/credito exatos; GEBDRE retorna 600 (receita 1000

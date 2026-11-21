@@ -12,7 +12,7 @@
 /*/{Protheus.doc} T_GEBCTB_CTB
     Teste do CTBLAN real partida dobrada (Task 2 GEB_CONTABIL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG + GEBCMIG OK; CTBGRV grava lote e retorna
     codigo nao vazio; CTBLAN com param GC4 grava GC2 (TIPO AUTO)
     + 2xGC3 (D 1.01.001 / C 3.01.001, debito igual a credito);

@@ -57,7 +57,7 @@
     Teste de massa fiscal 100 notas + apuracao mix SIMPLES/REGULAR
     (Task 5 GEB_FISCAL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG()+GEBFMIG() OK; seed GF1 PROD_M5_RT + GF2
     NCM_M5_RT (10/5 exatos) + GE1 EMP_M5 SIMPLES + GE4 EMISSAO
     ONLINE_FILA + GE4 APURACAO AUTO; pre-cleanup via DELETE LIKE

@@ -9,36 +9,12 @@
     @since 21/10/2026
 /*/
 User Function GEBPDVHTML(oReq)
-    Local aDir := {}
-    Local cPath := ""
+    Local cPath := "/opt/geban/public/pdv.html"
     Local cContent := ""
     Local aCtx := {}
-    Local lFound := .F.
-
-    // public/pdv.html: GEBAN_PUBLIC_DIR tem prioridade; depois o caminho
-    // de producao (/opt/geban) e o relativo ao diretorio de trabalho
-    // (instalacao all-in-one no Windows roda com cwd = raiz da instalacao).
-    aDir := {}
-    If !Empty(GetEnv("GEBAN_PUBLIC_DIR"))
-        aAdd(aDir, GetEnv("GEBAN_PUBLIC_DIR"))
-    EndIf
-    aAdd(aDir, "/opt/geban/public")
-    aAdd(aDir, "public")
-    aAdd(aDir, ".")
-    lFound := .F.
-    For nI := 1 To Len(aDir)
-        cPath := AllTrim(aDir[nI]) + "/pdv.html"
-        If File(cPath)
-            lFound := .T.
-            Exit
-        EndIf
-    Next nI
-    If !lFound
-        cPath := ""
-    EndIf
 
     // Tentar ler o arquivo
-    If lFound
+    If File(cPath)
         cContent := MemoRead(cPath)
     Else
         // Fallback: HTML minimal

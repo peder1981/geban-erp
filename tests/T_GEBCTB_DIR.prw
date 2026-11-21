@@ -13,7 +13,7 @@
 /*/{Protheus.doc} T_GEBCTB_DIR
     Teste do lancamento direto GEBCDIR (Task 3 GEB_CONTABIL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG + GEBCMIG OK; GEBCDIR com flag S + perfil
     ADMIN grava GC2 carimbado DIRETO + 2xGC3 balanceado;
     perfil CAIXA tambem autoriza com flag S; sem usuario nega;

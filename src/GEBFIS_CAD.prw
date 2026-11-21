@@ -15,7 +15,7 @@
     GEBFIS_MIG.prw (o teste inclui os dois fontes); sem dData usa a
     data atual via DToS(Date()). Retorna {IBS, CBS} da vigencia que
     contem dData, {0, 0} se GF2 ausente ou sem vigencia valida.
-    Notas AdvPP (balisador, ver registro interno e
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md e
     fis1-report.md): log via ConOut (FWLogMsg nao existe no runtime);
     If Nil em vez de Default (Default sobrescreve incondicionalmente);
     GetArea/RestArea guardados (GetArea retorna "" sem workarea

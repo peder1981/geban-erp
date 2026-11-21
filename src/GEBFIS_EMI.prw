@@ -21,7 +21,7 @@
     na apuracao do IBS/CBS ate ser autorizada.
     GEBFSPL(nTotal, nPartes) divide o valor em parcelas (ultima ajusta
     por diferenca para soma exata); nPartes <= 0 => {nTotal}.
-    Notas AdvPP (balisador, ver registro interno):
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md):
     log via ConOut (FWLogMsg nao existe no runtime); If Nil em vez
     de Default (Default sobrescreve incondicionalmente);
     GetArea/RestArea guardados (GetArea retorna "" sem workarea

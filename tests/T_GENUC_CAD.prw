@@ -8,7 +8,7 @@
 /*/{Protheus.doc} T_GENUC_CAD
     Teste de Empresas GE1 + Usuarios GE2 + Auditoria GE3 (Task 3 GEB_NUCLEO).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG() OK; GEBAUD() retorna .T.; round-trip hit
     via TCSqlQuery em GE3 (linha temporaria removida com DELETE
     ao final, rerun limpo); GEBUSR() miss retorna .F.

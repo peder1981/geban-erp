@@ -9,7 +9,7 @@
 /*/{Protheus.doc} T_GENUC_MNT
     Teste do Mentor GE4 + Fila GE5 + stub CTB_Lanca (Task 4).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG() OK; GEBMNT trava (AVISA_E_TRAVA -> .F.);
     GEBMNT libera com BO (AVISA_E_LIBERA_COM_BO -> .T. + trilha
     GE3 round-trip); GEBMNT desligado/miss -> .T.; GEBFILA grava

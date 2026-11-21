@@ -9,7 +9,7 @@
 /*/{Protheus.doc} T_GEBAN_MASSA
     Teste de massa 100 auditorias + fila (Task 5 GEB_NUCLEO).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG() OK; loop 100x GEBAUD("MASSA", "EV-MASSA-"+N,
     "carga") todos .T.; count via TCSqlQuery (GE3_MOTIV = 'carga')
     Len() == 100; GEBFILA round-trip hit em GE5; cleanup via DELETE

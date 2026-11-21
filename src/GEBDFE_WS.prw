@@ -3,7 +3,7 @@
 /*/{Protheus.doc} GEBDFE_WS
     Enderecos dos webservices da NF-e (55) e NFC-e (65) por UF e ambiente
     (1 producao, 2 homologacao), quem autoriza cada UF (SVRS, SVAN...) e a
-    URL de consulta por chave da NFC-e. FONTE GERADO por script interno gera_dfe_ws.py
+    URL de consulta por chave da NFC-e. FONTE GERADO por ops/gera_dfe_ws.py
     a partir do projeto publico sped-nfe (commit 346c14d, 02/10/2026): nao editar a mao.
     Linha: {modelo, uf, ambiente, servico, url, metodo, operacao, versao}.
     @type Tabela

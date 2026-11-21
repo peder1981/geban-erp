@@ -9,7 +9,7 @@
     - GEBMONATUALIZA(cToken, cRotina): atualiza ultima acao do token.
     - GEBMONLISTAR(): retorna array de usuarios monitorados,
       filtrando por empresa do admin (ADMIN ve todas).
-    - GEBMONDESLIGAR(cToken): remove da SEC_MON + encerra sessao via GEBSECRENDE.
+    - GEBMONDESLIGAR(cToken): remove da SEC_MON + encerra sessao via GEBSECTOKENDEL.
     - GEBMONMETRICAS(): retorna object {nUsuariosOnline, nEmpresasAtivas, nReqPorSeg, gargalos}.
     - GEBMONROTINA(cToken): retorna rotina em execucao.
     Tabela SEC_MON: TOKEN, USUARIO, EMPRESA, FILIAL, IP, LOGINEM, ULTIMAACAO, ROTINA, MEMORIAUSADA.
@@ -355,7 +355,7 @@ Return aRet
 // ============================================================
 
 /*/{Protheus.doc} GEBMONDESLIGAR
-    Remove da SEC_MON e encerra sessao via GEBSECRENDE.
+    Remove da SEC_MON e encerra sessao via GEBSECTOKENDEL.
     @type Desconexao forcada
     @author Peder Munksgaard
     @since 23/09/2026
@@ -385,7 +385,7 @@ User Function GEBMONDESLIGAR(cToken)
     TCSqlExec(cSql)
     ConOut("GEBMON_DESLIGAR: removido da SEC_MON token=" + cTok)
 
-    lOk := GEBSECRENDE(cToken)
+    lOk := GEBSECTOKENDEL(cTok)
 
     If Len(aArea) > 0
         RestArea(aArea)

@@ -20,7 +20,7 @@
     e obrigatorio: RecLock sozinho aborta ("no current record") em
     tabela vazia. O .T. aqui e append (registro novo), nao lock
     indefinido: UNICO caminho de escrita via workarea que persiste no
-    AdvPP (probes Task 3, ver registro interno).
+    AdvPP (probes Task 3, ver .superpowers/sdd/task-3-report.md).
     CTBLAN(cOrigem, nValor) e partida dobrada real: le o param do
     evento em GC4 (com fallback PADRAO), grava GC2 + 2xGC3 via
     CTBGRV com TIPO AUTO e confere debito igual a credito;
@@ -32,7 +32,7 @@
     compartilhado (usado pelo CTBLAN e pelo GEBCDIR): gera lote
     sequencial, grava GC2 + perna D + perna C em GC3, confere as
     somas e retorna o lote ("" se falhar).
-    Notas AdvPP (balisador, ver registro interno):
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md):
     log via ConOut (FWLogMsg nao existe no runtime); If Nil em vez
     de Default (Default sobrescreve incondicionalmente); alias
     literal (GetNextAlias nao existe); GetArea/RestArea guardados

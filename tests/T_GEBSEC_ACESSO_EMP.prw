@@ -1,5 +1,6 @@
 #include "totvs.ch"
 #include "../src/GEBDB_CORE.prw"
+#include "../src/GEBBOLIB.prw"
 #include "../src/GEBDB_TENANT.prw"
 #include "../src/GENUC_MIG.prw"
 #include "../src/_init.prw"
@@ -11,7 +12,7 @@
 #include "../src/GEBSEC_LOGIN.prw"
 
 /*/{Protheus.doc} T_GEBSEC_ACESSO_EMP
-    Testes da gestao de acessos por empresa (documentacao interna).
+    Testes da gestao de acessos por empresa (docs/superpowers/specs/2026-11-07-gestao-acessos-design.md).
     Cobre: login independente da filial do GE2; permissao exige vinculo com a empresa;
     linha exata da empresa sobrepoe a linha '*'; ADMIN vale so' na propria empresa;
     super sem vinculo.

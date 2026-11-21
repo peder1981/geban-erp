@@ -1,5 +1,6 @@
 #include "totvs.ch"
 #include "../src/GEBDB_CORE.prw"
+#include "../src/GEBBOLIB.prw"
 #include "../src/GEBDB_TENANT.prw"
 #include "../src/GEBPERIF_MIG.prw"
 #include "../src/GENUC_MIG.prw"

@@ -102,7 +102,7 @@ User Function T_GEBDFE()
         Return .F.
     EndIf
     If AllTrim(BOSTR(GetEnv("ADVPP_HTTP_INSECURE"))) == ""
-        ConOut("  aviso: rode pela suite (o runner de testes), que sobe o emulador e exporta ADVPP_HTTP_INSECURE")
+        ConOut("  aviso: rode pela suite (tests/run-all.sh), que sobe o emulador e exporta ADVPP_HTTP_INSECURE")
     EndIf
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebdfe CASCADE")
     TCSqlExec("CREATE SCHEMA test_gebdfe")

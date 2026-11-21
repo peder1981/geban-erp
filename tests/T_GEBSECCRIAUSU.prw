@@ -1,5 +1,6 @@
 #include "totvs.ch"
 #include "../src/GEBDB_CORE.prw"
+#include "../src/GEBBOLIB.prw"
 #include "../src/GENUC_MIG.prw"
 #include "../src/GEBDB_TENANT.prw"
 #include "../src/GEBPERIF_MIG.prw"
@@ -20,9 +21,6 @@
 #include "../src/GEBEXP_CTX.prw"
 #include "../src/GEBEXP_REL_BIZ.prw"
 #include "../src/GEBEXP_REL_NUC.prw"
-#include "../src/GEBEXP_WEB.prw"
-#include "../src/GEBGUI_MAIN.prw"
-#include "../src/GEBAN.prw"
 
 /*/{Protheus.doc} T_GEBSECCRIAUSU
     Prova de ponta a ponta que GEBSECCRIAUSU() provisiona um usuario que
@@ -241,22 +239,25 @@ User Function T_GEBSECCRIAUSU()
         EndIf
     EndIf
 
-    // === Login REAL via GEBAN() com o usuario provisionado ===
+    // === Login REAL pelo mesmo caminho do GEBTUI (GEBSECLOGIN -> tenant -> contexto) ===
     If lOk
-        lTmp := GEBAN(cCod, cUsu, cSenha)
-        If !lTmp
+        If GEBSECLOGIN(cUsu, cSenha, "tui") != "OK"
             lOk := .F.
-            ConOut("FAIL: GEBAN(" + cCod + "," + cUsu + ",<senha>) retornou .F.")
+            ConOut("FAIL: GEBSECLOGIN(" + cUsu + ",<senha>) nao autenticou o usuario provisionado")
         EndIf
     EndIf
-    // If aninhado: .AND. nao faz curto-circuito neste runtime, e
-    // GEBEXPIST() abre a workarea GEX (so' existe se o login ocorreu).
+    If lOk
+        If !GEBDBSetTenant(cCod) .Or. !GEBEXPCONTEXTO(cCod, Space(6), cUsu)
+            lOk := .F.
+            ConOut("FAIL: tenant/contexto nao abriu para " + cCod)
+        EndIf
+    EndIf
     If lOk
         If !GEBEXPIST()
             lOk := .F.
-            ConOut("FAIL: GEBEXPIST() .F. apos GEBAN() -- login real nao ocorreu (caiu no fallback)")
+            ConOut("FAIL: GEBEXPIST() .F. apos login -- sessao real nao ocorreu")
         Else
-            ConOut("OK: GEBAN() abriu sessao real para o usuario provisionado por GEBSECCRIAUSU()")
+            ConOut("OK: login real abriu sessao para o usuario provisionado por GEBSECCRIAUSU()")
         EndIf
     EndIf
 

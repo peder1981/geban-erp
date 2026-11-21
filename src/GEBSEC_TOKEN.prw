@@ -80,7 +80,7 @@ User Function GEBSECTOKEN(cUsuario, cEmpresa, cFilial, cIP)
     // qualquer N, inclusive 0 ou 1) nao
     // devolve tipo Date, e sim Numeric (ValType "N"), e DToS() desse
     // resultado retorna "" -- confirmado empiricamente rodando contra o
-    // Postgres. Por isso a virada de dia e' calculada
+    // Postgres real (servidor). Por isso a virada de dia e' calculada
     // manualmente em Y/M/D (GBSTokDiaSeguinte()), sem usar o operador "+"
     // sobre Date(). "/" tambem nao trunca aqui (retorna Double), entao
     // toda a aritmetica usa apenas "+", "-" e "%" (confirmados corretos).

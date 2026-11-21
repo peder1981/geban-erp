@@ -841,7 +841,7 @@ Return {lPronto, aL}
 
 Static Function DFEDicaRede(cMsg)
     If "status 0" $ cMsg .Or. "sem_comunicacao" $ cMsg
-        Return " (confira a internet do servidor e a cadeia de certificados ICP-Brasil; ver o runbook interno)"
+        Return " (confira a internet do servidor e a cadeia de certificados ICP-Brasil; ver docs/07-runbook.md)"
     EndIf
 Return ""
 

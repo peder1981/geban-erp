@@ -16,7 +16,7 @@
     nao lock indefinido: e o UNICO caminho de escrita via workarea
     que persiste no AdvPP (probes Task 3: DbAppend puro nao gravou,
     RecLock(.T.) sozinho so gravou em tabela nao-vazia,
-    DbAppend+RecLock(.T.) gravou em vazia e em duplo insert N=2; ver registro interno).
+    DbAppend+RecLock(.T.) gravou em vazia e em duplo insert N=2; ver .superpowers/sdd/task-3-report.md).
     GEBUSR(cCodUser) valida perfil em GE2: miss -> .F.; perfil CAIXA
     so autoriza se GEBCFG("PERMITE_DIRETA") == "S"; demais perfis -> .T.
     Leitura de GE2 via workarea (DbSelectArea/DbGoTop/scan/DbSkip),
@@ -26,7 +26,7 @@
     do MenuDef de GEBAN.prw); CADMenu() expoe Empresas/Usuarios/
     Auditoria. BrowseDef real chega em task futura; aqui stubs que
     so logam via ConOut.
-    Notas AdvPP (balisador, ver registro interno):
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md):
     log via ConOut (FWLogMsg nao existe no runtime); If Nil em vez
     de Default (Default sobrescreve incondicionalmente); alias
     literal (GetNextAlias nao existe); GetArea/RestArea guardados

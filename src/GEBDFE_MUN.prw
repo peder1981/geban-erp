@@ -2,7 +2,7 @@
 
 /*/{Protheus.doc} GEBDFE_MUN
     Municipios do IBGE (5571), codigo de 7 digitos + nome sem acento.
-    FONTE GERADO por script interno gera_dfe_mun.py a partir da API de localidades do
+    FONTE GERADO por ops/gera_dfe_mun.py a partir da API de localidades do
     IBGE (2026-10-19): nao editar a mao. Linha: "codigo|NOME".
     @type Tabela
     @author Peder Munksgaard

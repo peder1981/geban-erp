@@ -1,5 +1,6 @@
 #include "totvs.ch"
 #include "../src/GEBDB_CORE.prw"
+#include "../src/GEBBOLIB.prw"
 #include "../src/GEBDB_TENANT.prw"
 #include "../src/GEBPERIF_MIG.prw"
 #include "../src/GENUC_MIG.prw"
@@ -194,6 +195,11 @@ User Function T_GEBSEC_POL()
     ConOut("    expira=" + cData)
     If cData != "20260830"
         lOk := .F.
+    EndIf
+    // Bissexto: 01/02/2028 + 90 dias = 01/05/2028 (a soma antiga com fev = 28 dava 02/05)
+    If BODTADD("20280201", 90) != "20280501"
+        lOk := .F.
+        ConOut("    FAIL bissexto: " + BODTADD("20280201", 90))
     EndIf
     // Usuario inexistente -> usa hoje como referencia
     cData := GEBSECPOL_EXPIRACAO("NAOEXISTE")

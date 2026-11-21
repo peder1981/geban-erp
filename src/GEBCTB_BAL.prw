@@ -15,7 +15,7 @@
     GEBDRE(cComp) e a DRE bananica: receitas (grupo 3, credito
     menos debito) menos despesas e custos (grupo 4, debito menos
     credito); retorna o resultado numerico (zero se vazio).
-    Notas AdvPP (balisador, ver registro interno):
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md):
     log via ConOut (FWLogMsg nao existe no runtime); If Nil em vez
     de Default (Default sobrescreve incondicionalmente); alias
     literal (GetNextAlias nao existe); GetArea/RestArea guardados

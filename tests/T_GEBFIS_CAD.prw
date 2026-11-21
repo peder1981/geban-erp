@@ -10,7 +10,7 @@
 /*/{Protheus.doc} T_GEBFIS_CAD
     Teste dos cadastros fiscais GF1/GF2 (Task 2 GEB_FISCAL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GEBFMIG() retorna .T.; GEBFPRO() hit apos INSERT
     temporario em GF1 (retorna {COD, NCM, DESC} com NCM
     conferido); GEBFPRO() miss retorna array vazio; GEBFALI()

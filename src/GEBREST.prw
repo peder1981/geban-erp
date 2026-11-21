@@ -106,6 +106,9 @@ User Function GEBREST(cMetodo, cPath, aParams, cUsuario, cIP)
     Local lRate      := .F.
     Local nLim       := 0
     Local cCfg       := ""
+    Local aRotas     := {}
+    Local aRota      := Nil
+    Local nR         := 0
 
     // Default de parametros.
     If cMetodo == Nil
@@ -159,397 +162,46 @@ User Function GEBREST(cMetodo, cPath, aParams, cUsuario, cIP)
         cPathNorm := SubStr(cPathNorm, 1, Len(cPathNorm) - 1)
     EndDo
 
-    // Roteamento (Ifs sequenciais, sem aninhamento profundo).
-    If cPathNorm == "/health" .Or. cPathNorm == "health"
-        cFunc := "GEBRESTHEALTH"
+    // Roteamento por tabela (GEBRESTROTAS): 404 se nenhum caminho casa,
+    // 403 se o RBAC (que olha so' o caminho) nega, 405 se o metodo nao casa.
+    // RBAC roda ANTES do handler: uma escrita sem permissao nunca executa.
+    If Left(cPathNorm, 1) != "/"
+        cPathNorm := "/" + cPathNorm
     EndIf
-    If SubStr(cPathNorm, 1, 10) == "/usuarios/" .And. Len(cPathNorm) > 10
-        cFunc := "GEBRESTURGET"
+    If cMetodo == "DEL"
+        cMetodo := "DELETE"
     EndIf
-    If cPathNorm == "/usuarios" .Or. cPathNorm == "/usuarios/"
-        cFunc := "GEBRESTUSRLST"
-    EndIf
-    If cPathNorm == "/empresas"
-        cFunc := "GEBRESTEMPLST"
-    EndIf
-    If cPathNorm == "/produtos"
-        cFunc := "GEBRESTPRDLST"
-    EndIf
-    If cPathNorm == "/notas"
-        cFunc := "GEBRESTNOTLST"
-    EndIf
-    If cPathNorm == "/financeiro/fluxo"
-        cFunc := "GEBRESTFLXLST"
-    EndIf
-    If cPathNorm == "/financeiro/contas"
-        cFunc := "GEBRESTCONLST"
-    EndIf
-    If SubStr(cPathNorm, 1, 18) == "/fiscal/relatorio/"
-        cFunc := "GEBRESTRELFISSC"
-    EndIf
-    If cPathNorm == "/relatorios/gerencial"
-        cFunc := "GEBRESTRELGER"
-    EndIf
-    If cPathNorm == "/monitor/usuarios"
-        cFunc := "GEBRESTMONUSU"
-    EndIf
-    If SubStr(cPathNorm, 1, 16) == "/monitor/sessao/"
-        cFunc := "GEBRESTMONDES"
-    EndIf
-    If cPathNorm == "/derrama/guias"
-        cFunc := "GEBRESTDERLST"
-    EndIf
-    If cPathNorm == "/estoque"
-        cFunc := "GEBRESTESTLST"
-    EndIf
-    If cPathNorm == "/estoque/vendas"
-        cFunc := "GEBRESTVENLST"
-    EndIf
-    If cPathNorm == "/contabil/lancamentos"
-        cFunc := "GEBRESTCTBLST"
-    EndIf
-    If cPathNorm == "/contabil/contas"
-        cFunc := "GEBRESTCTCLST"
-    EndIf
-    If cPathNorm == "/compras/pedidos"
-        cFunc := "GEBRESTCOMLST"
-    EndIf
-    If cPathNorm == "/compras/fornecedores"
-        cFunc := "GEBRESTFORLST"
-    EndIf
-
-    If cPathNorm == "/filiais"
-        cFunc := "GEBRESTFILLST"
-    EndIf
-    If cPathNorm == "/derrama/gerar"
-        cFunc := "GEBRESTDERGER"
-    EndIf
-    If cPathNorm == "/derrama/baixar"
-        cFunc := "GEBRESTDERBAI"
-    EndIf
-    If cPathNorm == "/derrama/parcelar"
-        cFunc := "GEBRESTDERPAR"
-    EndIf
-    If cPathNorm == "/derrama/juros"
-        cFunc := "GEBRESTDERJUR"
-    EndIf
-    If cPathNorm == "/derrama/protestar"
-        cFunc := "GEBRESTDERPRO"
-    EndIf
-    If cPathNorm == "/estoque/vender"
-        cFunc := "GEBRESTESTVEN"
-    EndIf
-    If cPathNorm == "/estoque/fiados"
-        cFunc := "GEBRESTESTFIA"
-    EndIf
-    If cPathNorm == "/estoque/fiados/juros"
-        cFunc := "GEBRESTESTFIJ"
-    EndIf
-    If cPathNorm == "/contabil/lancar"
-        cFunc := "GEBRESTCTBDIR"
-    EndIf
-    If cPathNorm == "/financeiro/baixar"
-        cFunc := "GEBRESTFINBAI"
-    EndIf
-    If cPathNorm == "/compras/itens"
-        cFunc := "GEBRESTCOMIT"
-    EndIf
-    If cPathNorm == "/compras/entradas"
-        cFunc := "GEBRESTCOMENT"
-    EndIf
-    If cPathNorm == "/fiscal/apurar"
-        cFunc := "GEBRESTFISAPU"
-    EndIf
-    If cPathNorm == "/fiscal/creditos"
-        cFunc := "GEBRESTFISCRE"
-    EndIf
-    If cPathNorm == "/fiscal/simples/config"
-        cFunc := "GEBRESTSNCFG"
-    EndIf
-    If cPathNorm == "/fiscal/simples/folha"
-        cFunc := "GEBRESTSNFOL"
-    EndIf
-    If cPathNorm == "/fiscal/simples/apurar"
-        cFunc := "GEBRESTSNAPU"
-    EndIf
-    If cPathNorm == "/fiscal/simples/atividade"
-        cFunc := "GEBRESTSNATV"
-    EndIf
-    If cPathNorm == "/fiscal/simples/produto"
-        cFunc := "GEBRESTSNPRD"
-    EndIf
-    If cPathNorm == "/fiscal/simples/exportacao"
-        cFunc := "GEBRESTSNEXP"
-    EndIf
-    If cPathNorm == "/fiscal/simples/feriado"
-        cFunc := "GEBRESTSNFER"
-    EndIf
-    If SubStr(cPathNorm, 1, 24) == "/fiscal/simples/extrato/"
-        cFunc := "GEBRESTSNEXT"
-    EndIf
-    If SubStr(cPathNorm, 1, 22) == "/fiscal/simples/anual/"
-        cFunc := "GEBRESTSNANU"
-    EndIf
-    If SubStr(cPathNorm, 1, 4) == "/bo/"
-        cFunc := "GEBRESTBO"
-    EndIf
-    If SubStr(cPathNorm, 1, 20) == "/contabil/balancete/"
-        cFunc := "GEBRESTCTBBAL"
-    EndIf
-    If SubStr(cPathNorm, 1, 14) == "/contabil/dre/"
-        cFunc := "GEBRESTCTBDRE"
-    EndIf
-    If cPathNorm == "/unidades"
-        cFunc := "GEBRESTUNILST"
-    EndIf
-    If cPathNorm == "/vinculos"
-        cFunc := "GEBRESTVINCSC"
-    EndIf
-    If cPathNorm == "/public/empresas"
-        cFunc := "GEBRESTPUBEMP"
-    EndIf
-    If cFunc == ""
-        cStatus := "404"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"route_not_found: " + cPathNorm})
+    aRotas := GEBRESTROTAS()
+    For nR := 1 To Len(aRotas)
+        If GEBRESTCASA(aRotas[nR], cPathNorm)
+            If aRota == Nil
+                aRota := aRotas[nR]
+            EndIf
+            If aRotas[nR][1] == cMetodo
+                aRota := aRotas[nR]
+                Exit
+            EndIf
+        EndIf
+    Next nR
+    If aRota == Nil
         If Len(aArea) > 0
             RestArea(aArea)
         EndIf
-        Return {cStatus, cBody}
+        Return {"404", GEBRESTJSONRESP(.F., Nil, {"route_not_found: " + cPathNorm})}
     EndIf
-
-    // RBAC ANTES de qualquer handler (exceto /health). Precisa rodar aqui,
-    // antes do dispatch: se rodasse depois, um POST/PUT/DELETE sem
-    // permissao ja' teria executado a escrita e so' a resposta viraria 403.
-    If cFunc != "GEBRESTHEALTH"
-        If !GEBRESTRBAC(cUsuarioN, cPathNorm, cMetodo)
-            cStatus := "403"
-            cBody := GEBRESTJSONRESP(.F., Nil, {"access_denied: usuario " + cUsuarioN + " sem permissao para " + cPathNorm})
+    cFunc := aRota[2]
+    If aRota[2] != "/health"
+        If !GEBRESTRBAC(cUsuarioN, cPathNorm, cMetodo, aRota)
             If Len(aArea) > 0
                 RestArea(aArea)
             EndIf
-            Return {cStatus, cBody}
+            Return {"403", GEBRESTJSONRESP(.F., Nil, {"access_denied: usuario " + cUsuarioN + " sem permissao para " + cPathNorm})}
         EndIf
     EndIf
-
-    // Mapeamento metodo HTTP -> funcao de acao. O roteamento acima so'
-    // olha o PATH e produz o nome "de listagem/consulta" de cada rota
-    // (GEBRESTUSRLST, GEBRESTURGET, GEBRESTEMPLST, ...); os blocos
-    // POST/PUT/DELETE abaixo comparam contra ESSES MESMOS nomes de rota
-    // e chamam o handler de escrita correspondente. (Antes comparavam
-    // contra os nomes dos handlers de escrita -- GEBRESTURLSC etc. --
-    // que o roteamento nunca atribui, e todo POST/PUT/DELETE caia em 405.)
-    If cMetodo == "GET"
-        // GET handlers (Ifs sequenciais).
-        If cFunc == "GEBRESTHEALTH"
-            aRes := GEBRESTHEALTH(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTUSRLST"
-            aRes := GEBRESTUSRLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTURGET"
-            aRes := GEBRESTURGET(cUsuarioN, SubStr(cPathNorm, 11))
-        EndIf
-        If cFunc == "GEBRESTEMPLST"
-            aRes := GEBRESTEMPLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTPRDLST"
-            aRes := GEBRESTPRDLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTNOTLST"
-            aRes := GEBRESTNOTLST(cUsuarioN, aParamsN)
-        EndIf
-        If cFunc == "GEBRESTFLXLST"
-            aRes := GEBRESTFLXLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTCONLST"
-            aRes := GEBRESTCONLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTRELFISSC"
-            aRes := GEBRESTRELFISSC(cUsuarioN, SubStr(cPathNorm, 19))
-        EndIf
-        If cFunc == "GEBRESTSNEXT"
-            aRes := GEBRESTSNREL(GEBSNEXTRATO(SubStr(cPathNorm, 25)))
-        EndIf
-        If cFunc == "GEBRESTSNANU"
-            aRes := GEBRESTSNREL(GEBSNANUAL(SubStr(cPathNorm, 23)))
-        EndIf
-        If cFunc == "GEBRESTBO"
-            aRes := GEBRESTBO("GET", SubStr(cPathNorm, 5), aParamsN, cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTRELGER"
-            aRes := GEBRESTRELGER(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTMONUSU"
-            aRes := GEBRESTMONUSU(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTDERLST"
-            aRes := GEBRESTDERLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTESTLST"
-            aRes := GEBRESTESTLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTVENLST"
-            aRes := GEBRESTVENLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTCTBLST"
-            aRes := GEBRESTCTBLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTCTCLST"
-            aRes := GEBRESTCTCLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTCOMLST"
-            aRes := GEBRESTCOMLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTFORLST"
-            aRes := GEBRESTFORLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTCTBBAL"
-            aRes := GEBRESTCTBBAL(cUsuarioN, SubStr(cPathNorm, 21))
-        EndIf
-        If cFunc == "GEBRESTCTBDRE"
-            aRes := GEBRESTCTBDRE(cUsuarioN, SubStr(cPathNorm, 15))
-        EndIf
-        If cFunc == "GEBRESTUNILST"
-            aRes := GEBRESTUNILST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTFILLST"
-            aRes := GEBRESTFILLST(cUsuarioN)
-        EndIf
-        If cFunc == "GEBRESTPUBEMP"
-            aRes := GEBRESTPUBEMP(cUsuarioN)
-        EndIf
-        If Len(aRes) == 0
-            cStatus := "405"
-            aRes := {cStatus, GEBRESTJSONRESP(.F., Nil, {"metodo_nao_permitido: GET " + cPathNorm})}
-        EndIf
+    If aRota[1] == cMetodo
+        aRes := Eval(aRota[6], cUsuarioN, SubStr(cPathNorm, Len(aRota[2]) + 1), aParamsN, cMetodo)
     Else
-        If cMetodo == "POST"
-            If cFunc == "GEBRESTUNILST"
-                aRes := GEBRESTUNILSC(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTUSRLST"
-                aRes := GEBRESTURLSC(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTEMPLST"
-                aRes := GEBRESTEMPLSC(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTPRDLST"
-                aRes := GEBRESTPRDLSC(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTNOTLST"
-                aRes := GEBRESTNOTPOST(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTFILLST"
-                aRes := GEBRESTFILSC(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTVINCSC"
-                aRes := GEBRESTVINCSC(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTDERGER"
-                aRes := GEBRESTDERGER(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTDERBAI"
-                aRes := GEBRESTDERBAI(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTDERPAR"
-                aRes := GEBRESTDERPAR(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTDERJUR"
-                aRes := GEBRESTDERJUR(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTDERPRO"
-                aRes := GEBRESTDERPRO(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTESTVEN"
-                aRes := GEBRESTESTVEN(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTESTFIA"
-                aRes := GEBRESTESTFIA(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTESTFIJ"
-                aRes := GEBRESTESTFIJ(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTCTBDIR"
-                aRes := GEBRESTCTBDIR(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTCONLST"
-                aRes := GEBRESTFINCON(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTFINBAI"
-                aRes := GEBRESTFINBAI(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTFORLST"
-                aRes := GEBRESTCOMFOR(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTCOMLST"
-                aRes := GEBRESTCOMPED(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTCOMIT"
-                aRes := GEBRESTCOMIT(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTCOMENT"
-                aRes := GEBRESTCOMENT(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTFISAPU"
-                aRes := GEBRESTFISAPU(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTFISCRE"
-                aRes := GEBRESTFISCRE(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTSNCFG"
-                aRes := GEBRESTSNCFG(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTSNFOL"
-                aRes := GEBRESTSNFOL(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTSNAPU"
-                aRes := GEBRESTSNAPU(cUsuarioN, aParamsN)
-            EndIf
-            If cFunc == "GEBRESTSNATV"
-                aRes := GEBRESTSNRESP(GEBSNATV(GEBRESTSNARG(aParamsN, 1), GEBRESTSNARG(aParamsN, 2), GEBRESTSNARG(aParamsN, 3)), {})
-            EndIf
-            If cFunc == "GEBRESTSNPRD"
-                aRes := GEBRESTSNRESP(GEBSNPRD(GEBRESTSNARG(aParamsN, 1), GEBRESTSNARG(aParamsN, 2), GEBRESTSNARG(aParamsN, 3), GEBRESTSNARG(aParamsN, 4)), {})
-            EndIf
-            If cFunc == "GEBRESTSNEXP"
-                aRes := GEBRESTSNRESP(GEBSNEXP(GEBRESTSNARG(aParamsN, 1), GEBRESTSNARG(aParamsN, 2)), {})
-            EndIf
-            If cFunc == "GEBRESTSNFER"
-                aRes := GEBRESTSNRESP(GEBSNFER(GEBRESTSNARG(aParamsN, 1), GEBRESTSNARG(aParamsN, 2)), {})
-            EndIf
-            If cFunc == "GEBRESTBO"
-                aRes := GEBRESTBO("POST", SubStr(cPathNorm, 5), aParamsN, cUsuarioN)
-            EndIf
-            If Len(aRes) == 0
-                cStatus := "405"
-                aRes := {cStatus, GEBRESTJSONRESP(.F., Nil, {"metodo_nao_permitido: POST " + cPathNorm})}
-            EndIf
-        Else
-            If cMetodo == "PUT"
-                If cFunc == "GEBRESTURGET"
-                    aRes := GEBRESTUSRUPD(cUsuarioN, SubStr(cPathNorm, 11), aParamsN)
-                Else
-                    cStatus := "405"
-                    aRes := {cStatus, GEBRESTJSONRESP(.F., Nil, {"metodo_nao_permitido: PUT " + cPathNorm})}
-                EndIf
-            Else
-                If cMetodo == "DELETE" .Or. cMetodo == "DEL"
-                    If cFunc == "GEBRESTURGET"
-                        aRes := GEBRESTUSRRM(cUsuarioN, SubStr(cPathNorm, 11))
-                    Else
-                        If cFunc == "GEBRESTMONDES"
-                            aRes := GEBRESTMONDES(cUsuarioN, SubStr(cPathNorm, 17))
-                        Else
-                            cStatus := "405"
-                            aRes := {cStatus, GEBRESTJSONRESP(.F., Nil, {"metodo_nao_permitido: DELETE " + cPathNorm})}
-                        EndIf
-                    EndIf
-                Else
-                    cStatus := "405"
-                    aRes := {cStatus, GEBRESTJSONRESP(.F., Nil, {"metodo_nao_permitido: " + cMetodo})}
-                EndIf
-            EndIf
-        EndIf
+        aRes := {"405", GEBRESTJSONRESP(.F., Nil, {"metodo_nao_permitido: " + cMetodo + " " + cPathNorm})}
     EndIf
 
     // Monta resposta.
@@ -566,6 +218,93 @@ User Function GEBREST(cMetodo, cPath, aParams, cUsuario, cIP)
     EndIf
 Return {cStatus, cBody}
 
+/*/{Protheus.doc} GEBRESTROTAS
+    Tabela de rotas do GEBREST: {metodo, caminho, (livre), menu RBAC, item RBAC,
+    bloco}. Caminho terminado em "/" e' prefixo: o resto vai ao bloco como "a"
+    (u = usuario, p = parametros, m = metodo). Menu "*" = livre para usuario
+    autenticado; menu "" = sem RBAC proprio (/health, /bo usa GEBBOROTA).
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+    @return array, rotas
+/*/
+Static Function GEBRESTROTAS()
+Return {;
+        {"GET", "/health", .F., "", "", {|u, a, p, m| GEBRESTHEALTH(u)}},;
+        {"GET", "/public/empresas", .F., "*", "", {|u, a, p, m| GEBRESTPUBEMP(u)}},;
+        {"GET", "/usuarios", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTUSRLST(u)}},;
+        {"POST", "/usuarios", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTURLSC(u, p)}},;
+        {"GET", "/usuarios/", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTURGET(u, a)}},;
+        {"PUT", "/usuarios/", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTUSRUPD(u, a, p)}},;
+        {"DELETE", "/usuarios/", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTUSRRM(u, a)}},;
+        {"GET", "/empresas", .F., "CONFIG", "EMPRES", {|u, a, p, m| GEBRESTEMPLST(u)}},;
+        {"POST", "/empresas", .F., "CONFIG", "EMPRES", {|u, a, p, m| GEBRESTEMPLSC(u, p)}},;
+        {"GET", "/unidades", .F., "CONFIG", "EMPRES", {|u, a, p, m| GEBRESTUNILST(u)}},;
+        {"POST", "/unidades", .F., "CONFIG", "EMPRES", {|u, a, p, m| GEBRESTUNILSC(u, p)}},;
+        {"GET", "/filiais", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTFILLST(u)}},;
+        {"POST", "/filiais", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTFILSC(u, p)}},;
+        {"POST", "/vinculos", .F., "SEGURANCA", "USUARI", {|u, a, p, m| GEBRESTVINCSC(u, p)}},;
+        {"GET", "/produtos", .F., "FISCAL", "PRODUT", {|u, a, p, m| GEBRESTPRDLST(u)}},;
+        {"POST", "/produtos", .F., "FISCAL", "PRODUT", {|u, a, p, m| GEBRESTPRDLSC(u, p)}},;
+        {"GET", "/notas", .F., "FISCAL", "NOTAS", {|u, a, p, m| GEBRESTNOTLST(u, p)}},;
+        {"POST", "/notas", .F., "FISCAL", "NOTAS", {|u, a, p, m| GEBRESTNOTPOST(u, p)}},;
+        {"GET", "/fiscal/relatorio/", .F., "FISCAL", "RELATF", {|u, a, p, m| GEBRESTRELFISSC(u, a)}},;
+        {"POST", "/fiscal/apurar", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTFISAPU(u, p)}},;
+        {"POST", "/fiscal/creditos", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTFISCRE(u, p)}},;
+        {"POST", "/fiscal/simples/config", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNCFG(u, p)}},;
+        {"POST", "/fiscal/simples/folha", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNFOL(u, p)}},;
+        {"POST", "/fiscal/simples/apurar", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNAPU(u, p)}},;
+        {"POST", "/fiscal/simples/atividade", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNRESP(GEBSNATV(GEBRESTSNARG(p, 1), GEBRESTSNARG(p, 2), GEBRESTSNARG(p, 3)), {})}},;
+        {"POST", "/fiscal/simples/produto", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNRESP(GEBSNPRD(GEBRESTSNARG(p, 1), GEBRESTSNARG(p, 2), GEBRESTSNARG(p, 3), GEBRESTSNARG(p, 4)), {})}},;
+        {"POST", "/fiscal/simples/exportacao", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNRESP(GEBSNEXP(GEBRESTSNARG(p, 1), GEBRESTSNARG(p, 2)), {})}},;
+        {"POST", "/fiscal/simples/feriado", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNRESP(GEBSNFER(GEBRESTSNARG(p, 1), GEBRESTSNARG(p, 2)), {})}},;
+        {"GET", "/fiscal/simples/extrato/", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNREL(GEBSNEXTRATO(a))}},;
+        {"GET", "/fiscal/simples/anual/", .F., "FISCAL", "APURA", {|u, a, p, m| GEBRESTSNREL(GEBSNANUAL(a))}},;
+        {"GET", "/financeiro/fluxo", .F., "FINANCEIRO", "FLUXO", {|u, a, p, m| GEBRESTFLXLST(u)}},;
+        {"GET", "/financeiro/contas", .F., "FINANCEIRO", "FLUXO", {|u, a, p, m| GEBRESTCONLST(u)}},;
+        {"POST", "/financeiro/contas", .F., "FINANCEIRO", "FLUXO", {|u, a, p, m| GEBRESTFINCON(u, p)}},;
+        {"POST", "/financeiro/baixar", .F., "FINANCEIRO", "FLUXO", {|u, a, p, m| GEBRESTFINBAI(u, p)}},;
+        {"GET", "/relatorios/gerencial", .F., "RELATORIOS", "GERENC", {|u, a, p, m| GEBRESTRELGER(u)}},;
+        {"GET", "/monitor/usuarios", .F., "MONITOR", "MONITR", {|u, a, p, m| GEBRESTMONUSU(u)}},;
+        {"DELETE", "/monitor/sessao/", .F., "MONITOR", "MONITR", {|u, a, p, m| GEBRESTMONDES(u, a)}},;
+        {"GET", "/derrama/guias", .F., "DERRAMA", "GUIAS", {|u, a, p, m| GEBRESTDERLST(u)}},;
+        {"POST", "/derrama/gerar", .F., "DERRAMA", "GUIAS", {|u, a, p, m| GEBRESTDERGER(u, p)}},;
+        {"POST", "/derrama/baixar", .F., "DERRAMA", "GUIAS", {|u, a, p, m| GEBRESTDERBAI(u, p)}},;
+        {"POST", "/derrama/parcelar", .F., "DERRAMA", "GUIAS", {|u, a, p, m| GEBRESTDERPAR(u, p)}},;
+        {"POST", "/derrama/juros", .F., "DERRAMA", "GUIAS", {|u, a, p, m| GEBRESTDERJUR(u, p)}},;
+        {"POST", "/derrama/protestar", .F., "DERRAMA", "GUIAS", {|u, a, p, m| GEBRESTDERPRO(u, p)}},;
+        {"GET", "/estoque", .F., "ESTOQUE", "ESTOQ", {|u, a, p, m| GEBRESTESTLST(u)}},;
+        {"GET", "/estoque/vendas", .F., "ESTOQUE", "ESTOQ", {|u, a, p, m| GEBRESTVENLST(u)}},;
+        {"POST", "/estoque/vender", .F., "ESTOQUE", "ESTOQ", {|u, a, p, m| GEBRESTESTVEN(u, p)}},;
+        {"POST", "/estoque/fiados", .F., "ESTOQUE", "ESTOQ", {|u, a, p, m| GEBRESTESTFIA(u, p)}},;
+        {"POST", "/estoque/fiados/juros", .F., "ESTOQUE", "ESTOQ", {|u, a, p, m| GEBRESTESTFIJ(u, p)}},;
+        {"GET", "/contabil/lancamentos", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTBLST(u)}},;
+        {"GET", "/contabil/contas", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTCLST(u)}},;
+        {"POST", "/contabil/lancar", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTBDIR(u, p)}},;
+        {"GET", "/contabil/balancete/", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTBBAL(u, a)}},;
+        {"GET", "/contabil/dre/", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTBDRE(u, a)}},;
+        {"GET", "/compras/pedidos", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMLST(u)}},;
+        {"POST", "/compras/pedidos", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMPED(u, p)}},;
+        {"GET", "/compras/fornecedores", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTFORLST(u)}},;
+        {"POST", "/compras/fornecedores", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMFOR(u, p)}},;
+        {"POST", "/compras/itens", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMIT(u, p)}},;
+        {"POST", "/compras/entradas", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMENT(u, p)}},;
+        {"GET", "/bo/", .F., "", "", {|u, a, p, m| GEBRESTBO(m, a, p, u)}},;
+        {"POST", "/bo/", .F., "", "", {|u, a, p, m| GEBRESTBO(m, a, p, u)}}}
+
+/*/{Protheus.doc} GEBRESTCASA
+    O caminho pedido casa com a rota? Exato, ou prefixo (rota terminada em
+    "/") com sufixo nao vazio.
+    @type function
+    @author Peder Munksgaard
+    @since 21/11/2026
+/*/
+Static Function GEBRESTCASA(aRota, cPath)
+    If Right(aRota[2], 1) == "/"
+        Return Len(cPath) > Len(aRota[2]) .And. Left(cPath, Len(aRota[2])) == aRota[2]
+    EndIf
+Return cPath == aRota[2]
+
 // ===== UTILIDADES =====
 
 /*/{Protheus.doc} GEBRESTRBAC
@@ -579,102 +318,15 @@ Return {cStatus, cBody}
     @param cMetodo Metodo HTTP
     @return .T. se permitido, .F. caso contrario
 /*/
-Static Function GEBRESTRBAC(cUsuario, cPath, cMetodo)
-    Local lPermit := .F.
-    Local cMen    := ""
-    Local cItm    := ""
+Static Function GEBRESTRBAC(cUsuario, cPath, cMetodo, aRota)
+    Local cMen    := aRota[4]
+    Local cItm    := aRota[5]
     Local aBo     := {}
-
     If cUsuario == ""
         Return .F.
     EndIf
-
-    // mapeamento path -> menu, item (Ifs sequenciais).
-    If cPath == "/health"
+    If cMen == "*"
         Return .T.
-    EndIf
-    If cPath == "/public/empresas"
-        Return .T.
-    EndIf
-    If cPath == "/usuarios" .Or. SubStr(cPath, 1, 10) == "/usuarios/"
-        cMen := "SEGURANCA"
-        cItm := "USUARI"
-    EndIf
-    If cPath == "/empresas"
-        cMen := "CONFIG"
-        cItm := "EMPRES"
-    EndIf
-    If cPath == "/produtos"
-        cMen := "FISCAL"
-        cItm := "PRODUT"
-    EndIf
-    If cPath == "/notas"
-        cMen := "FISCAL"
-        cItm := "NOTAS"
-    EndIf
-    If cPath == "/financeiro/fluxo" .Or. cPath == "/financeiro/contas"
-        cMen := "FINANCEIRO"
-        cItm := "FLUXO"
-    EndIf
-    If SubStr(cPath, 1, 18) == "/fiscal/relatorio/"
-        cMen := "FISCAL"
-        cItm := "RELATF"
-    EndIf
-    If cPath == "/relatorios/gerencial"
-        cMen := "RELATORIOS"
-        cItm := "GERENC"
-    EndIf
-    If cPath == "/monitor/usuarios" .Or. SubStr(cPath, 1, 16) == "/monitor/sessao/"
-        cMen := "MONITOR"
-        cItm := "MONITR"
-    EndIf
-    If cPath == "/derrama/guias"
-        cMen := "DERRAMA"
-        cItm := "GUIAS"
-    EndIf
-    If cPath == "/estoque" .Or. cPath == "/estoque/vendas"
-        cMen := "ESTOQUE"
-        cItm := "ESTOQ"
-    EndIf
-    If cPath == "/contabil/lancamentos" .Or. cPath == "/contabil/contas"
-        cMen := "CONTABIL"
-        cItm := "LANCTO"
-    EndIf
-    If cPath == "/compras/pedidos" .Or. cPath == "/compras/fornecedores"
-        cMen := "COMPRAS"
-        cItm := "PEDID"
-    EndIf
-    If cPath == "/unidades"
-        cMen := "CONFIG"
-        cItm := "EMPRES"
-    EndIf
-    If cPath == "/filiais" .Or. cPath == "/vinculos"
-        cMen := "SEGURANCA"
-        cItm := "USUARI"
-    EndIf
-    If cPath == "/derrama/gerar" .Or. cPath == "/derrama/baixar" .Or. cPath == "/derrama/parcelar" .Or. cPath == "/derrama/juros" .Or. cPath == "/derrama/protestar"
-        cMen := "DERRAMA"
-        cItm := "GUIAS"
-    EndIf
-    If cPath == "/estoque/vender" .Or. cPath == "/estoque/fiados" .Or. cPath == "/estoque/fiados/juros"
-        cMen := "ESTOQUE"
-        cItm := "ESTOQ"
-    EndIf
-    If cPath == "/contabil/lancar" .Or. SubStr(cPath, 1, 20) == "/contabil/balancete/" .Or. SubStr(cPath, 1, 14) == "/contabil/dre/"
-        cMen := "CONTABIL"
-        cItm := "LANCTO"
-    EndIf
-    If cPath == "/financeiro/baixar"
-        cMen := "FINANCEIRO"
-        cItm := "FLUXO"
-    EndIf
-    If cPath == "/compras/fornecedores" .Or. cPath == "/compras/pedidos" .Or. cPath == "/compras/itens" .Or. cPath == "/compras/entradas"
-        cMen := "COMPRAS"
-        cItm := "PEDID"
-    EndIf
-    If cPath == "/fiscal/apurar" .Or. cPath == "/fiscal/creditos" .Or. SubStr(cPath, 1, 16) == "/fiscal/simples/"
-        cMen := "FISCAL"
-        cItm := "APURA"
     EndIf
     If SubStr(cPath, 1, 4) == "/bo/"
         aBo := GEBBOROTA(SubStr(cPath, 5), cMetodo)
@@ -696,8 +348,7 @@ Static Function GEBRESTRBAC(cUsuario, cPath, cMetodo)
             Return .F.
         EndIf
     EndIf
-    lPermit := GEBSECRBAC(cUsuario, cMen, cItm)
-Return lPermit
+Return GEBSECRBAC(cUsuario, cMen, cItm)
 
 /*/{Protheus.doc} GEBRESTJSONRESP
     Monta resposta JSON padrao.
@@ -791,9 +442,9 @@ Static Function GEBRESTJSONENC(xVal)
     // Logical.
     If ValType(xVal) == "L"
         If xVal
-            Return ".true."
+            Return "true"
         Else
-            Return ".false."
+            Return "false"
         EndIf
     EndIf
 
@@ -861,225 +512,6 @@ Static Function GEBRESTJSONESCAPE(cStr)
         EndIf
     Next nIdx
 Return cRet
-
-/*/{Protheus.doc} GEBRESTJSONDEC
-    Decodifica JSON simples para array. Suporta objetos {} e arrays [].
-    Retorna array de tokens {type, value} onde type e "obj","arr","str","num","bool","null".
-    @type Funcao auxiliar JSON
-    @author Peder Munksgaard
-    @since 23/09/2026
-    @param cJson String JSON
-    @return Array de tokens
-/*/
-Static Function GEBRESTJSONDEC(cJson)
-    Local aRet    := {}
-    Local cStr    := ""
-    Local nLen    := 0
-    Local nIdx    := 0
-    Local cChar   := ""
-    Local cTok    := ""
-    Local lInStr  := .F.
-    Local cAcc    := ""
-    Local cQ      := Chr(34)
-    Local cBS     := Chr(92)
-
-    If cJson == Nil
-        Return aRet
-    EndIf
-
-    nLen := Len(cJson)
-    cAcc := ""
-    For nIdx := 1 To nLen
-        cChar := SubStr(cJson, nIdx, 1)
-        If cChar == cQ .And. (nIdx == 1 .Or. SubStr(cJson, nIdx - 1, 1) != cBS)
-            If lInStr
-                // Fim da string.
-                lInStr := .F.
-                If cAcc != ""
-                    AAdd(aRet, {"str", cAcc})
-                EndIf
-                cAcc := ""
-            Else
-                // Inicio da string.
-                lInStr := .T.
-                cAcc := ""
-            EndIf
-        Else
-            If lInStr
-                cAcc := cAcc + cChar
-            Else
-                If cChar == "{" .Or. cChar == "[" .Or. cChar == "}" .Or. cChar == "]" .Or. cChar == ":" .Or. cChar == ","
-                    If cAcc != ""
-                        AAdd(aRet, {"str", cAcc})
-                        cAcc := ""
-                    EndIf
-                    AAdd(aRet, {"sym", cChar})
-                Else
-                    If cChar == " " .Or. cChar == Chr(10) .Or. cChar == Chr(13) .Or. cChar == Chr(9)
-                        If cAcc != ""
-                            AAdd(aRet, {"str", cAcc})
-                            cAcc := ""
-                        EndIf
-                    Else
-                        cAcc := cAcc + cChar
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    Next nIdx
-    If cAcc != ""
-        AAdd(aRet, {"str", cAcc})
-    EndIf
-Return aRet
-
-/*/{Protheus.doc} GEBRESTJSONTOOBJ
-    Converte array de tokens JSON para array AdvPL.
-    @type Funcao auxiliar JSON
-    @author Peder Munksgaard
-    @since 23/09/2026
-    @param aTok Array de tokens
-    @return Array/valor AdvPL
-/*/
-Static Function GEBRESTJSONTOOBJ(aTok)
-    Local aRet    := {}
-    Local nIdx    := 0
-    Local cType   := ""
-    Local cVal    := ""
-    Local oObj    := {}
-    Local cKey    := ""
-    Local aStack  := {}
-    Local nLen    := 0
-
-    If aTok == Nil
-        Return aRet
-    EndIf
-
-    nLen := Len(aTok)
-    If nLen == 0
-        Return aRet
-    EndIf
-
-    // Parse simples: percorre tokens e constrói estrutura.
-    nIdx := 1
-    oObj := GEBRESTJSONPARSE(aTok, nIdx)
-    Return oObj
-
-/*/{Protheus.doc} GEBRESTJSONPARSE
-    Parse recursivo de tokens JSON.
-    @type Funcao auxiliar JSON
-    @author Peder Munksgaard
-    @since 23/09/2026
-/*/
-Static Function GEBRESTJSONPARSE(aTok, ByRef nPos)
-    Local xVal    := Nil
-    Local cType   := ""
-    Local cVal    := ""
-    Local aArr    := {}
-    Local oObj    := {}
-    Local cKey    := ""
-    Local lDone   := .F.
-    Local nLen    := 0
-    Local nI      := 0
-
-    If nPos > Len(aTok)
-        Return Nil
-    EndIf
-
-    cType := aTok[nPos][1]
-    cVal  := aTok[nPos][2]
-
-    If cType == "sym"
-        If cVal == "{"
-            nPos++
-            Do While nPos <= Len(aTok) .And. .Not. lDone
-                If aTok[nPos][1] == "sym" .And. aTok[nPos][2] == "}"
-                    lDone := .T.
-                Else
-                    If aTok[nPos][1] == "str"
-                        cKey := aTok[nPos][2]
-                        nPos++
-                        // Skip ":"
-                        If aTok[nPos][1] == "sym" .And. aTok[nPos][2] == ":"
-                            nPos++
-                        EndIf
-                        xVal := GEBRESTJSONPARSE(aTok, nPos)
-                        oObj[cKey] := xVal
-                    Else
-                        nPos++
-                    EndIf
-                EndIf
-            EndDo
-            nPos++
-            Return oObj
-        Else
-            If cVal == "["
-                nPos++
-                Do While nPos <= Len(aTok) .And. .Not. lDone
-                    If aTok[nPos][1] == "sym" .And. aTok[nPos][2] == "]"
-                        lDone := .T.
-                    Else
-                        xVal := GEBRESTJSONPARSE(aTok, nPos)
-                        AAdd(aArr, xVal)
-                    EndIf
-                EndDo
-                nPos++
-                Return aArr
-            Else
-                If cVal == "null"
-                    nPos++
-                    Return Nil
-                Else
-                    If cVal == ".true." .Or. cVal == ".True." .Or. cVal == "True"
-                        nPos++
-                        Return .T.
-                    Else
-                        If cVal == ".false." .Or. cVal == ".False." .Or. cVal == "False"
-                            nPos++
-                            Return .F.
-                        Else
-                            nPos++
-                            Return cVal
-                        EndIf
-                    EndIf
-                EndIf
-            EndIf
-        EndIf
-    Else
-        If cType == "str"
-            nPos++
-            // Tenta converter para numero.
-            If Val(cVal) != 0 .Or. cVal == "0"
-                If Lower(cVal) != "true" .And. Lower(cVal) != "false"
-                    Return Val(cVal)
-                EndIf
-            EndIf
-            Return cVal
-        Else
-            nPos++
-            Return cVal
-        EndIf
-    EndIf
-Return xVal
-
-/*/{Protheus.doc} GEBRESTJSONTOARR
-    Converte string JSON para array AdvPL (formato simples).
-    @type Funcao auxiliar JSON
-    @author Peder Munksgaard
-    @since 23/09/2026
-    @param cJson String JSON
-    @return Array AdvPL
-/*/
-Static Function GEBRESTJSONTOARR(cJson)
-    Local aTok  := {}
-    Local aRet  := {}
-
-    If cJson == Nil .Or. cJson == ""
-        Return aRet
-    EndIf
-
-    aTok := GEBRESTJSONDEC(cJson)
-    aRet := GEBRESTJSONTOOBJ(aTok)
-Return aRet
 
 /*/{Protheus.doc} GEBRESTRLIMIT
     Rate limiting simples por IP. UsaGE4 "SEG_RATELIMIT" como maximo.

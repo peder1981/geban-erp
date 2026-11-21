@@ -171,11 +171,7 @@ User Function GEBSECPOL_EXPIRACAO(cUsuario)
     Local aUser   := {}
     Local cCfg    := ""
     Local nDias   := 90
-    Local nYear   := 0
-    Local nMonth  := 0
-    Local nDay    := 0
     Local cResult := ""
-    Local aDays   := {31,28,31,30,31,30,31,31,30,31,30,31}
     Local nIdx    := 0
 
     // Default de parametro.
@@ -188,7 +184,7 @@ User Function GEBSECPOL_EXPIRACAO(cUsuario)
         If Len(aArea) > 0
             RestArea(aArea)
         EndIf
-        Return StoToD("00000000")
+        Return ""
     EndIf
 
     // Busca ultima troca de senha em SEC_PWDLAST de GE2_SEC (workarea, pois TCSqlQuery nao retorna valores).
@@ -220,20 +216,8 @@ User Function GEBSECPOL_EXPIRACAO(cUsuario)
         EndIf
     EndIf
 
-    // Soma dias manualmente (AdvPP nao tem AddDays).
-    nYear  := Val(SubStr(cUltima, 1, 4))
-    nMonth := Val(SubStr(cUltima, 5, 2))
-    nDay   := Val(SubStr(cUltima, 7, 2))
-    nDay   := nDay + nDias
-    Do While nDay > aDays[nMonth]
-        nDay  := nDay - aDays[nMonth]
-        nMonth := nMonth + 1
-        If nMonth > 12
-            nMonth := 1
-            nYear  := nYear + 1
-        EndIf
-    EndDo
-    cResult := cValToChar(nYear) + PadL(cValToChar(nMonth), 2, "0") + PadL(cValToChar(nDay), 2, "0")
+    // ponytail: BODTADD usa dia juliano (bissexto correto); data + n no AdvPP devolve numero.
+    cResult := BODTADD(cUltima, nDias)
 
     ConOut("GEBSECPOL_EXPIRACAO: user=" + cUsuario + " ultima=" + cUltima + " dias=" + cValToChar(nDias) + " expira=" + cResult)
 

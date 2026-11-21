@@ -55,7 +55,7 @@
 /*/{Protheus.doc} T_GEBFIS_APU
     Teste da apuracao AUTO/MANUAL/DIRETA + creditos (Task 4 GEB_FISCAL).
     Chamada sem prefixo U_ e includes relativos: exigencia do
-    runtime AdvPP (registro interno).
+    runtime AdvPP (ver .superpowers/sdd/task-1-report.md).
     Asserts: GENMIG()+GEBFMIG() OK; seed GF1/GF2 + GE1 SIMPLES + GE4
     EMISSAO ONLINE_FILA + GE4 APURACAO AUTO; emite 2 notas via GEBFEMI
     (NF-T4-A 2x1000 + NF-T4-B 1x500, base 2500, IBS 250, CBS 125);

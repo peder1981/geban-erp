@@ -26,7 +26,7 @@
     GEBFCRE(cComp, cOrig, nValor, cTipo) grava GF6 (transf/ressarc:
     cTipo TRANSF ou RESSARC, miss => TRANSF) com filial da sessao e
     D_E_L_E_T_ = ' '; retorna .F. se GF6 ausente.
-    Notas AdvPP (balisador, ver registro interno):
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md):
     log via ConOut (FWLogMsg nao existe no runtime); If Nil em vez
     de Default (Default sobrescreve incondicionalmente);
     GetArea/RestArea guardados (GetArea retorna "" sem workarea

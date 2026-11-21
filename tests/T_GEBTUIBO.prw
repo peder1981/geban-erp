@@ -110,13 +110,6 @@ User Function T_GEBTUIBO()
     lOk := Chk(lOk, "rota inexistente", "rota_inexistente" $ GEBBOEXEC("POST", "nada/nada", JsonObject():New(), "super")[2])
     lOk := Chk(lOk, "metodo errado", "rota_inexistente" $ GEBBOEXEC("GET", "loja/venda", JsonObject():New(), "super")[2])
 
-    lOk := Chk(lOk, "tela faturamento", GEBTUIFAT("zz", "", "super"))
-    lOk := Chk(lOk, "tela loja", GEBTUILOJ("zz", "", "super"))
-    lOk := Chk(lOk, "tela estoque", GEBTUIBOEST("super"))
-    lOk := Chk(lOk, "tela financeiro", GEBTUIBOFIN("super"))
-    lOk := Chk(lOk, "tela contabil", GEBTUIBOCTB("super"))
-    lOk := Chk(lOk, "tela compras", GEBTUIBOCOM("super"))
-    lOk := Chk(lOk, "tela banco", GEBTUIBOBCO("super"))
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebtuibo CASCADE")
     If lOk

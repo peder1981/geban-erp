@@ -15,7 +15,7 @@
     (linha ausente = sem restricao extra); GEBMNT("LANC_DIRETO")
     libera (AVISA_E_TRAVA nega). Contas vazias, valor zerado ou
     falha do writer retornam .F.
-    Notas AdvPP (balisador, ver registro interno):
+    Notas AdvPP (balisador, ver .superpowers/sdd/task-1-report.md):
     log via ConOut (FWLogMsg nao existe no runtime); If Nil em vez
     de Default (Default sobrescreve incondicionalmente); alias
     literal (GetNextAlias nao existe); GetArea/RestArea guardados

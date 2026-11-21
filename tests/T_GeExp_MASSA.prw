@@ -67,7 +67,7 @@
     Cria 3 empresas REAIS (schemas Postgres independentes emp_<cod>, via
     GEBDBProvisionaEmpresa) em vez de simular multiplas empresas com uma
     coluna EMPRESA sombra dentro de um unico schema compartilhado (design
-    aposentado -- ver documentacao interna
+    aposentado -- ver docs/superpowers/plans/2026-09-24-geban-entrypoint-
     postgres-bootstrap.md e o Task 8 brief). Para cada empresa, dentro do
     seu proprio schema (GEBDBSetTenant), roda de ponta a ponta: cadastro
     de produtos/fornecedor/contas, emissao de 20 NFs, apuracao do mes,
@@ -132,7 +132,7 @@ User Function T_GeExp_MASSA()
     // (GE4/GF1/GF2/GCP1/GFN1/GC1/GC4) das 3 empresas ANTES de chamar
     // qualquer funcao de negocio que use workarea (GEBFAPU/GEBDBAI/
     // GEBRELGERAL/GEBTRAK*, mais abaixo na Fase 2). Achado empirico
-    // desta task (reproduzido contra o Postgres real do ambiente de homologacao), causa
+    // desta task (reproduzido contra o Postgres real do servidor), causa
     // raiz rastreada no codigo Go do runtime AdvPP (~/Projetos/AdvPP):
     //   1. DBCLOSEAREA() e' NO-OP neste runtime (pkg/vm/natives.go:1108)
     //      -- nao fecha nada de verdade; a alias "fechada" continua
