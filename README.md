@@ -181,6 +181,7 @@ Cada teste em `tests/T_*.prw` cria um schema descartável e o remove ao final. R
 
 | Documento | Conteúdo |
 |-----------|----------|
+| [Manual do usuário](docs/08-manual-do-usuario.md) ([PDF](docs/08-manual-do-usuario.pdf)) | Passo a passo de todas as telas, com capturas anotadas de cada módulo e de cada formulário |
 | [Documentação técnica](docs/01-documentacao-tecnica.md) | Arquitetura e módulos |
 | [Regras de negócio](docs/02-regras-negocio.md) | Regras de negócio e domínio |
 | [Especificação funcional](docs/03-especificacao-funcional.md) | Especificação funcional |

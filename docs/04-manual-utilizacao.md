@@ -1,5 +1,9 @@
 # GEBAN — Manual de Utilização (para MEI)
 
+> **Para operar pela interface web, use o [Manual do usuário](08-manual-do-usuario.md)**
+> (também em PDF), com o passo a passo de todas as telas e capturas anotadas.
+> Este documento continua valendo para os conceitos e para o uso pela linha de comando.
+
 > Linguagem simples, sem jargão escondido. Toda palavra difícil vem com explicação na hora.
 > Público: você que vende banana (ou qualquer produto) e precisa emitir nota, pagar imposto e fechar o mês sem dor de cabeça.
 

@@ -5,6 +5,9 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 
 ## [Não lançado]
 
+### Documentação
+- **Manual do usuário** (`docs/08-manual-do-usuario.md` e PDF): passo a passo de todas as telas, com capturas reais anotadas (moldura numerada e balão no menu, campo ou botão a usar), a rotina executada numa empresa de demonstração e a referência dos 153 formulários dos 9 módulos.
+
 ### Interface (AdvPP 4.8.5, PO-UI)
 - **Requer AdvPP 4.8.5 ou posterior** (`Nil` e `NULL` do banco como texto vazio, passagem por referência `@var`, curto-circuito, aritmética de datas).
 - **Cancelar cupom** volta à frente de loja (aba Caixa); **Cotação de fornecedor** e **Menor preço cotado** ganham formulário em Compras.
