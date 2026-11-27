@@ -52,6 +52,13 @@ User Function GEBSECLOGIN(cUser, cPass, cIP)
     Local cIp      := ""
     Local lAudit   := .F.
 
+    // Login e' operacao de catalogo: GE2/GE2_SEC sao referenciadas como
+    // public.<tabela> em TODA query abaixo. Sem o prefixo, uma sessao ja
+    // em tenant (relogin apos "Sair" no TUI) resolveria emp_xx.ge2 --
+    // que existe e sombrearia public.ge2, e o usuario "sumiria".
+    // (Nao usar SET search_path: mudar o schema ambiente quebraria
+    // RestArea() de workareas abertas nas tabelas do tenant, ex. GE4.)
+
     // Default parametros.
     If cUser == Nil
         cUser := ""
@@ -83,7 +90,7 @@ User Function GEBSECLOGIN(cUser, cPass, cIP)
     cUser := AllTrim(cUser)
 
     // Busca usuario em GE2.
-    aUser := TCSqlQuery("SELECT GE2_FILIAL, GE2_BLOQ, CASE WHEN GE2_VALID <> '' AND GE2_VALID < to_char(current_date, 'YYYYMMDD') THEN 'S' ELSE 'N' END AS VENC FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cUser) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aUser := TCSqlQuery("SELECT GE2_FILIAL, GE2_BLOQ, CASE WHEN GE2_VALID <> '' AND GE2_VALID < to_char(current_date, 'YYYYMMDD') THEN 'S' ELSE 'N' END AS VENC FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cUser) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aUser) == 0
         ConOut("GEBSECLOGIN: usuario inexistente '" + cUser + "'")
         If Len(aArea) > 0
@@ -99,7 +106,7 @@ User Function GEBSECLOGIN(cUser, cPass, cIP)
     // Busca credenciais em GE2_SEC.
     // Credencial e' identificada pelo usuario (catalogo). Se houver mais de uma linha
     // (legado com filiais diferentes), prefere a da filial do GE2; o UPDATE usa R_E_C_N_O_.
-    aSec := TCSqlQuery("SELECT R_E_C_N_O_ AS RID, SEC_IGNEXP, SEC_FORCE, CASE WHEN SEC_PWDLAST = '00000000' THEN 'N' WHEN SEC_IGNEXP = 'S' THEN 'N' WHEN to_date(SEC_PWDLAST, 'YYYYMMDD') + 90 < current_date THEN 'S' ELSE 'N' END AS EXPIRA, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, CASE WHEN SEC_LOCKED > to_char(now(), 'YYYYMMDD HH24:MI:SS') THEN 'S' ELSE 'N' END AS BLOQ FROM GE2_SEC WHERE SEC_USUARIO = " + GEBDBQuote(cUser) + " AND D_E_L_E_T_ = ' ' ORDER BY (SEC_FILIAL = " + GEBDBQuote(cFil) + ") DESC LIMIT 1")
+    aSec := TCSqlQuery("SELECT R_E_C_N_O_ AS RID, SEC_IGNEXP, SEC_FORCE, CASE WHEN SEC_PWDLAST = '00000000' THEN 'N' WHEN SEC_IGNEXP = 'S' THEN 'N' WHEN to_date(SEC_PWDLAST, 'YYYYMMDD') + 90 < current_date THEN 'S' ELSE 'N' END AS EXPIRA, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, CASE WHEN SEC_LOCKED > to_char(now(), 'YYYYMMDD HH24:MI:SS') THEN 'S' ELSE 'N' END AS BLOQ FROM public.GE2_SEC WHERE SEC_USUARIO = " + GEBDBQuote(cUser) + " AND D_E_L_E_T_ = ' ' ORDER BY (SEC_FILIAL = " + GEBDBQuote(cFil) + ") DESC LIMIT 1")
     If Len(aSec) == 0
         ConOut("GEBSECLOGIN: credenciais ausentes para usuario " + cUser)
         If Len(aArea) > 0
@@ -144,13 +151,13 @@ User Function GEBSECLOGIN(cUser, cPass, cIP)
     If cHash == "" .Or. cHash != cStored
         // Falha: incrementa failCount.
         nFail := nFail + 1
-        TCSqlExec("UPDATE GE2_SEC SET SEC_FAILCNT = " + cValToChar(nFail) + " WHERE R_E_C_N_O_ = " + cRid)
+        TCSqlExec("UPDATE public.GE2_SEC SET SEC_FAILCNT = " + cValToChar(nFail) + " WHERE R_E_C_N_O_ = " + cRid)
         If nFail >= 5
             ConOut("GEBSECLOGIN: maximo de tentativas atingido para usuario " + cUser)
             // Bloqueio TEMPORARIO (15 min, relogio do banco): o permanente
             // ('20991231') deixava qualquer um travar qualquer conta -- o
             // super inclusive -- com 5 senhas erradas, sem desbloqueio.
-            TCSqlExec("UPDATE GE2_SEC SET SEC_LOCKED = to_char(now() + interval '15 minutes', 'YYYYMMDD HH24:MI:SS') WHERE R_E_C_N_O_ = " + cRid)
+            TCSqlExec("UPDATE public.GE2_SEC SET SEC_LOCKED = to_char(now() + interval '15 minutes', 'YYYYMMDD HH24:MI:SS') WHERE R_E_C_N_O_ = " + cRid)
             If Len(aArea) > 0
                 RestArea(aArea)
             EndIf
@@ -191,7 +198,7 @@ User Function GEBSECLOGIN(cUser, cPass, cIP)
     EndIf
 
     // Sucesso: reseta failCount, atualiza lastLogin.
-    TCSqlExec("UPDATE GE2_SEC SET SEC_FAILCNT = 0, SEC_LASTLOGIN = " + GEBDBQuote(cToday) + ", SEC_LOCKED = '00000000' WHERE R_E_C_N_O_ = " + cRid)
+    TCSqlExec("UPDATE public.GE2_SEC SET SEC_FAILCNT = 0, SEC_LASTLOGIN = " + GEBDBQuote(cToday) + ", SEC_LOCKED = '00000000' WHERE R_E_C_N_O_ = " + cRid)
 
     // Audit em GEH -- tabela por-empresa (GEBEXPCriaAuditoria(), dentro
     // de emp_<cod>), so' existe depois que um tenant foi selecionado.
@@ -324,7 +331,7 @@ User Function GEBSECPODE(cUsuario, cAlvo, lExigeVinc)
     If cEmp == ""
         Return .F.
     EndIf
-    If Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsuario) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND UPPER(TRIM(GE2_EMP_PERFIL)) = 'ADMIN' AND D_E_L_E_T_ = ' '")) == 0
+    If Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsuario) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND UPPER(TRIM(GE2_EMP_PERFIL)) = 'ADMIN' AND D_E_L_E_T_ = ' '")) == 0
         Return .F.
     EndIf
     If cAlv == "" .Or. cAlvo == Nil
@@ -333,11 +340,11 @@ User Function GEBSECPODE(cUsuario, cAlvo, lExigeVinc)
     If GEBSECISSUPER(cAlv)
         Return .F.
     EndIf
-    If Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) <> " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' ' LIMIT 1")) > 0
+    If Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) <> " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' ' LIMIT 1")) > 0
         Return .F.
     EndIf
     If lExigeVinc != Nil .And. lExigeVinc
-        If Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' ' LIMIT 1")) == 0
+        If Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' ' LIMIT 1")) == 0
             Return .F.
         EndIf
     EndIf
@@ -346,7 +353,7 @@ Return .T.
 // GEBSECDERRUBA(cUsu) -> invalida as sessoes (tokens) abertas do usuario:
 // troca de senha por outra pessoa costuma responder a comprometimento.
 User Function GEBSECDERRUBA(cUsu)
-Return TCSqlExec("UPDATE GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_USUARIO = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' '")
+Return TCSqlExec("UPDATE public.GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_USUARIO = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' '")
 
 /*/{Protheus.doc} GEBSECISSUPER
     Diz se o codigo e' a conta global super (case-insensitive).
@@ -508,7 +515,7 @@ User Function GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSup
     // Sem parametro, mantem o comportamento anterior (linha existente
     // ou FWxFilial).
     If lOk
-        aHit := TCSqlQuery("SELECT GE2_FILIAL FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+        aHit := TCSqlQuery("SELECT GE2_FILIAL FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
         If cFilP != ""
             cFil := cFilP
             If Len(aHit) > 0
@@ -516,13 +523,13 @@ User Function GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSup
                 // filial. Sem essa atualizacao, GE2 e GE2_SEC ficavam divergentes.
                 If cValToChar(aHit[1]:GE2_FILIAL) != cFilP
                     ConOut("GEBSECCRIAUSU: identidade " + cUsu + " passa a viver na filial " + cFilP)
-                    lOk := TCSqlExec("UPDATE GE2 SET GE2_FILIAL = " + GEBDBQuote(cFilP) + " WHERE GE2_COD = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' '")
+                    lOk := TCSqlExec("UPDATE public.GE2 SET GE2_FILIAL = " + GEBDBQuote(cFilP) + " WHERE GE2_COD = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' '")
                     If !lOk
                         ConOut("GEBSECCRIAUSU: falha ao mover GE2 para a filial " + cFilP)
                     EndIf
                 EndIf
             Else
-                lOk := TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', " + GEBDBQuote(cFilP) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(cNome) + ", " + GEBDBQuote(cPerfil) + ")")
+                lOk := TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', " + GEBDBQuote(cFilP) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(cNome) + ", " + GEBDBQuote(cPerfil) + ")")
                 If !lOk
                     ConOut("GEBSECCRIAUSU: falha ao inserir GE2 na filial " + cFilP)
                 EndIf
@@ -532,7 +539,7 @@ User Function GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSup
                 cFil := cValToChar(aHit[1]:GE2_FILIAL)
             Else
                 cFil := FWxFilial("GE2")
-                lOk := TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(cNome) + ", " + GEBDBQuote(cPerfil) + ")")
+                lOk := TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(cNome) + ", " + GEBDBQuote(cPerfil) + ")")
                 If !lOk
                     ConOut("GEBSECCRIAUSU: falha ao inserir GE2 para " + cUsu)
                 EndIf
@@ -542,11 +549,11 @@ User Function GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSup
 
     // 3. GE2_SEC: substitui credencial existente ou cria nova.
     If lOk
-        aHit := TCSqlQuery("SELECT SEC_USUARIO FROM GE2_SEC WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+        aHit := TCSqlQuery("SELECT SEC_USUARIO FROM public.GE2_SEC WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
         If Len(aHit) > 0
-            lOk := TCSqlExec("UPDATE GE2_SEC SET SEC_SALT = " + GEBDBQuote(cSalt) + ", SEC_HASH = " + GEBDBQuote(cHash) + ", SEC_FAILCNT = 0, SEC_LOCKED = '00000000', SEC_FORCE = 'N', SEC_PWDLAST = " + GEBDBQuote(cToday) + " WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' '")
+            lOk := TCSqlExec("UPDATE public.GE2_SEC SET SEC_SALT = " + GEBDBQuote(cSalt) + ", SEC_HASH = " + GEBDBQuote(cHash) + ", SEC_FAILCNT = 0, SEC_LOCKED = '00000000', SEC_FORCE = 'N', SEC_PWDLAST = " + GEBDBQuote(cToday) + " WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsu) + " AND D_E_L_E_T_ = ' '")
         Else
-            lOk := TCSqlExec("INSERT INTO GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, SEC_LASTLOGIN, SEC_PWDLAST) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(cSalt) + ", " + GEBDBQuote(cHash) + ", 0, '00000000', '00000000', " + GEBDBQuote(cToday) + ")")
+            lOk := TCSqlExec("INSERT INTO public.GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, SEC_LASTLOGIN, SEC_PWDLAST) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(cSalt) + ", " + GEBDBQuote(cHash) + ", 0, '00000000', '00000000', " + GEBDBQuote(cToday) + ")")
         EndIf
         If !lOk
             ConOut("GEBSECCRIAUSU: falha ao gravar GE2_SEC para " + cUsu)
@@ -556,11 +563,11 @@ User Function GEBSECCRIAUSU(cUsu, cSenha, aEmpresas, cNome, cPerfil, lPermiteSup
     // 4. GE2_EMP: um vinculo por empresa (sem duplicar).
     If lOk
         For nI := 1 To Len(aEmps)
-            aHit := TCSqlQuery("SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsu) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(aEmps[nI]) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+            aHit := TCSqlQuery("SELECT GE2_EMP_USUARIO FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsu) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(aEmps[nI]) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
             If Len(aHit) == 0
-                lOk := TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(aEmps[nI]) + ", " + GEBDBQuote(cPerfil) + ")")
+                lOk := TCSqlExec("INSERT INTO public.GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cUsu) + ", " + GEBDBQuote(aEmps[nI]) + ", " + GEBDBQuote(cPerfil) + ")")
             Else
-                lOk := TCSqlExec("UPDATE GE2_EMP SET GE2_EMP_PERFIL = " + GEBDBQuote(cPerfil) + " WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsu) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(aEmps[nI]) + " AND D_E_L_E_T_ = ' '")
+                lOk := TCSqlExec("UPDATE public.GE2_EMP SET GE2_EMP_PERFIL = " + GEBDBQuote(cPerfil) + " WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsu) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(aEmps[nI]) + " AND D_E_L_E_T_ = ' '")
             EndIf
             If !lOk
                 ConOut("GEBSECCRIAUSU: falha ao vincular " + cUsu + " a empresa " + aEmps[nI])

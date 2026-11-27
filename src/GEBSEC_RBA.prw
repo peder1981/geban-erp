@@ -72,7 +72,7 @@ User Function GEBSECRBAC(cUsuario, cMenu, cItem)
         EndIf
         Return .F.
     EndIf
-    aVinc := TCSqlQuery("SELECT UPPER(TRIM(GE2_EMP_PERFIL)) AS PERF FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsuario) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aVinc := TCSqlQuery("SELECT UPPER(TRIM(GE2_EMP_PERFIL)) AS PERF FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsuario) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aVinc) == 0
         ConOut("GEBSECRBAC: sem vinculo com a empresa " + cEmp + " (usuario " + cUsuario + ")")
         If Len(aArea) > 0

@@ -48,6 +48,10 @@
 // bTUIBrw: com o app ativo, GEBTUIBRW mostra a tabela na pagina Resultado.
 Static bTUIBrw := Nil
 
+// s_oTUIMenu: so existe um PoMenu por aplicacao; no relogin (apos "Sair")
+// reusa o objeto com os itens zerados em vez de criar outro.
+Static s_oTUIMenu := Nil
+
 /*/{Protheus.doc} GEBTUI
     Interface do GEBAN em componentes PO-UI (PoApp): login (com troca de
     senha obrigatoria/expirada), empresa e filial, menu lateral com os
@@ -310,7 +314,9 @@ Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
     oResT := PoTable():New(oRes)
     GEBTUIBRWAPP({|cAlias, cTit| oRes:Set("title", cTit), TUICarrega(oResT, cAlias, Nil), oApp:Navigate(oRes), .T.})
 
-    oMenu := PoMenu():New(oApp)
+    // So existe um PoMenu por aplicacao: no relogin (apos "Sair") reusa o
+    // objeto esvaziando os itens em vez de criar outro.
+    oMenu := TUIMenuRef(oApp, .T.)
     oIni := PoPage():New(oApp, "Inicio")
     TUIMenuItem(oApp, oMenu, "Inicio", "an an-house", oIni, aNav)
     aMods := TUIModulos(cEmp, cFil, cUsu)
@@ -332,7 +338,7 @@ Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
     oPg := PoPage():New(oApp, "Minha senha")
     TUIMenuItem(oApp, oMenu, "Minha senha", "an an-key", oPg, aNav)
     TUISenhaForm(oApp, oPg, cUsu)
-    oMenu:AddItem("Sair", "an an-sign-out", {|| oApp:Close()})
+    oMenu:AddItem("Sair", "an an-sign-out", {|| TUISair(oApp, oMenu)})
     TUIInicio(oApp, oIni, cEmp, cFil, cUsu, aAtalhos, aNav)
     aNav[1] := oIni
     oApp:Notify("Bem-vindo, " + cUsu + " (" + cEmp + ").", "success")
@@ -343,6 +349,35 @@ Return
 // o bloco capturar a pagina certa, nao a variavel do laco.
 Static Function TUIMenuItem(oApp, oMenu, cRot, cIcone, oPg, aNav)
     oMenu:AddItem(cRot, cIcone, {|| aNav[1] := oPg, oApp:Navigate(oPg)})
+Return
+
+/*/{Protheus.doc} TUIMenuRef
+    Um PoMenu por aplicacao. No relogin reusa o existente (itens zerados).
+    @type function
+    @since 27/11/2026
+/*/
+Static Function TUIMenuRef(oApp, lReset)
+    If s_oTUIMenu == Nil
+        s_oTUIMenu := PoMenu():New(oApp)
+    ElseIf lReset
+        // ClearItems (nao Set("items",{})): esvazia itens e handlers sem
+        // trocar o tipo interno da lista -- Set() quebraria o proximo AddItem.
+        s_oTUIMenu:ClearItems()
+    EndIf
+Return s_oTUIMenu
+
+/*/{Protheus.doc} TUISair
+    "Sair" do menu lateral. oApp:Close() encerrava a sessao e deixava a
+    aba em branco (o browser nao recarrega): aqui o menu e esvaziado e a
+    navegacao volta para uma tela de acesso nova.
+    @type function
+    @since 27/11/2026
+/*/
+Static Function TUISair(oApp, oMenu)
+    Local oPg := PoPage():New(oApp, "GEBAN - Entrar")
+    oMenu:ClearItems()
+    TUILogin(oApp, oPg)
+    oApp:Navigate(oPg)
 Return
 
 Static Function TUISenhaForm(oApp, oPg, cUsu)
@@ -1941,14 +1976,14 @@ User Function GEBTUITROCASENHA(cUsuLog, cAlvo, cSenha, cNome, cPerfil)
         EndIf
     EndIf
     If lOk
-        aUsr := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cAlvoL) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+        aUsr := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cAlvoL) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
         If Len(aUsr) == 0
             lOk := .F.
             cMsg := "usuario_inexistente"
         Else
             cAtuNome := cValToChar(aUsr[1]:GE2_NOME)
             // Perfil e' por empresa: le o vinculo da empresa da sessao.
-            aPf := TCSqlQuery("SELECT UPPER(TRIM(GE2_EMP_PERFIL)) AS PERF FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlvoL) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+            aPf := TCSqlQuery("SELECT UPPER(TRIM(GE2_EMP_PERFIL)) AS PERF FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlvoL) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
             // Sem vinculo nesta empresa: so' bloqueia se houver troca de perfil (abaixo).
             lSemVinc := (Len(aPf) == 0)
             If !lSemVinc
@@ -2033,7 +2068,7 @@ User Function GEBTUITROCASENHA(cUsuLog, cAlvo, cSenha, cNome, cPerfil)
                 lOk := .F.
                 cMsg := "nome_recusado"
             Else
-                lOk := TCSqlExec("UPDATE GE2 SET GE2_NOME = '" + StrTran(AllTrim(cNomeL), "'", "''") + "' WHERE GE2_COD = " + GEBDBQuote(cAlvoL) + " AND D_E_L_E_T_ = ' '")
+                lOk := TCSqlExec("UPDATE public.GE2 SET GE2_NOME = '" + StrTran(AllTrim(cNomeL), "'", "''") + "' WHERE GE2_COD = " + GEBDBQuote(cAlvoL) + " AND D_E_L_E_T_ = ' '")
                 If !lOk
                     cMsg := "nome_recusado"
                 EndIf
@@ -2054,7 +2089,7 @@ User Function GEBTUITROCASENHA(cUsuLog, cAlvo, cSenha, cNome, cPerfil)
                     lOk := .F.
                     cMsg := "perfil_recusado"
                 Else
-                    lOk := TCSqlExec("UPDATE GE2_EMP SET GE2_EMP_PERFIL = " + GEBDBQuote(Upper(AllTrim(cPerfilL))) + " WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlvoL) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND D_E_L_E_T_ = ' '")
+                    lOk := TCSqlExec("UPDATE public.GE2_EMP SET GE2_EMP_PERFIL = " + GEBDBQuote(Upper(AllTrim(cPerfilL))) + " WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlvoL) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND D_E_L_E_T_ = ' '")
                     If !lOk
                         cMsg := "perfil_recusado"
                     EndIf

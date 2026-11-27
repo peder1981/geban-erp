@@ -89,11 +89,11 @@ Static Function GEBWAPIAUTH(cTok, cEmp)
     // Token vem da URL (nao confiavel): sempre escapado (GEBDBQuote).
     // Alem do token valido: usuario ainda ativo e ainda vinculado a
     // empresa (excluir usuario ou remover vinculo derruba a sessao na hora).
-    aTokRow := TCSqlQuery("SELECT T.TOK_USUARIO, T.TOK_EMPRESA FROM GE2_TOK T " + ;
+    aTokRow := TCSqlQuery("SELECT T.TOK_USUARIO, T.TOK_EMPRESA FROM public.GE2_TOK T " + ;
         "WHERE T.TOK_TOKEN = " + GEBDBQuote(cToken) + " AND T.TOK_EMPRESA = " + GEBDBQuote(cEmpr) + ;
         " AND T.TOK_EXPIRES > " + GEBDBQuote(DToS(Date()) + " " + Time()) + " AND T.D_E_L_E_T_ = ' '" + ;
-        " AND EXISTS (SELECT 1 FROM GE2 U WHERE U.GE2_COD = T.TOK_USUARIO AND U.D_E_L_E_T_ = ' ')" + ;
-        " AND (LOWER(T.TOK_USUARIO) = 'super' OR EXISTS (SELECT 1 FROM GE2_EMP E WHERE E.GE2_EMP_USUARIO = T.TOK_USUARIO" + ;
+        " AND EXISTS (SELECT 1 FROM public.GE2 U WHERE U.GE2_COD = T.TOK_USUARIO AND U.D_E_L_E_T_ = ' ')" + ;
+        " AND (LOWER(T.TOK_USUARIO) = 'super' OR EXISTS (SELECT 1 FROM public.GE2_EMP E WHERE E.GE2_EMP_USUARIO = T.TOK_USUARIO" + ;
         " AND LOWER(E.GE2_EMP_EMPRESA) = LOWER(T.TOK_EMPRESA) AND E.D_E_L_E_T_ = ' '))")
     If Len(aTokRow) == 0
         If Len(aArea) > 0

@@ -109,7 +109,7 @@ User Function GEBSECTOKEN(cUsuario, cEmpresa, cFilial, cIP)
         ":" + PadL(cValToChar(nMinResto), 2, "0") + ":" + PadL(cValToChar(nSegAtu), 2, "0")
 
     // Grava em GE2_TOK.
-    TCSqlExec("INSERT INTO GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', " + GEBDBQuote(cToken) + ", " + GEBDBQuote(cUsuario) + ", " + GEBDBQuote(cEmp) + ", " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cIp) + ", " + GEBDBQuote(cData + " " + cHora) + ", " + GEBDBQuote(cExpires) + ")")
+    TCSqlExec("INSERT INTO public.GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', " + GEBDBQuote(cToken) + ", " + GEBDBQuote(cUsuario) + ", " + GEBDBQuote(cEmp) + ", " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cIp) + ", " + GEBDBQuote(cData + " " + cHora) + ", " + GEBDBQuote(cExpires) + ")")
     ConOut("GEBSECTOKEN: token gerado para usuario " + cUsuario)
 
     If Len(aArea) > 0
@@ -167,7 +167,7 @@ User Function GEBSECTOKENDEL(cToken)
     EndIf
 
     If cTok != ""
-        TCSqlExec("UPDATE GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_TOKEN = " + GEBDBQuote(cTok) + " AND D_E_L_E_T_ = ' '")
+        TCSqlExec("UPDATE public.GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_TOKEN = " + GEBDBQuote(cTok) + " AND D_E_L_E_T_ = ' '")
         lOk := .T.
         ConOut("GEBSECTOKENDEL: token invalidado")
     EndIf

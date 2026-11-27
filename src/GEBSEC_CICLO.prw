@@ -46,7 +46,7 @@ User Function GEBSECBLOQUEIA(cUsuLog, cAlvo, lBloq)
     If lBloq
         cVal := "S"
     EndIf
-    lOk := TCSqlExec("UPDATE GE2 SET GE2_BLOQ = " + GEBDBQuote(cVal) + " WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := TCSqlExec("UPDATE public.GE2 SET GE2_BLOQ = " + GEBDBQuote(cVal) + " WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
     If lOk .And. lBloq
         // Derruba as sessoes abertas do usuario.
         GEBSECDERRUBA(cAlv)
@@ -73,7 +73,7 @@ User Function GEBSECVALIDADE(cUsuLog, cAlvo, cData)
     If cDt != "" .And. !(Len(cDt) == 8 .And. IsDigit(cDt))
         Return {.F., "validade invalida: use AAAAMMDD ou vazio para limpar"}
     EndIf
-    lOk := TCSqlExec("UPDATE GE2 SET GE2_VALID = " + GEBDBQuote(cDt) + " WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := TCSqlExec("UPDATE public.GE2 SET GE2_VALID = " + GEBDBQuote(cDt) + " WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
 Return {lOk, "ok"}
 
 // GEBSECELIMINAACESSOS(cUsuLog, cAlvo) -> {lOk, cMsg}.
@@ -92,13 +92,13 @@ User Function GEBSECELIMINAACESSOS(cUsuLog, cAlvo)
     EndIf
     If GEBSECISSUPER(cUsuLog)
         // Super: remove de todas as empresas e bloqueia (conta sem acesso).
-        lOk := TCSqlExec("UPDATE GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
-        lOk := lOk .And. TCSqlExec("UPDATE GE2 SET GE2_BLOQ = 'S' WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+        lOk := TCSqlExec("UPDATE public.GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+        lOk := lOk .And. TCSqlExec("UPDATE public.GE2 SET GE2_BLOQ = 'S' WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
         GEBSECDERRUBA(cAlv)
     Else
         // ADMIN: so' os vinculos da propria empresa; sessoes dessa empresa caem.
-        lOk := TCSqlExec("UPDATE GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' '")
-        lOk := lOk .And. TCSqlExec("UPDATE GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TOK_EMPRESA) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' '")
+        lOk := TCSqlExec("UPDATE public.GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' '")
+        lOk := lOk .And. TCSqlExec("UPDATE public.GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_USUARIO = " + GEBDBQuote(cAlv) + " AND LOWER(TOK_EMPRESA) = " + GEBDBQuote(cEmp) + " AND D_E_L_E_T_ = ' '")
     EndIf
     ConOut("GEBSECELIMINAACESSOS: " + cAlv + " por " + cUsuLog + " ok=" + Iif(lOk, "S", "N"))
 Return {lOk, "ok"}
@@ -117,13 +117,13 @@ User Function GEBSECEXCLUI(cUsuLog, cAlvo)
     If GEBSECISSUPER(cAlv)
         Return {.F., "a conta super nao pode ser excluida"}
     EndIf
-    aAcc := TCSqlQuery("SELECT SEC_USUARIO FROM GE2_SEC WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND SEC_LASTLOGIN <> '00000000' AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aAcc := TCSqlQuery("SELECT SEC_USUARIO FROM public.GE2_SEC WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND SEC_LASTLOGIN <> '00000000' AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aAcc) > 0
         Return {.F., "usuario ja acessou o sistema: use Eliminar acessos"}
     EndIf
-    lOk := TCSqlExec("UPDATE GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
-    lOk := lOk .And. TCSqlExec("UPDATE GE2_SEC SET D_E_L_E_T_ = '*' WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
-    lOk := lOk .And. TCSqlExec("UPDATE GE2 SET D_E_L_E_T_ = '*' WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := TCSqlExec("UPDATE public.GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := lOk .And. TCSqlExec("UPDATE public.GE2_SEC SET D_E_L_E_T_ = '*' WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := lOk .And. TCSqlExec("UPDATE public.GE2 SET D_E_L_E_T_ = '*' WHERE GE2_COD = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
     ConOut("GEBSECEXCLUI: " + cAlv + " por " + cUsuLog)
 Return {lOk, "ok"}
 
@@ -147,7 +147,7 @@ User Function GEBSECIGNORAEXP(cUsuLog, cAlvo, lIgnora)
     If lIgnora
         cVal := "S"
     EndIf
-    lOk := TCSqlExec("UPDATE GE2_SEC SET SEC_IGNEXP = " + GEBDBQuote(cVal) + " WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := TCSqlExec("UPDATE public.GE2_SEC SET SEC_IGNEXP = " + GEBDBQuote(cVal) + " WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
 Return {lOk, "ok"}
 
 // GEBSECFORCATROCA(cUsuLog, cAlvo, lForca) -> {lOk, cMsg}. Troca obrigatoria no proximo logon.
@@ -167,5 +167,5 @@ User Function GEBSECFORCATROCA(cUsuLog, cAlvo, lForca)
     If lForca
         cVal := "S"
     EndIf
-    lOk := TCSqlExec("UPDATE GE2_SEC SET SEC_FORCE = " + GEBDBQuote(cVal) + " WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
+    lOk := TCSqlExec("UPDATE public.GE2_SEC SET SEC_FORCE = " + GEBDBQuote(cVal) + " WHERE SEC_USUARIO = " + GEBDBQuote(cAlv) + " AND D_E_L_E_T_ = ' '")
 Return {lOk, "ok"}

@@ -289,7 +289,7 @@ User Function GEBSECFORCAR(cUsuario)
     EndIf
 
     // Busca usuario.
-    aUser := TCSqlQuery("SELECT * FROM GE2_SEC WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsuario) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aUser := TCSqlQuery("SELECT * FROM public.GE2_SEC WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsuario) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aUser) == 0
         ConOut("GEBSECFORCAR: usuario inexistente '" + cUsuario + "'")
         If Len(aArea) > 0
@@ -299,7 +299,7 @@ User Function GEBSECFORCAR(cUsuario)
     EndIf
 
     // Zera SEC_PWDLAST para forcar redefinicao na proxima entrada.
-    TCSqlExec("UPDATE GE2_SEC SET SEC_PWDLAST = '00000000' WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsuario) + "")
+    TCSqlExec("UPDATE public.GE2_SEC SET SEC_PWDLAST = '00000000' WHERE SEC_FILIAL = " + GEBDBQuote(cFil) + " AND SEC_USUARIO = " + GEBDBQuote(cUsuario) + "")
     lOk := .T.
     ConOut("GEBSECFORCAR: usuario=" + cUsuario + " marcado para redefinicao")
 

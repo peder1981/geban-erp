@@ -252,7 +252,7 @@ User Function GEBMONLISTAR()
     // Verifica se eh ADMIN.
     If cEmpCtx != ""
         aHit := TCSqlQuery( ;
-            "SELECT GE2_PERFIL FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cEmpCtx) + " AND D_E_L_E_T_ = ' ' LIMIT 1"
+            "SELECT GE2_PERFIL FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cEmpCtx) + " AND D_E_L_E_T_ = ' ' LIMIT 1"
         )
         If Len(aHit) > 0
             oRow := aHit[1]
@@ -433,7 +433,7 @@ User Function GEBMONMETRICAS()
 
     aAtivas := TCSqlQuery( ;
         "SELECT TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_CREATED " + ;
-        "FROM GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > " + GEBDBQuote(DToS(Date())) + ""
+        "FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > " + GEBDBQuote(DToS(Date())) + ""
     )
     nOnline := Len(aAtivas)
 

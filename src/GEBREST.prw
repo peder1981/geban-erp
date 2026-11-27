@@ -344,7 +344,7 @@ Static Function GEBRESTRBAC(cUsuario, cPath, cMetodo, aRota)
     // ADMIN (ou super): permissao de VER usuarios nao da' direito de criar
     // ou promover usuario.
     If (cMen == "SEGURANCA" .Or. cMen == "CONFIG") .And. Upper(AllTrim(cValToChar(cMetodo))) != "GET"
-        If !GEBSECISSUPER(cUsuario) .And. Len(TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cUsuario) + " AND UPPER(TRIM(GE2_PERFIL)) = 'ADMIN' AND D_E_L_E_T_ = ' '")) == 0
+        If !GEBSECISSUPER(cUsuario) .And. Len(TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cUsuario) + " AND UPPER(TRIM(GE2_PERFIL)) = 'ADMIN' AND D_E_L_E_T_ = ' '")) == 0
             Return .F.
         EndIf
     EndIf
@@ -687,7 +687,7 @@ Return aRes
 // empresa da sessao.
 Static Function GEBRESTUSRDAEMP()
     Local aRet := {}
-    Local aRows := TCSqlQuery("SELECT DISTINCT UPPER(TRIM(GE2_EMP_USUARIO)) AS U FROM GE2_EMP WHERE LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND D_E_L_E_T_ = ' '")
+    Local aRows := TCSqlQuery("SELECT DISTINCT UPPER(TRIM(GE2_EMP_USUARIO)) AS U FROM public.GE2_EMP WHERE LOWER(TRIM(GE2_EMP_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND D_E_L_E_T_ = ' '")
     AEval(aRows, {|o| AAdd(aRet, AllTrim(cValToChar(o:U)))})
 Return aRet
 
@@ -958,7 +958,7 @@ User Function GEBRESTURLSC(cUsuario, aBody)
     EndIf
 
     // Duplicidade (cCod ja' validado por GEBDBSchemaValido acima).
-    aHit := TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aHit := TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aHit) > 0
         cStatus := "409"
         cBody := GEBRESTJSONRESP(.F., Nil, {"usuario_duplicado: " + cCod})
@@ -1296,9 +1296,9 @@ User Function GEBRESTUSRRM(cUsuario, cCod)
     EndIf
     // Usuario excluido perde tudo junto: vinculos (senao recriar o mesmo
     // codigo herdava as empresas antigas), credencial e sessoes abertas.
-    TCSqlExec("UPDATE GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' '")
-    TCSqlExec("UPDATE GE2_SEC SET D_E_L_E_T_ = '*' WHERE SEC_USUARIO = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' '")
-    TCSqlExec("UPDATE GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_USUARIO = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' '")
+    TCSqlExec("UPDATE public.GE2_EMP SET D_E_L_E_T_ = '*' WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' '")
+    TCSqlExec("UPDATE public.GE2_SEC SET D_E_L_E_T_ = '*' WHERE SEC_USUARIO = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' '")
+    TCSqlExec("UPDATE public.GE2_TOK SET D_E_L_E_T_ = '*' WHERE TOK_USUARIO = " + GEBDBQuote(cCod) + " AND D_E_L_E_T_ = ' '")
     cBody := GEBRESTJSONRESP(.T., {cCod, "deleted"}, {})
 
     aRes := {cStatus, cBody}
@@ -2073,9 +2073,9 @@ User Function GEBRESTMONUSU(cUsuario)
         Return {cStatus, cBody}
     EndIf
     If GEBSECISSUPER(cUsuario)
-        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES FROM GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > to_char(now(), 'YYYYMMDD HH24:MI:SS') ORDER BY R_E_C_N_O_")
+        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > to_char(now(), 'YYYYMMDD HH24:MI:SS') ORDER BY R_E_C_N_O_")
     Else
-        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES FROM GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > to_char(now(), 'YYYYMMDD HH24:MI:SS') AND LOWER(TRIM(TOK_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " ORDER BY R_E_C_N_O_")
+        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > to_char(now(), 'YYYYMMDD HH24:MI:SS') AND LOWER(TRIM(TOK_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " ORDER BY R_E_C_N_O_")
     EndIf
     AEval(aChk, {|o| AAdd(aDados, {Val(cValToChar(o:ID)), cValToChar(o:TOK_USUARIO), cValToChar(o:TOK_EMPRESA), cValToChar(o:TOK_FILIAL), cValToChar(o:TOK_IP), cValToChar(o:TOK_CREATED), cValToChar(o:TOK_EXPIRES)})})
 
@@ -2114,7 +2114,7 @@ User Function GEBRESTMONDES(cUsuario, cToken)
     EndIf
 
     // Verifica se e ADMIN.
-    aUser := TCSqlQuery("SELECT * FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cUsuario) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aUser := TCSqlQuery("SELECT * FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cUsuario) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aUser) > 0
         If Upper(AllTrim(aUser[1]:GE2_PERFIL)) == "ADMIN"
             lAdmin := .T.
@@ -2142,16 +2142,16 @@ User Function GEBRESTMONDES(cUsuario, cToken)
     // proprio token (compatibilidade). Fora o super: so' sessoes da empresa
     // da propria sessao e nunca a do super.
     If GEBSECISSUPER(cUsuario)
-        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID FROM GE2_TOK WHERE D_E_L_E_T_ = ' ' AND (TOK_TOKEN = " + GEBDBQuote(cToken) + " OR CAST(R_E_C_N_O_ AS TEXT) = " + GEBDBQuote(cToken) + ")")
+        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND (TOK_TOKEN = " + GEBDBQuote(cToken) + " OR CAST(R_E_C_N_O_ AS TEXT) = " + GEBDBQuote(cToken) + ")")
     Else
-        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID FROM GE2_TOK WHERE D_E_L_E_T_ = ' ' AND (TOK_TOKEN = " + GEBDBQuote(cToken) + " OR CAST(R_E_C_N_O_ AS TEXT) = " + GEBDBQuote(cToken) + ")" + ;
+        aChk := TCSqlQuery("SELECT R_E_C_N_O_ AS ID FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND (TOK_TOKEN = " + GEBDBQuote(cToken) + " OR CAST(R_E_C_N_O_ AS TEXT) = " + GEBDBQuote(cToken) + ")" + ;
             " AND LOWER(TRIM(TOK_EMPRESA)) = " + GEBDBQuote(GEBDBTenantAtual()) + " AND LOWER(TOK_USUARIO) <> 'super'")
     EndIf
     If Len(aChk) == 0
         cStatus := "404"
         cBody := GEBRESTJSONRESP(.F., Nil, {"sessao_nao_encontrada"})
     Else
-        TCSqlExec("UPDATE GE2_TOK SET D_E_L_E_T_ = '*' WHERE R_E_C_N_O_ = " + cValToChar(Val(cValToChar(aChk[1]:ID))))
+        TCSqlExec("UPDATE public.GE2_TOK SET D_E_L_E_T_ = '*' WHERE R_E_C_N_O_ = " + cValToChar(Val(cValToChar(aChk[1]:ID))))
         cBody := GEBRESTJSONRESP(.T., {Val(cValToChar(aChk[1]:ID)), "desligado"}, {})
     EndIf
 
@@ -2701,7 +2701,7 @@ User Function GEBRESTVINCSC(cUsuario, aBody)
         EndIf
         Return {cStatus, cBody}
     EndIf
-    aHit := TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cAlvo) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aHit := TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cAlvo) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aHit) == 0
         cStatus := "404"
         cBody := GEBRESTJSONRESP(.F., Nil, {"usuario_nao_encontrado: " + cAlvo})
@@ -2736,7 +2736,7 @@ User Function GEBRESTVINCSC(cUsuario, aBody)
             EndIf
         EndIf
     EndIf
-    aHit := TCSqlQuery("SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlvo) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(cEmp) + " AND TRIM(BOTH ' ' FROM GE2_EMP_FILIAL) = TRIM(BOTH ' ' FROM " + GEBDBQuote(cFil) + ") AND D_E_L_E_T_ = ' ' LIMIT 1")
+    aHit := TCSqlQuery("SELECT GE2_EMP_USUARIO FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cAlvo) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(cEmp) + " AND TRIM(BOTH ' ' FROM GE2_EMP_FILIAL) = TRIM(BOTH ' ' FROM " + GEBDBQuote(cFil) + ") AND D_E_L_E_T_ = ' ' LIMIT 1")
     If Len(aHit) > 0
         cStatus := "409"
         cBody := GEBRESTJSONRESP(.F., Nil, {"vinculo_duplicado"})
@@ -2745,7 +2745,7 @@ User Function GEBRESTVINCSC(cUsuario, aBody)
         EndIf
         Return {cStatus, cBody}
     EndIf
-    If !TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cAlvo) + ", " + GEBDBQuote(cEmp) + ")")
+    If !TCSqlExec("INSERT INTO public.GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA) VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cAlvo) + ", " + GEBDBQuote(cEmp) + ")")
         cStatus := "500"
         cBody := GEBRESTJSONRESP(.F., Nil, {"falha_criar_vinculo"})
         If Len(aArea) > 0

@@ -90,10 +90,10 @@ User Function GEBEXPCONTEXTO(cEmpresa, cFilial, cUsuario)
     // GE2_EMP triplo logo abaixo, que e' a guarda real) E tem vinculo
     // com a empresa em GE2_EMP -- GE2.EMPRESA foi aposentada no redesign
     // multi-tenant (Fase 1); GE2_EMP e' o vinculo many-to-many real.
-    cSql := "SELECT GE2_COD FROM GE2 WHERE GE2_COD = " + GEBDBQuote(cUsuario) + " AND D_E_L_E_T_ = ' '"
+    cSql := "SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = " + GEBDBQuote(cUsuario) + " AND D_E_L_E_T_ = ' '"
     aHit := TCSqlQuery(cSql)
     If Len(aHit) > 0
-        cSql := "SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsuario) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(Lower(AllTrim(cEmpresa))) + " AND TRIM(BOTH ' ' FROM GE2_EMP_FILIAL) = TRIM(BOTH ' ' FROM " + GEBDBQuote(cFilial) + ") AND D_E_L_E_T_ = ' '"
+        cSql := "SELECT GE2_EMP_USUARIO FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = " + GEBDBQuote(cUsuario) + " AND GE2_EMP_EMPRESA = " + GEBDBQuote(Lower(AllTrim(cEmpresa))) + " AND TRIM(BOTH ' ' FROM GE2_EMP_FILIAL) = TRIM(BOTH ' ' FROM " + GEBDBQuote(cFilial) + ") AND D_E_L_E_T_ = ' '"
         aHit := TCSqlQuery(cSql)
         If Len(aHit) > 0
             lOk := .T.
