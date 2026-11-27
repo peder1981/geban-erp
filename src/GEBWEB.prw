@@ -47,6 +47,9 @@ User Function GEBWEB(nPorta)
 
     oSrv := WSRestServer():New("geban-web", "1.0")
     oSrv:AddRoute("POST", "/api/login", "U_GEBWEB_LOGINAPI")
+    // Alias do login para o PDV web: /api/login e' bloqueado na borda
+    // (cloudflared), mas /api/pdv/login passa pela regra /api/* -> 8090.
+    oSrv:AddRoute("POST", "/api/pdv/login", "U_GEBWEB_LOGINAPI")
     oSrv:AddRoute("GET", "/api/health", "U_GEBWAPI_HEALTH")
     oSrv:AddRoute("GET", "/api/public/empresas", "U_GEBWAPI_PUBEMP")
     oSrv:AddRoute("GET", "/api/usuarios", "U_GEBWAPI_USRLST")

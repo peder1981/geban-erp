@@ -437,7 +437,7 @@ async function doLogin() {
   const msg = document.getElementById('m-login');
   if (!emp || !user || !pass) { msg.textContent='Preencha todos os campos'; msg.className='msg err'; return; }
   try {
-    const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({empresa:emp, usuario:user, senha:pass})});
+    const r = await fetch(API_PREFIX + '/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({empresa:emp, usuario:user, senha:pass})});
     let d = await r.json();
     if (Array.isArray(d)) {
       const o = {};
