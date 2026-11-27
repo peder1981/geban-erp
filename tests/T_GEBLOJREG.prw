@@ -68,6 +68,8 @@ User Function T_GEBLOJREG()
     Local aR2 := {}
     Local cItem := ""
     Local nValC := 0
+    Local nCryptoOK := 0
+    Local cCupomC := ""
     Local nI := 0
     Local cEnd := "1A1zP1eBV4YqeZqSypBkMYbB"
 
@@ -150,9 +152,11 @@ User Function T_GEBLOJREG()
         aR := GEBLOJVEN(cSes, {{"P1", 1}}, {{"CRYPTO", 10, 1, "BTC|" + cEnd}}, "", 0, "", "", "", "", "", "FISCAL")
         lOk := Chk(aR[1], "venda crypto", lOk)
         If aR[1]
-            aR := TCSqlQuery("SELECT GLJ5_FORMA AS F, GLJ5_VALOR AS V FROM GLJ5 WHERE GLJ5_CUPOM = " + GEBDBQuote(aR[3][1]) + " AND GLJ5_FORMA = 'CRYPTO'")
+            cCupomC := aR[3][1]
+            nCryptoOK := 10
+            aR := TCSqlQuery("SELECT GLJ5_FORMA AS F, GLJ5_VALOR AS V FROM GLJ5 WHERE GLJ5_CUPOM = " + GEBDBQuote(cCupomC) + " AND GLJ5_FORMA = 'CRYPTO'")
             lOk := Chk(Len(aR) == 1 .And. (BOVAL(aR[1]:V) == 10), "glj5 crypto", lOk)
-            aR := TCSqlQuery("SELECT GCK2_MOEDA AS M, GCK2_BRL AS B, GCK2_QTD AS Q FROM GCK2 WHERE GCK2_CUPOM = " + GEBDBQuote(aR[3][1]))
+            aR := TCSqlQuery("SELECT GCK2_MOEDA AS M, GCK2_BRL AS B, GCK2_QTD AS Q FROM GCK2 WHERE GCK2_CUPOM = " + GEBDBQuote(cCupomC))
             lOk := Chk(Len(aR) == 1 .And. (BOCOL(aR[1]:M) == "BTC") .And. (BOVAL(aR[1]:B) == 10) .And. (BOVAL(aR[1]:Q) > 0), "gck2 auditoria", lOk)
             aR := TCSqlQuery("SELECT GFN1_SALDO AS S FROM GFN1 WHERE GFN1_CONTA = 'CRYPTO'")
             lOk := Chk(Len(aR) == 1 .And. (BOVAL(aR[1]:S) == 10), "conta crypto creditada", lOk)
@@ -213,7 +217,7 @@ User Function T_GEBLOJREG()
                 nValC := BOVAL(aR[3][nI][2])
             EndIf
         Next nI
-        lOk := Chk(nValC == 4, "resumo crypto", lOk)
+        lOk := Chk(nValC == 4 + nCryptoOK, "resumo crypto", lOk)
     EndIf
 
     TCSqlExec("SET search_path TO test_geblojreg")

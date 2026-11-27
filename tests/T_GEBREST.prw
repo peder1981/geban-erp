@@ -124,6 +124,12 @@ User Function T_GEBREST()
     TCSqlExec("DROP SCHEMA IF EXISTS emp_zzgebrest CASCADE")
     TCSqlExec("CREATE SCHEMA emp_zzgebrest")
     TCSqlExec("SET search_path TO emp_zzgebrest, test_gebrest")
+    // Catalogo de identidade e' global (public.*): remove as copias que as
+    // migracoes criaram nos schemas de teste para nao sombrear public via
+    // DbSelectArea (em producao emp_<cod> nao tem ge2*). SEC_PERM fica: e'
+    // consultada sem qualificacao de proposito.
+    TCSqlExec("DROP TABLE IF EXISTS test_gebrest.ge2, test_gebrest.ge2_sec, test_gebrest.ge2_emp, test_gebrest.ge2_tok")
+    TCSqlExec("DROP TABLE IF EXISTS emp_zzgebrest.ge2, emp_zzgebrest.ge2_sec, emp_zzgebrest.ge2_emp, emp_zzgebrest.ge2_tok")
     lTmp := GEBFMIG()
     If !lTmp
         lOk := .F.
@@ -151,25 +157,25 @@ User Function T_GEBREST()
 
     // Seed usuarios ADMIN e OPERADOR. GE2 tambem nao tem mais coluna
     // EMPRESA -- vinculo usuario-empresa agora e' via GE2_EMP.
-    TCSqlExec("DELETE FROM GE2 WHERE D_E_L_E_T_ = ' ' AND GE2_COD IN ('REST-ADM','REST-OP')")
-    TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '" + cFil + "', 'REST-ADM', 'Admin REST', 'ADMIN')")
-    TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '" + cFil + "', 'REST-OP', 'Operador REST', 'OPERADOR')")
-    TCSqlExec("INSERT INTO GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, SEC_LASTLOGIN, SEC_PWDLAST) VALUES (' ', '" + cFil + "', 'REST-ADM', 'GEBAN', '12345', 0, '00000000', '00000000', '" + DToS(Date()) + "')")
-    TCSqlExec("INSERT INTO GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, SEC_LASTLOGIN, SEC_PWDLAST) VALUES (' ', '" + cFil + "', 'REST-OP', 'GEBAN', '67890', 0, '00000000', '00000000', '" + DToS(Date()) + "')")
-    TCSqlExec("DELETE FROM GE2_EMP WHERE GE2_EMP_USUARIO IN ('REST-ADM','REST-OP')")
-    TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '" + cFil + "', 'REST-ADM', 'zzgebrest', 'ADMIN')")
-    TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '" + cFil + "', 'REST-OP', 'zzgebrest', 'OPERADOR')")
+    TCSqlExec("DELETE FROM public.GE2 WHERE D_E_L_E_T_ = ' ' AND GE2_COD IN ('REST-ADM','REST-OP')")
+    TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '" + cFil + "', 'REST-ADM', 'Admin REST', 'ADMIN')")
+    TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '" + cFil + "', 'REST-OP', 'Operador REST', 'OPERADOR')")
+    TCSqlExec("INSERT INTO public.GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, SEC_LASTLOGIN, SEC_PWDLAST) VALUES (' ', '" + cFil + "', 'REST-ADM', 'GEBAN', '12345', 0, '00000000', '00000000', '" + DToS(Date()) + "')")
+    TCSqlExec("INSERT INTO public.GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH, SEC_FAILCNT, SEC_LOCKED, SEC_LASTLOGIN, SEC_PWDLAST) VALUES (' ', '" + cFil + "', 'REST-OP', 'GEBAN', '67890', 0, '00000000', '00000000', '" + DToS(Date()) + "')")
+    TCSqlExec("DELETE FROM public.GE2_EMP WHERE GE2_EMP_USUARIO IN ('REST-ADM','REST-OP')")
+    TCSqlExec("INSERT INTO public.GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '" + cFil + "', 'REST-ADM', 'zzgebrest', 'ADMIN')")
+    TCSqlExec("INSERT INTO public.GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '" + cFil + "', 'REST-OP', 'zzgebrest', 'OPERADOR')")
     // Usuario sem nenhuma permissao RBAC (perfil sem linha em SEC_PERM e
     // nao-ADMIN) -- usado para provar que escrita negada nao executa.
-    TCSqlExec("DELETE FROM GE2 WHERE GE2_COD = 'REST-NOP'")
-    TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '" + cFil + "', 'REST-NOP', 'Sem Permissao REST', 'SEMPERM')")
+    TCSqlExec("DELETE FROM public.GE2 WHERE GE2_COD = 'REST-NOP'")
+    TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '" + cFil + "', 'REST-NOP', 'Sem Permissao REST', 'SEMPERM')")
 
     // Empresa "provisionada" para POST /usuarios: GEBSECCRIAUSU() exige
     // que o schema emp_<cod> exista (GEBDBSchemaExists). Schema vazio e'
     // suficiente aqui; removido no cleanup.
     // As chamadas REST rodam DENTRO de uma sessao de empresa (como pela API
     // e pela tela): ADMIN so' age na empresa da sessao (GEBSECPODE).
-    TCSqlExec("SET search_path TO emp_zzgebrest, test_gebrest")
+    TCSqlExec("SET search_path TO emp_zzgebrest, test_gebrest, public")
 
     // Configura permissoes RBAC para REST.
     TCSqlExec("DELETE FROM SEC_PERM WHERE D_E_L_E_T_ = ' ' AND SEC_PERM_PERFIL IN ('ADMIN','OPERADOR')")
@@ -304,7 +310,7 @@ User Function T_GEBREST()
             ConOut("    FAIL: json sem status")
         EndIf
         // Gravacao real: GE2 + GE2_SEC (salt 32 hex) + GE2_EMP.
-        aDados := TCSqlQuery("SELECT GE2_PERFIL FROM GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")
+        aDados := TCSqlQuery("SELECT GE2_PERFIL FROM public.GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")
         If Len(aDados) != 1
             lOk := .F.
             ConOut("    FAIL: esperado 1 linha GE2 para REST_NEW, veio " + cValToChar(Len(aDados)))
@@ -312,7 +318,7 @@ User Function T_GEBREST()
             lOk := .F.
             ConOut("    FAIL: GE2_PERFIL=" + cValToChar(aDados[1]:GE2_PERFIL))
         EndIf
-        aDados := TCSqlQuery("SELECT SEC_SALT FROM GE2_SEC WHERE SEC_USUARIO = 'REST_NEW' AND D_E_L_E_T_ = ' '")
+        aDados := TCSqlQuery("SELECT SEC_SALT FROM public.GE2_SEC WHERE SEC_USUARIO = 'REST_NEW' AND D_E_L_E_T_ = ' '")
         If Len(aDados) != 1
             lOk := .F.
             ConOut("    FAIL: esperado 1 linha GE2_SEC para REST_NEW, veio " + cValToChar(Len(aDados)))
@@ -323,7 +329,7 @@ User Function T_GEBREST()
                 ConOut("    FAIL: SEC_SALT com " + cValToChar(Len(cSalt1)) + " chars (esperado 32)")
             EndIf
         EndIf
-        aDados := TCSqlQuery("SELECT GE2_EMP_EMPRESA FROM GE2_EMP WHERE GE2_EMP_USUARIO = 'REST_NEW' AND GE2_EMP_EMPRESA = 'zzgebrest' AND D_E_L_E_T_ = ' '")
+        aDados := TCSqlQuery("SELECT GE2_EMP_EMPRESA FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = 'REST_NEW' AND GE2_EMP_EMPRESA = 'zzgebrest' AND D_E_L_E_T_ = ' '")
         If Len(aDados) != 1
             lOk := .F.
             ConOut("    FAIL: esperado 1 vinculo GE2_EMP REST_NEW/zzgebrest, veio " + cValToChar(Len(aDados)))
@@ -354,7 +360,8 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: super esperado 403, got " + cValToChar(aRes[1]))
     EndIf
-    aDados := TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD IN ('REST_NOEMP','REST-HIFEN','super')")
+    // 'super' ja' existe no catalogo real (bootstrap) -- fora da checagem.
+    aDados := TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD IN ('REST_NOEMP','REST-HIFEN')")
     If Len(aDados) > 0
         lOk := .F.
         ConOut("    FAIL: POST rejeitado deixou " + cValToChar(Len(aDados)) + " linha(s) em GE2")
@@ -409,7 +416,7 @@ User Function T_GEBREST()
             lOk := .F.
             ConOut("    FAIL: esperado 200, got " + cStatus + " body=" + cBody)
         EndIf
-        aDados := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")
+        aDados := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM public.GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")
         If Len(aDados) != 1
             lOk := .F.
             ConOut("    FAIL: REST_NEW sumiu de GE2")
@@ -435,7 +442,7 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: esperado 200, got " + cStatus + " body=" + cValToChar(aRes[2]))
     EndIf
-    aDados := TCSqlQuery("SELECT SEC_SALT FROM GE2_SEC WHERE SEC_USUARIO = 'REST_NEW' AND D_E_L_E_T_ = ' '")
+    aDados := TCSqlQuery("SELECT SEC_SALT FROM public.GE2_SEC WHERE SEC_USUARIO = 'REST_NEW' AND D_E_L_E_T_ = ' '")
     If Len(aDados) != 1
         lOk := .F.
         ConOut("    FAIL: esperado 1 linha GE2_SEC, veio " + cValToChar(Len(aDados)))
@@ -459,7 +466,7 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: esperado 400, got " + cStatus + " body=" + cValToChar(aRes[2]))
     EndIf
-    aDados := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")
+    aDados := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM public.GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")
     If Len(aDados) != 1
         lOk := .F.
         ConOut("    FAIL: REST_NEW sumiu de GE2")
@@ -502,7 +509,7 @@ User Function T_GEBREST()
             lOk := .F.
             ConOut("    FAIL: esperado 200, got " + cStatus)
         EndIf
-        If Len(TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")) > 0
+        If Len(TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = 'REST_NEW' AND D_E_L_E_T_ = ' '")) > 0
             lOk := .F.
             ConOut("    FAIL: REST_NEW continua ativo em GE2 apos DELETE")
         EndIf
@@ -885,10 +892,10 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: esperado 403, got " + cValToChar(aRes[1]))
     EndIf
-    If Len(TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = 'REST_RBAC'")) > 0
+    If Len(TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = 'REST_RBAC'")) > 0
         lOk := .F.
         ConOut("    FAIL: POST negado gravou GE2")
-    ElseIf Len(TCSqlQuery("SELECT SEC_USUARIO FROM GE2_SEC WHERE SEC_USUARIO = 'REST_RBAC'")) > 0
+    ElseIf Len(TCSqlQuery("SELECT SEC_USUARIO FROM public.GE2_SEC WHERE SEC_USUARIO = 'REST_RBAC'")) > 0
         lOk := .F.
         ConOut("    FAIL: POST negado gravou GE2_SEC")
     Else
@@ -902,7 +909,7 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: esperado 403, got " + cValToChar(aRes[1]))
     EndIf
-    aDados := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM GE2 WHERE GE2_COD = 'REST-OP' AND D_E_L_E_T_ = ' '")
+    aDados := TCSqlQuery("SELECT GE2_NOME, GE2_PERFIL FROM public.GE2 WHERE GE2_COD = 'REST-OP' AND D_E_L_E_T_ = ' '")
     If Len(aDados) != 1
         lOk := .F.
         ConOut("    FAIL: REST-OP sumiu de GE2")
@@ -920,7 +927,7 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: esperado 403, got " + cValToChar(aRes[1]))
     EndIf
-    If Len(TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = 'REST-OP' AND D_E_L_E_T_ = ' '")) != 1
+    If Len(TCSqlQuery("SELECT GE2_COD FROM public.GE2 WHERE GE2_COD = 'REST-OP' AND D_E_L_E_T_ = ' '")) != 1
         lOk := .F.
         ConOut("    FAIL: DELETE negado removeu REST-OP")
     Else
@@ -944,8 +951,8 @@ User Function T_GEBREST()
     // ===== T32: aspas simples em valores que chegam a SQL concatenado =====
     ConOut("")
     ConOut("  [T32] token/chave com aspas simples -> 400 sem SQL")
-    TCSqlExec("DELETE FROM GE2_TOK WHERE TOK_TOKEN = 'TOK-T32'")
-    TCSqlExec("INSERT INTO GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'TOK-T32', 'REST-ADM', '01', '" + cFil + "', '127.0.0.1', '20260925 00:00:00', '20990101 00:00:00')")
+    TCSqlExec("DELETE FROM public.GE2_TOK WHERE TOK_TOKEN = 'TOK-T32'")
+    TCSqlExec("INSERT INTO public.GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'TOK-T32', 'REST-ADM', '01', '" + cFil + "', '127.0.0.1', '20260925 00:00:00', '20990101 00:00:00')")
     aRes := GEBREST("DELETE", "/monitor/sessao/x' OR '1'='1", {}, "REST-ADM", "127.0.0.1")
     // Valor escapado (GEBDBQuote): a busca nao acha nada -> 404 (antes, 400
     // por uma guarda de aspas). O que importa: TOK-T32 continua valido.
@@ -953,7 +960,7 @@ User Function T_GEBREST()
         lOk := .F.
         ConOut("    FAIL: token com aspas esperado 404/400, got " + cValToChar(aRes[1]))
     EndIf
-    If Len(TCSqlQuery("SELECT TOK_TOKEN FROM GE2_TOK WHERE TOK_TOKEN = 'TOK-T32' AND D_E_L_E_T_ = ' '")) != 1
+    If Len(TCSqlQuery("SELECT TOK_TOKEN FROM public.GE2_TOK WHERE TOK_TOKEN = 'TOK-T32' AND D_E_L_E_T_ = ' '")) != 1
         lOk := .F.
         ConOut("    FAIL: token TOK-T32 foi invalidado pela injecao")
     EndIf
@@ -964,13 +971,13 @@ User Function T_GEBREST()
     Else
         ConOut("    OK: 400 nos dois casos")
     EndIf
-    TCSqlExec("DELETE FROM GE2_TOK WHERE TOK_TOKEN = 'TOK-T32'")
+    TCSqlExec("DELETE FROM public.GE2_TOK WHERE TOK_TOKEN = 'TOK-T32'")
 
     // ===== CLEANUP =====
     TCSqlExec("DELETE FROM GE1 WHERE GE1_COD IN ('01','02','03','04')")
-    TCSqlExec("DELETE FROM GE2 WHERE GE2_COD IN ('REST-ADM','REST-OP','REST-NOP','REST_NEW','REST_BAD','REST_RBAC','REST_NOEMP')")
-    TCSqlExec("DELETE FROM GE2_SEC WHERE SEC_USUARIO IN ('REST-ADM','REST-OP','REST_NEW','REST_BAD','REST_RBAC','REST_NOEMP')")
-    TCSqlExec("DELETE FROM GE2_EMP WHERE GE2_EMP_USUARIO IN ('REST-ADM','REST-OP','REST_NEW','REST_RBAC')")
+    TCSqlExec("DELETE FROM public.GE2 WHERE GE2_COD IN ('REST-ADM','REST-OP','REST-NOP','REST_NEW','REST_BAD','REST_RBAC','REST_NOEMP')")
+    TCSqlExec("DELETE FROM public.GE2_SEC WHERE SEC_USUARIO IN ('REST-ADM','REST-OP','REST_NEW','REST_BAD','REST_RBAC','REST_NOEMP')")
+    TCSqlExec("DELETE FROM public.GE2_EMP WHERE GE2_EMP_USUARIO IN ('REST-ADM','REST-OP','REST_NEW','REST_RBAC')")
     TCSqlExec("DROP SCHEMA IF EXISTS emp_zzgebrest CASCADE")
     TCSqlExec("DELETE FROM SEC_PERM WHERE SEC_PERM_PERFIL IN ('ADMIN','OPERADOR')")
     TCSqlExec("DELETE FROM GE4 WHERE GE4_EVENTO = 'SEG_RATELIMIT'")

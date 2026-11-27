@@ -42,7 +42,7 @@ User Function T_GeExp_CTX()
     Local cEmpA := "01"
     Local cEmpB := "02"
     Local cFil := "      "
-    Local cUsu := "TESTE01"
+    Local cUsu := "T_GCTX01"
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_geexp_ctx CASCADE")
     TCSqlExec("CREATE SCHEMA test_geexp_ctx")
@@ -63,8 +63,10 @@ User Function T_GeExp_CTX()
     EndIf
 
     // Insere usuario TESTE01 vinculado SO a empresa A (NAO a empresa B) via GE2_EMP.
-    TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '      ', 'TESTE01', 'Usuario Teste', 'ADMIN')")
-    TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA) VALUES (' ', '      ', 'TESTE01', '01')")
+    // Catalogo (GE2/GE2_EMP) e' global em public: GEBEXPCONTEXTO consulta
+    // public.<tabela> explicitamente, entao o fixture grava la' e limpa depois.
+    TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '      ', 'T_GCTX01', 'Usuario Teste', 'ADMIN')")
+    TCSqlExec("INSERT INTO public.GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA) VALUES (' ', '      ', 'T_GCTX01', '01')")
 
     // 2. GEBEXPCONTEXTO usuario valido empresa A => .T.
     lTmp := GEBEXPCONTEXTO(cEmpA, cFil, cUsu)
@@ -114,10 +116,10 @@ User Function T_GeExp_CTX()
     EndIf
 
     // Cleanup.
-    TCSqlExec("DELETE FROM GEH WHERE GEH_USUARIO = 'TESTE01'")
+    TCSqlExec("DELETE FROM GEH WHERE GEH_USUARIO = 'T_GCTX01'")
     TCSqlExec("DELETE FROM GEX WHERE D_E_L_E_T_ = ' '")
-    TCSqlExec("DELETE FROM GE2_EMP WHERE GE2_EMP_USUARIO = 'TESTE01'")
-    TCSqlExec("DELETE FROM GE2 WHERE GE2_COD = 'TESTE01'")
+    TCSqlExec("DELETE FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = 'T_GCTX01'")
+    TCSqlExec("DELETE FROM public.GE2 WHERE GE2_COD = 'T_GCTX01'")
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_geexp_ctx CASCADE")
 

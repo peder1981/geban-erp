@@ -27,6 +27,7 @@ User Function T_GEBMON()
     Local cHojeStr := ""
     Local cAmanhaStr := ""
     Local nOnlineGet := -1
+    Local nOnline0 := 0
 
     If !GEBDBConecta()
         ConOut("T_GEBMON: GEBDBConecta fail")
@@ -48,6 +49,11 @@ User Function T_GEBMON()
     GBAUDINIC()
     GEBMONINIC()
 
+    // Baseline: GE2_TOK e' catalogo global (public) e acumula tokens de
+    // outros testes; a metrica conta todos os validos, entao o assert usa
+    // o delta em vez de um total absoluto.
+    nOnline0 := GEBMONMETRICAS()[1]
+
     // GEBSECTOKEN() deve expirar em ~8h (mesmo dia ou dia seguinte), nao
     // em ~480 dias -- cobre a correcao de Date()+N em GEBSEC_TOKEN.prw.
     cTokGer := GEBSECTOKEN("usrtest", "01", "01", "127.0.0.1")
@@ -55,7 +61,7 @@ User Function T_GEBMON()
         ConOut("T_GEBMON: GEBSECTOKEN nao gerou token")
         lOk := .F.
     Else
-        aTokRow := TCSqlQuery("SELECT TOK_EXPIRES FROM GE2_TOK WHERE TOK_TOKEN = '" + cTokGer + "'")
+        aTokRow := TCSqlQuery("SELECT TOK_EXPIRES FROM public.GE2_TOK WHERE TOK_TOKEN = '" + cTokGer + "'")
         If Len(aTokRow) != 1
             ConOut("T_GEBMON: token gerado nao encontrado em GE2_TOK")
             lOk := .F.
@@ -79,8 +85,8 @@ User Function T_GEBMON()
     // no futuro) deve contar. Datas fixas (nao Date()+/-N) porque, neste
     // runtime AdvPP, Date()+N nao devolve tipo Date (ver nota em
     // GEBSEC_TOKEN.prw); usar literais evita depender desse operador aqui.
-    TCSqlExec("INSERT INTO GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'tok_expirado', 'usrexp', '01', '01', '127.0.0.1', '20200101 00:00:00', '20200102 00:00:00')")
-    TCSqlExec("INSERT INTO GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'tok_valido', 'usrval', '01', '01', '127.0.0.1', '20301231 00:00:00', '20301231 23:59:59')")
+    TCSqlExec("INSERT INTO public.GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'tok_expirado_tmon', 'usrexp_tmon', '01', '01', '127.0.0.1', '20200101 00:00:00', '20200102 00:00:00')")
+    TCSqlExec("INSERT INTO public.GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'tok_valido_tmon', 'usrval_tmon', '01', '01', '127.0.0.1', '20301231 00:00:00', '20301231 23:59:59')")
 
     aMet := GEBMONMETRICAS()
     aList := GEBMONLISTAR()
@@ -94,11 +100,13 @@ User Function T_GEBMON()
     If Len(aMet) >= 1
         nOnlineGet := aMet[1]
     EndIf
-    If nOnlineGet != 2
-        ConOut("T_GEBMON: nUsuariosOnline esperado 2, obtido " + cValToChar(nOnlineGet))
+    If nOnlineGet != nOnline0 + 2
+        ConOut("T_GEBMON: nUsuariosOnline esperado " + cValToChar(nOnline0 + 2) + " (baseline+2), obtido " + cValToChar(nOnlineGet))
         lOk := .F.
     EndIf
 
+    TCSqlExec("DELETE FROM public.GE2_TOK WHERE TOK_TOKEN = " + GEBDBQuote(cTokGer))
+    TCSqlExec("DELETE FROM public.GE2_TOK WHERE TOK_USUARIO IN ('usrexp_tmon', 'usrval_tmon')")
     TCSqlExec("DROP SCHEMA IF EXISTS emp_test_mon CASCADE")
 
     If lOk

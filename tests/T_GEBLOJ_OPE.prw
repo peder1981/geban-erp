@@ -98,11 +98,13 @@ User Function T_GEBLOJ_OPE()
         "(' ', '      ', 'P2', 'N2', 'Produto 2'), (' ', '      ', 'P3', 'N2', 'Queijo kg')")
     TCSqlExec("INSERT INTO GF2 (D_E_L_E_T_, GF2_FILIAL, GF2_NCM, GF2_IBS, GF2_CBS, GF2_INI, GF2_FIM) VALUES (' ', '      ', 'N1', 10, 5, '20200101', '20991231')")
     // Supervisor ADMIN com senha (perfil ADMIN tem LOJA/DESCONTO).
-    TCSqlExec("INSERT INTO GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '      ', 'sup1', 'Supervisor', 'ADMIN')")
-    TCSqlExec("INSERT INTO GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH) VALUES (' ', '      ', 'sup1', 'salgadinho123456', " + ;
+    // Catalogo de identidade e' global em public: GEBSECLOGIN/GEBSECRBAC
+    // consultam public.<tabela> explicitamente.
+    TCSqlExec("INSERT INTO public.GE2 (D_E_L_E_T_, GE2_FILIAL, GE2_COD, GE2_NOME, GE2_PERFIL) VALUES (' ', '      ', 'T_LOJOP1', 'Supervisor', 'ADMIN')")
+    TCSqlExec("INSERT INTO public.GE2_SEC (D_E_L_E_T_, SEC_FILIAL, SEC_USUARIO, SEC_SALT, SEC_HASH) VALUES (' ', '      ', 'T_LOJOP1', 'salgadinho123456', " + ;
         GEBDBQuote(HashSenha("Senha#Forte1", "salgadinho123456")) + ")")
     // Perfil e' por empresa (GE2_EMP): supervisor ADMIN na empresa do teste.
-    TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '', 'sup1', 'lojope', 'ADMIN')")
+    TCSqlExec("INSERT INTO public.GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '', 'T_LOJOP1', 'lojope', 'ADMIN')")
     GEBFATPRC("", "P1", 10)
     GEBFATPRC("", "P2", 20)
     GEBFATPRC("", "P3", 50)
@@ -150,10 +152,10 @@ User Function T_GEBLOJ_OPE()
     BOSETPARM("LOJ_DESC_MAX", "10")
     aR := GEBLOJVEN(cSes, {{"P2", 2, 20}}, {{"DINHEIRO", 35}}, "", 5)
     lOk := Chk(lOk, "desconto acima", !aR[1] .And. "desconto_acima_do_limite" $ aR[2])
-    lOk := Chk(lOk, "supervisor senha errada", !GEBLOJVEN(cSes, {{"P2", 2, 20}}, {{"DINHEIRO", 35}}, "", 5, "", "", "sup1", "errada")[1])
-    aR := GEBLOJVEN(cSes, {{"P2", 2, 20}}, {{"DINHEIRO", 35}}, "", 5, "", "", "sup1", "Senha#Forte1")
+    lOk := Chk(lOk, "supervisor senha errada", !GEBLOJVEN(cSes, {{"P2", 2, 20}}, {{"DINHEIRO", 35}}, "", 5, "", "", "T_LOJOP1", "errada")[1])
+    aR := GEBLOJVEN(cSes, {{"P2", 2, 20}}, {{"DINHEIRO", 35}}, "", 5, "", "", "T_LOJOP1", "Senha#Forte1")
     lOk := Chk(lOk, "venda C liberada", aR[1] .And. aR[3][2] == 35)
-    lOk := Chk(lOk, "quem liberou", aR[1] .And. BOCOL(TCSqlQuery("SELECT GLJB_AUTOR AS A FROM GLJB WHERE GLJB_CUPOM = " + GEBDBQuote(aR[3][1]))[1]:A) == "sup1")
+    lOk := Chk(lOk, "quem liberou", aR[1] .And. BOCOL(TCSqlQuery("SELECT GLJB_AUTOR AS A FROM GLJB WHERE GLJB_CUPOM = " + GEBDBQuote(aR[3][1]))[1]:A) == "T_LOJOP1")
 
     // Devolucao e vale-troca
     lOk := Chk(lOk, "devolucao fora do cupom", !GEBLOJDEV(cSes, cA, {{"P9", 1}}, "VALE", "")[1])
@@ -209,14 +211,18 @@ User Function T_GEBLOJ_OPE()
 
     // Operador com LOJA/DESCONTO libera sozinho.
     GEBLOJCX("02", "Caixa 2", "", "")
-    cSes := GEBLOJABRE("02", "sup1", 0, "20261016")[3]
+    cSes := GEBLOJABRE("02", "T_LOJOP1", 0, "20261016")[3]
     lOk := Chk(lOk, "operador libera", GEBLOJVEN(cSes, {{"P2", 1, 20}}, {{"DINHEIRO", 15}}, "", 5)[1])
 
     // Contabil
     lOk := Chk(lOk, "devolucao contabil", Abs(Chave(GEBCTXRAZAO("3.02.001", "20261001", "20261031")[3][1], "saldo_final")) == 20)
     lOk := Chk(lOk, "vale contabil", Abs(Chave(GEBCTXRAZAO("2.01.003", "20261001", "20261031")[3][1], "saldo_final")) == 6.67)
 
+    TCSqlExec("DELETE FROM public.GE2_EMP WHERE GE2_EMP_USUARIO = 'T_LOJOP1'")
+    TCSqlExec("DELETE FROM public.GE2_SEC WHERE SEC_USUARIO = 'T_LOJOP1'")
+    TCSqlExec("DELETE FROM public.GE2 WHERE GE2_COD = 'T_LOJOP1'")
     TCSqlExec("DROP SCHEMA IF EXISTS test_geblojope CASCADE")
+    TCSqlExec("DROP SCHEMA IF EXISTS emp_lojope CASCADE")
     If lOk
         ConOut("T_GEBLOJ_OPE PASS")
     Else
