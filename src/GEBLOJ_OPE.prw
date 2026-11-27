@@ -414,6 +414,7 @@ User Function GEBLOJCUPOM(cCupom)
     Local aTxt := {}
     Local aRel := {{"cupom"}}
     Local aDfe := {}
+    Local aR := {}
     Local nTroco := 0
     Local nI := 0
     cCupom := Upper(BOCOL(cCupom))
@@ -421,7 +422,7 @@ User Function GEBLOJCUPOM(cCupom)
         Return {.F., "falha_tabelas", {}}
     EndIf
     aC := TCSqlQuery("SELECT GLJ3_SESSAO AS S, GLJ3_DATA AS D, GLJ3_CLI AS C, GLJ3_BRUTO AS B, GLJ3_DESC AS DE, GLJ3_TOTAL AS T, GLJ3_STATUS AS ST, " + ;
-        "GLJ3_NOTA AS N FROM GLJ3 WHERE GLJ3_FILIAL = " + GEBDBQuote(FWxFilial("GLJ3")) + " AND GLJ3_CUPOM = " + GEBDBQuote(cCupom) + " AND D_E_L_E_T_ = ' '")
+        "GLJ3_NOTA AS N, GLJ3_REGIME AS RG FROM GLJ3 WHERE GLJ3_FILIAL = " + GEBDBQuote(FWxFilial("GLJ3")) + " AND GLJ3_CUPOM = " + GEBDBQuote(cCupom) + " AND D_E_L_E_T_ = ' '")
     If Len(aC) == 0
         Return {.F., "cupom_inexistente: " + cCupom, {}}
     EndIf
@@ -459,6 +460,9 @@ User Function GEBLOJCUPOM(cCupom)
         aAdd(aTxt, "  promocao " + BOCOL(aHit[nI]:PM) + " em " + BOCOL(aHit[nI]:P) + ": -" + BONUM(BOVAL(aHit[nI]:D), 2))
     Next nI
     aAdd(aTxt, "Bruto " + BONUM(BOVAL(aC[1]:B), 2) + "  Desconto " + BONUM(BOVAL(aC[1]:DE), 2) + "  TOTAL " + BONUM(BOVAL(aC[1]:T), 2))
+    If !(BOCOL(aC[1]:RG) == "")
+        aAdd(aTxt, "Regime: " + BOCOL(aC[1]:RG))
+    EndIf
     aHit := TCSqlQuery("SELECT GLJ5_FORMA AS F, GLJ5_VALOR AS V, GLJ5_TROCO AS T, GLJ5_PARC AS PC, GLJ5_DOC AS D FROM GLJ5 WHERE GLJ5_FILIAL = " + ;
         GEBDBQuote(FWxFilial("GLJ5")) + " AND GLJ5_CUPOM = " + GEBDBQuote(cCupom) + " AND D_E_L_E_T_ = ' ' ORDER BY R_E_C_N_O_")
     For nI := 1 To Len(aHit)
@@ -475,6 +479,13 @@ User Function GEBLOJCUPOM(cCupom)
         EndIf
     Next nI
     aAdd(aTxt, "TROCO " + BONUM(nTroco, 2))
+    // Crypto: detalhe da conversao (moeda, quantidade e endereco) de GCK2.
+    aR := GEBCRYPAGOS(cCupom)
+    If aR[1]
+        For nI := 1 To Len(aR[3])
+            aAdd(aTxt, "CRYPTO " + aR[3][nI][1] + " " + cValToChar(aR[3][nI][4]) + " = R$ " + BONUM(aR[3][nI][3], 2) + " -> " + aR[3][nI][2])
+        Next nI
+    EndIf
     aHit := TCSqlQuery("SELECT GLJH_DEV AS D, GLJH_PROD AS P, GLJH_QTD AS Q, GLJH_VALOR AS V, GLJH_MODO AS M FROM GLJH WHERE GLJH_FILIAL = " + ;
         GEBDBQuote(FWxFilial("GLJH")) + " AND GLJH_CUPOM = " + GEBDBQuote(cCupom) + " AND D_E_L_E_T_ = ' ' ORDER BY R_E_C_N_O_")
     For nI := 1 To Len(aHit)

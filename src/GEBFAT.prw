@@ -38,6 +38,9 @@ User Function GEBFATMIG()
     lOk := lOk .And. BOTAB("GFT2", "GFT2_TAB TEXT NOT NULL, GFT2_PROD TEXT NOT NULL, GFT2_PRECO NUMERIC(18,6) NOT NULL", "GFT2_TAB")
     lOk := lOk .And. BOTAB("GFT3", "GFT3_NUM TEXT NOT NULL, GFT3_CLI TEXT NOT NULL, GFT3_COND TEXT NOT NULL, GFT3_EMISSAO TEXT NOT NULL, " + ;
         "GFT3_LOCAL TEXT NOT NULL, GFT3_DESC NUMERIC(8,4) NOT NULL, GFT3_STATUS TEXT NOT NULL, GFT3_MOTIVO TEXT NOT NULL, GFT3_CC TEXT NOT NULL", "GFT3_NUM")
+    // Regime da venda (DIFAL extraoficial): COMPROVANTE = sem documento
+    // fiscal; FISCAL/vazio = comportamento padrao.
+    lOk := lOk .And. TCSqlExec("ALTER TABLE GFT3 ADD COLUMN IF NOT EXISTS GFT3_REGIME TEXT NOT NULL DEFAULT ' '")
     lOk := lOk .And. BOTAB("GFT4", "GFT4_NUM TEXT NOT NULL, GFT4_PROD TEXT NOT NULL, GFT4_QTD NUMERIC(18,4) NOT NULL, " + ;
         "GFT4_PRECO NUMERIC(18,6) NOT NULL, GFT4_QTDFAT NUMERIC(18,4) NOT NULL", "GFT4_NUM")
     lOk := lOk .And. BOTAB("GFT5", "GFT5_NOTA TEXT NOT NULL, GFT5_PED TEXT NOT NULL, GFT5_CLI TEXT NOT NULL, GFT5_DATA TEXT NOT NULL, " + ;
@@ -113,13 +116,15 @@ Return {.T., "preco gravado na tabela " + cTab}
     @param aItens {{cProd, nQtd[, nPreco]}...}
     @return {lOk, cMsg, {cNum, nTotal}}
 /*/
-User Function GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC)
+User Function GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC, cRegime)
     Local aCli := {}
     Local aIt := {}
     Local nPreco := 0
     Local nTot := 0
+    Local nMaxDesc := 0
     Local nI := 0
     Local nJ := 0
+    Local cReg := Upper(BOCOL(cRegime))
 
     cNum := Upper(BOCOL(cNum))
     cCli := Upper(BOCOL(cCli))
@@ -127,6 +132,12 @@ User Function GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC)
     cData := BODATA(cData)
     If cData == "" .Or. nDesc < 0 .Or. nDesc >= 100
         Return {.F., "data_ou_desconto_invalidos", {}}
+    EndIf
+    If cReg == ""
+        cReg := "FISCAL"
+    EndIf
+    If !(cReg == "FISCAL" .Or. cReg == "COMPROVANTE")
+        Return {.F., "regime_invalido: FISCAL ou COMPROVANTE", {}}
     EndIf
     If aItens == Nil .Or. Len(aItens) == 0
         Return {.F., "sem_itens", {}}
@@ -143,6 +154,15 @@ User Function GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC)
     EndIf
     If !GEBFXPARC(cCond, 1, cData)[1]
         Return {.F., "condicao_inexistente: " + BOCOL(cCond), {}}
+    EndIf
+    // DIFAL extraoficial: com LOJ_REG_ATIVO=S o teto de desconto depende do
+    // regime (COMPROVANTE -> LOJ_REG_DESCC, FISCAL -> LOJ_REG_DESCF).
+    // No pedido nao ha forma de pagamento, entao nao se testa "dinheiro".
+    If BOPARM("LOJ_REG_ATIVO", "N") == "S"
+        nMaxDesc := BOVAL(BOPARM(Iif(cReg == "COMPROVANTE", "LOJ_REG_DESCC", "LOJ_REG_DESCF"), "10"))
+        If nDesc > nMaxDesc
+            Return {.F., "desconto_acima_do_limite: " + BONUM(nMaxDesc, 2) + "% no regime " + cReg, {}}
+        EndIf
     EndIf
     If !GEBCTXRATEIA(cCC, 1)[1]
         Return {.F., GEBCTXRATEIA(cCC, 1)[2], {}}
@@ -174,9 +194,9 @@ User Function GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC)
     ElseIf Len(FATPedido(cNum)) > 0
         Return {.F., "pedido_duplicado: " + cNum, {}}
     EndIf
-    TCSqlExec("INSERT INTO GFT3 (D_E_L_E_T_, GFT3_FILIAL, GFT3_NUM, GFT3_CLI, GFT3_COND, GFT3_EMISSAO, GFT3_LOCAL, GFT3_DESC, GFT3_STATUS, GFT3_MOTIVO, GFT3_CC) VALUES (' ', " + ;
+    TCSqlExec("INSERT INTO GFT3 (D_E_L_E_T_, GFT3_FILIAL, GFT3_NUM, GFT3_CLI, GFT3_COND, GFT3_EMISSAO, GFT3_LOCAL, GFT3_DESC, GFT3_STATUS, GFT3_MOTIVO, GFT3_CC, GFT3_REGIME) VALUES (' ', " + ;
         GEBDBQuote(FWxFilial("GFT3")) + ", " + GEBDBQuote(cNum) + ", " + GEBDBQuote(cCli) + ", " + GEBDBQuote(Upper(BOCOL(cCond))) + ", " + ;
-        GEBDBQuote(cData) + ", " + GEBDBQuote(BOCOL(cLocal)) + ", " + BONUM(nDesc, 4) + ", 'ABERTO', '', " + GEBDBQuote(Upper(BOCOL(cCC))) + ")")
+        GEBDBQuote(cData) + ", " + GEBDBQuote(BOCOL(cLocal)) + ", " + BONUM(nDesc, 4) + ", 'ABERTO', '', " + GEBDBQuote(Upper(BOCOL(cCC))) + ", " + GEBDBQuote(cReg) + ")")
     For nI := 1 To Len(aIt)
         TCSqlExec("INSERT INTO GFT4 (D_E_L_E_T_, GFT4_FILIAL, GFT4_NUM, GFT4_PROD, GFT4_QTD, GFT4_PRECO, GFT4_QTDFAT) VALUES (' ', " + ;
             GEBDBQuote(FWxFilial("GFT4")) + ", " + GEBDBQuote(cNum) + ", " + GEBDBQuote(aIt[nI][1]) + ", " + BONUM(aIt[nI][2], 4) + ", " + ;
@@ -362,7 +382,8 @@ User Function GEBFATFAT(cNum, aItens, cData, cNota)
     EndIf
 
     // NF-e real (GE4 DFE_NFE = S): autorizada antes de gravar; recusada = nada gravado.
-    If BOPARM("DFE_NFE", "N") == "S"
+    // Regime COMPROVANTE nunca emite documento fiscal (so' comprovante interno).
+    If BOPARM("DFE_NFE", "N") == "S" .And. !(aP[8] == "COMPROVANTE")
         aR := GEBFXPARC(aP[3], nTot, cData)
         oDfe := JsonObject():New()
         oDfe["ORIGEM"] := "FAT"
@@ -387,7 +408,7 @@ User Function GEBFATFAT(cNum, aItens, cData, cNota)
         cNota := aR[3][1]
     EndIf
     aNF := GEBFATNOTA(cNota, aFat, cData)
-    If BOPARM("DFE_NFE", "N") == "S"
+    If BOPARM("DFE_NFE", "N") == "S" .And. !(aP[8] == "COMPROVANTE")
         TCSqlExec("UPDATE GF3 SET GF3_STATUS = 'AUTORIZADA' WHERE GF3_FILIAL = " + GEBDBQuote(FWxFilial("GF3")) + " AND GF3_CHAVE = " + GEBDBQuote(cNota) + ;
             " AND D_E_L_E_T_ = ' '")
         aNF[1] := "NF-e autorizada"
@@ -755,14 +776,14 @@ Static Function FATCliente(cCli)
     EndIf
 Return {cCli, BOCOL(aHit[1]:N), BOVAL(aHit[1]:L), BOCOL(aHit[1]:C), BOCOL(aHit[1]:T)}
 
-// Pedido: {cNum, cCli, cCond, cLocal, cStatus, nDesc, cCentroCusto}; {} se nao existe.
+// Pedido: {cNum, cCli, cCond, cLocal, cStatus, nDesc, cCentroCusto, cRegime}; {} se nao existe.
 Static Function FATPedido(cNum)
-    Local aHit := TCSqlQuery("SELECT GFT3_CLI AS C, GFT3_COND AS CO, GFT3_LOCAL AS L, GFT3_STATUS AS S, GFT3_DESC AS D, GFT3_CC AS CC FROM GFT3 WHERE GFT3_FILIAL = " + ;
+    Local aHit := TCSqlQuery("SELECT GFT3_CLI AS C, GFT3_COND AS CO, GFT3_LOCAL AS L, GFT3_STATUS AS S, GFT3_DESC AS D, GFT3_CC AS CC, GFT3_REGIME AS RG FROM GFT3 WHERE GFT3_FILIAL = " + ;
         GEBDBQuote(FWxFilial("GFT3")) + " AND GFT3_NUM = " + GEBDBQuote(cNum) + " AND D_E_L_E_T_ = ' '")
     If Len(aHit) == 0
         Return {}
     EndIf
-Return {cNum, BOCOL(aHit[1]:C), BOCOL(aHit[1]:CO), BOCOL(aHit[1]:L), BOCOL(aHit[1]:S), BOVAL(aHit[1]:D), BOCOL(aHit[1]:CC)}
+Return {cNum, BOCOL(aHit[1]:C), BOCOL(aHit[1]:CO), BOCOL(aHit[1]:L), BOCOL(aHit[1]:S), BOVAL(aHit[1]:D), BOCOL(aHit[1]:CC), BOCOL(aHit[1]:RG)}
 
 // Itens com saldo: {{cProd, nSaldo, nPreco}...}.
 Static Function FATPendente(cNum)

@@ -4,6 +4,7 @@
 #include "GEBSEC_LOGIN.prw"
 #include "GEBDFE_DIST.prw"
 #include "GEBSN.prw"
+#include "GESSAR.prw"
 
 /*/{Protheus.doc} GEBSCH
     Agendador de rotinas por empresa (referencia: Schedule Protheus, TOTVS).
@@ -197,6 +198,9 @@ User Function GEBSCHRODA()
             TCSqlExec("INSERT INTO SCH_LOG (D_E_L_E_T_, SCH_LFILIAL, SCH_LROTINA, SCH_LDATA, SCH_LHORA, SCH_LSTATUS, SCH_LMSG) VALUES (' ', '', " + GEBDBQuote(AllTrim(cValToChar(aJobs[nI]:SCH_ROTINA))) + ", " + GEBDBQuote(cHoje) + ", " + GEBDBQuote(cAgora) + ", " + GEBDBQuote(Iif(aRes[1], "OK", "ERRO")) + ", " + GEBDBQuote(Left(cValToChar(aRes[2]), 200)) + ")")
         EndIf
     Next nI
+    // Gatilho Sarney: regras de reajuste de preco com agenda propria (GSK1),
+    // avaliadas a cada minuto dentro da mesma trava da empresa.
+    nRodou := nRodou + GESSARRUN()
     TCSqlQuery("SELECT pg_advisory_unlock(hashtext(" + GEBDBQuote(cTrava) + ")) AS U")
 Return nRodou
 

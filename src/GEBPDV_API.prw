@@ -136,7 +136,7 @@ User Function GEBPDVCUPOMNOV(cUsuario, aBody)
         Return PDVRES(.F., "pagamentos_obrigatorios", {})
     EndIf
 
-    aR := GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, "", "")
+    aR := GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, "", "", "", BOCOL(aBody:REGIME))
 
 Return PDVRES(aR[1], aR[2], aR)
 
@@ -608,6 +608,69 @@ User Function GEBPDVCAIXARESUMO(cUsuario, cSessao)
     EndIf
 
 Return PDVRES(.T., "resumo_caixa", aR)
+
+// ===== CRYPTO =====
+
+/*/{Protheus.doc} GEBPDVCRYCOT
+    Cotacao crypto das moedas com wallet ativa (para o caixa montar o QR).
+    @type Consulta crypto
+    @author Peder Munksgaard
+    @since 26/11/2026
+/*/
+User Function GEBPDVCRYCOT(cUsuario)
+    Local aR := {}
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBCRYCOT("")
+Return PDVRES(Len(aR) > 0, Iif(Len(aR) > 0, "cotacao_ok", "cotacao_indisponivel"), aR)
+
+/*/{Protheus.doc} GEBPDVCRYWAL LST
+    Lista as wallets crypto da empresa.
+    @type Consulta crypto
+    @author Peder Munksgaard
+    @since 26/11/2026
+/*/
+User Function GEBPDVCRYWALLST(cUsuario)
+    Local aR := {}
+    // PDV/01 basta: o caixa precisa ver as moedas ativas para cobrar.
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBCRYWALLST()
+Return PDVRES(aR[1], aR[2], aR[3])
+
+/*/{Protheus.doc} GEBPDVCRYPREV
+    Previa do pagamento crypto: cotacao + URI do QR para o caixa exibir
+    antes de finalizar. A venda re-cota no servidor na hora (GEBLOJVEN).
+    @type Consulta crypto
+    @author Peder Munksgaard
+    @since 26/11/2026
+/*/
+User Function GEBPDVCRYPREV(cUsuario, cMoeda, nBRL)
+    Local aR := {}
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBCRYQRCODE(cMoeda, nBRL)
+    If !aR[1]
+        Return PDVRES(.F., aR[2], {})
+    EndIf
+Return PDVRES(.T., "qr_ok", {aR[3][1], aR[3][2], aR[3][3], aR[3][4], BOVAL(nBRL)})
+
+/*/{Protheus.doc} GEBPDVCRYWAL REG
+    Cadastra/altera a wallet de uma moeda (CONFIG).
+    @type Cadastro crypto
+    @author Peder Munksgaard
+    @since 26/11/2026
+/*/
+User Function GEBPDVCRYWAL(cUsuario, aBody)
+    Local aR := {}
+    If !GEBSECRBAC(cUsuario, "CONFIG", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBCRYWAL(BOCOL(aBody:MOEDA), BOCOL(aBody:ENDERECO), BOCOL(aBody:ATIVO))
+Return PDVRES(aR[1], aR[2], {})
 
 /*/{Protheus.doc} PDVRES
     Resposta HTTP do PDV no envelope que public/pdv.html le:

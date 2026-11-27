@@ -311,7 +311,7 @@ User Function GEBBOEXEC(cMetodo, cRota, o, cUsu)
         aRes := GEBFATPRC(BOQ(o, "tabela"), BOQ(o, "produto"), BOQN(o, "preco"))
     ElseIf cRota == "faturamento/pedido"
         aRes := GEBFATPED(BOQ(o, "numero"), BOQ(o, "cliente"), BOQITENS(o, "itens", {"produto", "quantidade", "preco"}, {"quantidade", "preco"}), ;
-            BOQ(o, "condicao"), BOQN(o, "desconto"), BOQ(o, "armazem"), BOQ(o, "data"), BOQ(o, "centro"))
+            BOQ(o, "condicao"), BOQN(o, "desconto"), BOQ(o, "armazem"), BOQ(o, "data"), BOQ(o, "centro"), BOQ(o, "regime"))
     ElseIf cRota == "faturamento/liberar"
         If Upper(BOQ(o, "forcar")) == "S" .And. !GEBSECRBAC(cUsu, "FATURAMENTO", "LIBERA")
             Return {.F., "sem_permissao: FATURAMENTO/LIBERA para forcar a liberacao", Nil}

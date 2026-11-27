@@ -128,6 +128,11 @@ User Function GEBWEB(nPorta)
     oSrv:AddRoute("GET", "/api/pdv/perifericos", "U_GEBWAPI_PDVPERIFLIST")
     oSrv:AddRoute("POST", "/api/pdv/perifericos", "U_GEBWAPI_PDVPERIFREG")
     oSrv:AddRoute("DELETE", "/api/pdv/perifericos/{id}", "U_GEBWAPI_PDVPERIFDEL")
+    // Crypto (pagamento em moeda digital)
+    oSrv:AddRoute("GET", "/api/pdv/crypto/cotacao", "U_GEBWAPI_PDVCRYCOT")
+    oSrv:AddRoute("GET", "/api/pdv/crypto/wallets", "U_GEBWAPI_PDVCRYWALLST")
+    oSrv:AddRoute("GET", "/api/pdv/crypto/previa", "U_GEBWAPI_PDVCRYPREV")
+    oSrv:AddRoute("POST", "/api/pdv/crypto/wallet", "U_GEBWAPI_PDVCRYWAL")
     // Interface PDV
     oSrv:AddRoute("GET", "/pdv", "U_GEBPDVHTML")
     oSrv:AddRoute("GET", "/pdv/ws", "U_GEBPDVWS")
@@ -440,3 +445,35 @@ User Function GEBWAPI_PDVPERIFDEL(oReq)
         Return GEBWAPIDENY()
     EndIf
 Return GEBPDVPERIFDEL(cUsu, Val(GEBWAPIFIELD(oReq, "ID")))
+
+User Function GEBWAPI_PDVCRYCOT(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCRYCOT(cUsu)
+
+User Function GEBWAPI_PDVCRYWALLST(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCRYWALLST(cUsu)
+
+User Function GEBWAPI_PDVCRYPREV(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCRYPREV(cUsu, GEBWAPIFIELD(oReq, "MOEDA"), BOVAL(GEBWAPIFIELD(oReq, "VALOR")))
+
+User Function GEBWAPI_PDVCRYWAL(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCRYWAL(cUsu, oReq)

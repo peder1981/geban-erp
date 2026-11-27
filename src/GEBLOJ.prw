@@ -9,6 +9,8 @@
 #include "GEBSEC_LOGIN.prw"
 #include "GEBSEC_RBA.prw"
 #include "GEBDFE.prw"
+#include "GEBCRY.prw"
+#include "GESSAR.prw"
 
 /*/{Protheus.doc} GEBLOJ
     Frente de loja (inspirado em SLG/LOJA120, LOJA701 e SL1/SL2/SL4 do
@@ -58,6 +60,10 @@ User Function GEBLOJMIG()
         "GLJ5_TROCO NUMERIC(18,2) NOT NULL, GLJ5_TAXA NUMERIC(18,2) NOT NULL, GLJ5_DOC TEXT NOT NULL, GLJ5_PARC INTEGER NOT NULL, GLJ5_TEF TEXT NOT NULL", "GLJ5_CUPOM")
     lOk := lOk .And. BOTAB("GLJ6", "GLJ6_SESSAO TEXT NOT NULL, GLJ6_TIPO TEXT NOT NULL, GLJ6_VALOR NUMERIC(18,2) NOT NULL, " + ;
         "GLJ6_MOTIVO TEXT NOT NULL, GLJ6_DATA TEXT NOT NULL", "GLJ6_SESSAO")
+    // Regime da venda (comprovante x fiscal) e crypto: colunas novas nas
+    // tabelas antigas + tabelas dos modulos novos.
+    lOk := lOk .And. TCSqlExec("ALTER TABLE GLJ3 ADD COLUMN IF NOT EXISTS GLJ3_REGIME TEXT NOT NULL DEFAULT ' '")
+    lOk := lOk .And. GEBCRYMIG() .And. GESSARMIG()
 Return lOk
 
 /*/{Protheus.doc} GEBLOJCX
@@ -143,7 +149,7 @@ Return {.T., "sessao " + cSes + " aberta", cSes}
     @param cVend Vendedor (GLJC); cCPF CPF/CNPJ na nota; cOrc orcamento de origem
     @return {lOk, cMsg, {cCupom, nTotal, nTroco, cNota}}
 /*/
-User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc)
+User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc, cRegime)
     Local aSes := {}
     Local aCx := {}
     Local aIt := {}
@@ -155,6 +161,11 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     Local cData := ""
     Local cDoc := ""
     Local cPix := ""
+    Local cCryConta := ""
+    Local cMoeda := ""
+    Local cEndereco := ""
+    Local aCry := {}
+    Local lDin := .F.
     Local nBruto := 0
     Local nTot := 0
     Local nPago := 0
@@ -182,6 +193,15 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     cCPF := GEBLOJDIGITOS(cCPF)
     cOrc := Upper(BOCOL(cOrc))
     cCli := Upper(BOCOL(cCli))
+    // Regime da venda: COMPROVANTE = so' comprovante interno (sem NFC-e);
+    // FISCAL/vazio = comportamento padrao (NFC-e se DFE_NFCE=S).
+    cRegime := Upper(BOCOL(cRegime))
+    If cRegime == ""
+        cRegime := "FISCAL"
+    EndIf
+    If !(cRegime == "FISCAL" .Or. cRegime == "COMPROVANTE")
+        Return {.F., "regime_invalido: FISCAL ou COMPROVANTE", {}}
+    EndIf
     nDesc := Round(BOVAL(nDesc), 2)
     If aItens == Nil .Or. Len(aItens) == 0 .Or. aPagtos == Nil .Or. Len(aPagtos) == 0
         Return {.F., "itens_e_pagamentos_obrigatorios", {}}
@@ -242,7 +262,13 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
         Return {.F., "desconto_invalido", {}}
     EndIf
     // Desconto acima do limite: o operador ou um supervisor com LOJA/DESCONTO libera.
-    nMax := BOVAL(BOPARM("LOJ_DESC_MAX", "100"))
+    // Com LOJ_REG_ATIVO=S o teto depende do regime e de haver dinheiro.
+    For nI := 1 To Len(aPagtos)
+        If Upper(BOCOL(aPagtos[nI][1])) == "DINHEIRO"
+            lDin := .T.
+        EndIf
+    Next nI
+    nMax := LOJDescMax(cRegime, lDin)
     If nDesc > Round(nBruto * nMax / 100, 2)
         If GEBSECRBAC(aSes[6], "LOJA", "DESCONTO")
             cAutor := aSes[6]
@@ -256,8 +282,20 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     EndIf
     For nI := 1 To Len(aPagtos)
         cForma := Upper(BOCOL(aPagtos[nI][1]))
-        If AScan({"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE"}, cForma) == 0 .Or. BOVAL(aPagtos[nI][2]) <= 0
+        If AScan({"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE", "CRYPTO"}, cForma) == 0 .Or. BOVAL(aPagtos[nI][2]) <= 0
             Return {.F., "pagamento_invalido: " + cForma, {}}
+        EndIf
+        If cForma == "CRYPTO"
+            // Doc do pagamento crypto: "MOEDA|ENDERECO".
+            aCry := StrTokArr(LOJDocPg(aPagtos[nI]), "|")
+            If Len(aCry) < 2
+                Return {.F., "crypto_invalido: informe MOEDA|ENDERECO", {}}
+            EndIf
+            cMoeda := Upper(BOCOL(aCry[1]))
+            cEndereco := BOCOL(aCry[2])
+            If GEBCRYMOEDAPOS(cMoeda) == 0 .Or. cEndereco == ""
+                Return {.F., "crypto_invalido: moeda ou endereco", {}}
+            EndIf
         EndIf
         If cForma == "VALE"
             cDoc := LOJDocPg(aPagtos[nI])
@@ -295,10 +333,23 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
         Return {.F., "troco_so_em_dinheiro", {}}
     EndIf
     cPix := BOPARM("LOJ_CONTA_PIX", "BANCO")
+    cCryConta := BOPARM("CRY_CONTA", "")
     For nI := 1 To Len(aPagtos)
         If Upper(BOCOL(aPagtos[nI][1])) == "PIX" .And. Len(TCSqlQuery("SELECT GFN1_CONTA FROM GFN1 WHERE GFN1_FILIAL = " + ;
                 GEBDBQuote(FWxFilial("GFN1")) + " AND GFN1_CONTA = " + GEBDBQuote(cPix) + " AND D_E_L_E_T_ = ' '")) == 0
             Return {.F., "conta_pix_inexistente: " + cPix, {}}
+        EndIf
+        If Upper(BOCOL(aPagtos[nI][1])) == "CRYPTO"
+            If cCryConta == "" .Or. Len(TCSqlQuery("SELECT GFN1_CONTA FROM GFN1 WHERE GFN1_FILIAL = " + GEBDBQuote(FWxFilial("GFN1")) + ;
+                    " AND GFN1_CONTA = " + GEBDBQuote(cCryConta) + " AND D_E_L_E_T_ = ' '")) == 0
+                Return {.F., "conta_crypto_inexistente: configure CRY_CONTA com uma conta do financeiro", {}}
+            EndIf
+            aCry := StrTokArr(LOJDocPg(aPagtos[nI]), "|")
+            cMoeda := Upper(BOCOL(aCry[1]))
+            aR := GEBCRYQRCODE(cMoeda, BOVAL(aPagtos[nI][2]))
+            If !aR[1]
+                Return {.F., "crypto: " + aR[2], {}}
+            EndIf
         EndIf
     Next nI
 
@@ -337,7 +388,8 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     Next nI
 
     // NFC-e real (GE4 DFE_NFCE = S): autorizada ou em contingencia segue; rejeitada desfaz o TEF.
-    If BOPARM("DFE_NFCE", "N") == "S"
+    // Regime COMPROVANTE nunca emite documento fiscal (so' comprovante interno).
+    If BOPARM("DFE_NFCE", "N") == "S" .And. !(cRegime == "COMPROVANTE")
         aDfe := GEBDFENFCE(cCupom, LOJItensDfe(aIt, aBrutoIt), LOJPagDfe(aPagtos, aTefAut), cCPF)
         If !aDfe[1]
             For nJ := 1 To Len(aTef)
@@ -396,6 +448,19 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
                 " <= 0 THEN 'USADO' ELSE 'ABERTO' END WHERE GLJF_FILIAL = " + GEBDBQuote(FWxFilial("GLJF")) + " AND GLJF_VALE = " + GEBDBQuote(cDoc) + ;
                 " AND D_E_L_E_T_ = ' '")
             GEBCTXLP("LOJ_VALE", nVal, cCupom, cData, "", "", aCx[4])
+        ElseIf cForma == "CRYPTO"
+            // Blockchain: valor em BRL cai na conta CRY_CONTA; a quantidade
+            // crypto e a cotacao do momento ficam em GCK2 (auditoria).
+            cDoc := LOJDocPg(aPagtos[nI])
+            aCry := StrTokArr(cDoc, "|")
+            cMoeda := Upper(BOCOL(aCry[1]))
+            aR := GEBCRYQRCODE(cMoeda, nVal)
+            If !aR[1]
+                Return {.F., "crypto: " + aR[2], {}}
+            EndIf
+            GEBFXMOVCONTA(cCryConta, "C", nVal, "Crypto " + cMoeda + " " + cCupom, cCupom, cData)
+            GEBCTXLP("LOJ_CRYPTO", nVal, cCupom, cData, GEBCTXFIN(cCryConta), "", aCx[4])
+            GEBCRYPAGA(cCupom, cMoeda, BOCOL(aCry[2]), nVal, aR[3][3], aR[3][4])
         ElseIf cForma == "DEBITO" .Or. cForma == "CREDITO"
             If cForma == "DEBITO"
                 nTaxa := Round(nVal * BOVAL(BOPARM("LOJ_TAXA_DEB", "1.5")) / 100, 2)
@@ -431,9 +496,9 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     TCSqlExec("INSERT INTO GLJB (D_E_L_E_T_, GLJB_FILIAL, GLJB_CUPOM, GLJB_VEND, GLJB_CPF, GLJB_ORC, GLJB_AUTOR, GLJB_HORA) VALUES (' ', " + ;
         GEBDBQuote(FWxFilial("GLJB")) + ", " + GEBDBQuote(cCupom) + ", " + GEBDBQuote(cVend) + ", " + GEBDBQuote(cCPF) + ", " + GEBDBQuote(cOrc) + ", " + ;
         GEBDBQuote(cAutor) + ", " + GEBDBQuote(Time()) + ")")
-    TCSqlExec("INSERT INTO GLJ3 (D_E_L_E_T_, GLJ3_FILIAL, GLJ3_CUPOM, GLJ3_SESSAO, GLJ3_CLI, GLJ3_DATA, GLJ3_BRUTO, GLJ3_DESC, GLJ3_TOTAL, GLJ3_CUSTO, GLJ3_STATUS, GLJ3_NOTA) VALUES (' ', " + ;
+    TCSqlExec("INSERT INTO GLJ3 (D_E_L_E_T_, GLJ3_FILIAL, GLJ3_CUPOM, GLJ3_SESSAO, GLJ3_CLI, GLJ3_DATA, GLJ3_BRUTO, GLJ3_DESC, GLJ3_TOTAL, GLJ3_CUSTO, GLJ3_STATUS, GLJ3_NOTA, GLJ3_REGIME) VALUES (' ', " + ;
         GEBDBQuote(FWxFilial("GLJ3")) + ", " + GEBDBQuote(cCupom) + ", " + GEBDBQuote(cSessao) + ", " + GEBDBQuote(cCli) + ", " + GEBDBQuote(cData) + ", " + ;
-        BONUM(nBruto, 2) + ", " + BONUM(nDesc, 2) + ", " + BONUM(nTot, 2) + ", " + BONUM(nCusto, 2) + ", 'VENDIDO', " + GEBDBQuote(cNota) + ")")
+        BONUM(nBruto, 2) + ", " + BONUM(nDesc, 2) + ", " + BONUM(nTot, 2) + ", " + BONUM(nCusto, 2) + ", 'VENDIDO', " + GEBDBQuote(cNota) + ", " + GEBDBQuote(cRegime) + ")")
     // TEF: venda gravada, confirma as transacoes.
     For nI := 1 To Len(aTef)
         If !(aTef[nI] == "")
@@ -886,6 +951,18 @@ Return LOJCaixa(Upper(BOCOL(cCaixa)))
 /*/
 User Function GEBLOJESP(cSessao)
 Return LOJEsperado(Upper(BOCOL(cSessao)))
+
+// Teto de desconto (%) conforme o regime da venda. Com LOJ_REG_ATIVO=S:
+// COMPROVANTE + dinheiro usa LOJ_REG_DESCC; demais casos LOJ_REG_DESCF.
+// Sem o recurso ligado, vale LOJ_DESC_MAX (padrao 100 = sem teto).
+Static Function LOJDescMax(cRegime, lDin)
+    If !(BOPARM("LOJ_REG_ATIVO", "N") == "S")
+        Return BOVAL(BOPARM("LOJ_DESC_MAX", "100"))
+    EndIf
+    If cRegime == "COMPROVANTE" .And. lDin
+        Return BOVAL(BOPARM("LOJ_REG_DESCC", "10"))
+    EndIf
+Return BOVAL(BOPARM("LOJ_REG_DESCF", "3"))
 
 // Parcelas de um pagamento (3a posicao; padrao 1).
 Static Function LOJParc(aPg)

@@ -913,7 +913,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBFATMIG` | `GEBFATMIG()` | — |
 | `GEBFATCLI` | `GEBFATCLI(cCod, cNome, cDoc, cUF, nLimite, cCond, cTab)` | Cadastra/altera cliente. |
 | `GEBFATPRC` | `GEBFATPRC(cTab, cProd, nPreco)` | Preco do produto numa tabela (vazia = PADRAO). |
-| `GEBFATPED` | `GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC)` | Pedido de venda. |
+| `GEBFATPED` | `GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC, cRegime)` | Pedido de venda. `cRegime` = `FISCAL` (padrao) ou `COMPROVANTE` (DIFAL extraoficial: teto de desconto por `LOJ_REG_DESCF`/`LOJ_REG_DESCC` e sem NF-e no faturamento). |
 | `GEBFATLIB` | `GEBFATLIB(cNum, lForca)` | Liberacao do pedido (credito e estoque). |
 | `GEBFATCAN` | `GEBFATCAN(cNum)` | Cancela pedido sem nenhum faturamento. |
 | `GEBFATFAT` | `GEBFATFAT(cNum, aItens, cData, cNota)` | Documento de saida do pedido liberado. |
@@ -951,7 +951,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBLOJMIG` | `GEBLOJMIG()` | — |
 | `GEBLOJCX` | `GEBLOJCX(cCod, cNome, cConta, cLocal, cCC)` | Cadastra/altera um caixa. |
 | `GEBLOJABRE` | `GEBLOJABRE(cCaixa, cOper, nFundo, cData)` | Abre a sessao do caixa (uma aberta por caixa). |
-| `GEBLOJVEN` | `GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc)` | Venda no caixa (cupom). |
+| `GEBLOJVEN` | `GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc, cRegime)` | Venda no caixa (cupom). `cRegime` = `FISCAL` (padrao) ou `COMPROVANTE` (sem NFC-e; teto de desconto por regime quando `LOJ_REG_ATIVO=S`). Forma de pagamento `CRYPTO` recebe doc `"MOEDA|ENDERECO"` (BTC/ETH/XMR/USDC/USDT, cotacao CoinGecko, QR no PDV). |
 | `GEBLOJCAN` | `GEBLOJCAN(cCupom, cMotivo)` | Cancela um cupom da sessao aberta. |
 | `GEBLOJSAN` | `GEBLOJSAN(cSessao, cTipo, nValor, cMotivo, cConta)` | Sangria (SANGRIA: caixa -> cofre) ou suprimento (SUPRIMENTO: cofre -> caixa). |
 | `GEBLOJFECHA` | `GEBLOJFECHA(cSessao, nContado)` | Fecha a sessao com o dinheiro contado. |
@@ -1396,6 +1396,8 @@ nunca em código/log/commit. Conta `super` provisionada via `GEBSECCRIAUSU` com
 | `GEBDER_FIN.prw` | Derrama ↔ financeiro: `GEBDERGUIA` (guia + título a pagar de mesmo número; reapuração; guia complementar), `GEBDERPAGA` (paga a guia pelo financeiro), `GEBDERPODEPAR`/`GEBDERPARTIT` (parcelamento em títulos), `GEBDERTITS`, `GEBDERPROV` (provisão contábil pela diferença), `GEBDERFMIG` (GD4) |
 | `GEBRET.prw` | Retenções: `GEBRETCAD` (regra), `GEBRETVAL`, `GEBRETAPL` (na entrada de compra), relatório `GEBRETREL`, `GEBRETMIG` |
 | `GENUC_MIG.prw` | `GEBREGIME()` — regime único da empresa (parâmetro `REGIME`; senão a linha da empresa na GE1 com nome `SIMPLES`; senão `REGULAR`) |
+| `GEBCRY.prw` | Pagamento crypto no PDV: `GEBCRYMIG` (GCK1 wallet, GCK2 auditoria do pagamento), `GEBCRYMOEDAS` (lista fechada BTC/ETH/XMR/USDC/USDT), `GEBCRYWAL`/`GEBCRYWALLST` (wallets), `GEBCRYCOT` (cotação BRL via CoinGecko), `GEBCRYQRCODE` (URI de pagamento BIP21/EIP-681), `GEBCRYPAGA`/`GEBCRYPAGOS` |
+| `GESSAR.prw` | Gatilho Sarney (remarcação agendada de preços): `GESSARMIG` (GSK1 regra, GSK2 override por produto, GSK3 log), `GESSARCFG`/`GESSARLISTA`/`GESSARHIST`, `GESSARPROD` (override), `GESSARDEVE` (decisão pura: slot, vezes, slot único/dia), `GESSARAPLICA` (reajusta GFT2 PADRAO), `GESSARRUN` (executor 1x/min pelo agendador, trava por empresa) |
 
 Todas as funções de negócio devolvem `{lOk, cMsg, xDados}`. Os relatórios devolvem as linhas, com a primeira linha de cabeçalho, mais os totais em pares `{chave, valor}`.
 
@@ -1408,13 +1410,15 @@ Todas as funções de negócio devolvem `{lOk, cMsg, xDados}`. Os relatórios de
 - GD4 complemento da guia da Derrama (tipo, competência, vencimento, conta contábil, credor);
 - GRT1/GRT2 retenções (regras e retenções por documento);
 - GFT1–GFT7 faturamento;
-- GLJ1–GLJ7 loja (GLJ7 transações TEF); GLJ8 códigos de barras, GLJ9 promoções, GLJA promoção aplicada por item, GLJB complemento do cupom (vendedor, CPF, orçamento, quem liberou o desconto, hora), GLJC vendedores, GLJD/GLJE orçamentos, GLJF vales-troca, GLJH devoluções no caixa.
+- GLJ1–GLJ7 loja (GLJ7 transações TEF); GLJ8 códigos de barras, GLJ9 promoções, GLJA promoção aplicada por item, GLJB complemento do cupom (vendedor, CPF, orçamento, quem liberou o desconto, hora), GLJC vendedores, GLJD/GLJE orçamentos, GLJF vales-troca, GLJH devoluções no caixa; GLJ3_REGIME (FISCAL/COMPROVANTE, DIFAL extraoficial);
+- GCK1/GCK2 crypto (wallet do proprietário por moeda e auditoria do pagamento do cupom: moeda, endereço, BRL, quantidade e cotação);
+- GSK1/GSK2/GSK3 Gatilho Sarney (regra de reajuste, override por produto e log de aplicação).
 
-**Parâmetros GE4:** `EST_NEGATIVO`, `EST_VENCIDO`, `EST_FECHADO` (gravado pelo fechamento), `FIN_JUROS_DIA`, `FIN_MULTA`, `COM_ALCADA`, `BCO_DIAS_CONC`, `LOJ_CONTA_PIX`, `LOJ_CONTA_COFRE`, `LOJ_TAXA_DEB`, `LOJ_TAXA_CRED`, `LOJ_FIADO_DIAS`, `LOJ_DESC_MAX` (desconto máximo sem liberação, % do bruto; vazio = sem limite), `LOJ_BALANCA` (PRECO ou PESO na etiqueta), `LOJ_ORC_DIAS` (validade do orçamento, padrão 7), `LOJ_TEF` (S/N), `LOJ_TEF_PROVEDOR` (SIMULADOR/HTTP/CIELO), `LOJ_TEF_URL`, `LOJ_TEF_TOKEN`, `LOJ_TEF_TIMEOUT`, `LOJ_CIELO_URL` (padrão: sandbox), `LOJ_CIELO_MERCHANTID`, `LOJ_CIELO_MERCHANTKEY`, `LOJ_CIELO_CARTAO` e `LOJ_CIELO_BANDEIRA` (cartão usado na venda — só serve para a sandbox ou o emulador; ver docs/02 §19), `REGIME` (SIMPLES/REGULAR; gravado por `GEBSNCFG`), `DER_CONTA` (conta que paga a guia, padrão CAIXA), `DER_DIA_IBSCBS`, `DER_DIA_ICMS`, `DER_DIA_ISS` e `RET_DIA_<tributo>` (dia do vencimento, padrão 20, ajustado para dia útil).
+**Parâmetros GE4:** `EST_NEGATIVO`, `EST_VENCIDO`, `EST_FECHADO` (gravado pelo fechamento), `FIN_JUROS_DIA`, `FIN_MULTA`, `COM_ALCADA`, `BCO_DIAS_CONC`, `LOJ_CONTA_PIX`, `LOJ_CONTA_COFRE`, `LOJ_TAXA_DEB`, `LOJ_TAXA_CRED`, `LOJ_FIADO_DIAS`, `LOJ_DESC_MAX` (desconto máximo sem liberação, % do bruto; vazio = sem limite), `LOJ_BALANCA` (PRECO ou PESO na etiqueta), `LOJ_ORC_DIAS` (validade do orçamento, padrão 7), `LOJ_TEF` (S/N), `LOJ_TEF_PROVEDOR` (SIMULADOR/HTTP/CIELO), `LOJ_TEF_URL`, `LOJ_TEF_TOKEN`, `LOJ_TEF_TIMEOUT`, `LOJ_CIELO_URL` (padrão: sandbox), `LOJ_CIELO_MERCHANTID`, `LOJ_CIELO_MERCHANTKEY`, `LOJ_CIELO_CARTAO` e `LOJ_CIELO_BANDEIRA` (cartão usado na venda — só serve para a sandbox ou o emulador; ver docs/02 §19), `REGIME` (SIMPLES/REGULAR; gravado por `GEBSNCFG`), `DER_CONTA` (conta que paga a guia, padrão CAIXA), `DER_DIA_IBSCBS`, `DER_DIA_ICMS`, `DER_DIA_ISS` e `RET_DIA_<tributo>` (dia do vencimento, padrão 20, ajustado para dia útil); `LOJ_REG_ATIVO` (S/N, DIFAL extraoficial), `LOJ_REG_DESCC` (teto de desconto % com COMPROVANTE + dinheiro, padrão 10) e `LOJ_REG_DESCF` (demais casos, padrão 3); `CRY_CONTA` (conta financeira que recebe o valor crypto, ex.: `CRYPTO`) e `CRY_TIMEOUT` (timeout da cotação CoinGecko, padrão 15s).
 
 **Contas e eventos da integração** (inseridos se faltarem): 2.01.004 IBS/CBS a recolher, 2.01.005 tributos retidos a recolher, 2.01.006 ICMS/ISS a recolher (fora do DAS), 3.02.002 IBS/CBS sobre vendas, 4.02.007 ICMS/ISS fora do DAS; eventos `APU_IBSCBS`, `SN_FORA`, `RET_FORN`, `FIN_RECEITA` (o `SN_DAS` passou a ser usado). Ver docs/02 §20. Frente de loja: `LOJ_VALE` (D 2.01.003 / C 3.01.001, venda paga com vale-troca).
 
-**Venda da loja (`loja/venda`):** além de `sessao`, `itens`, `pagamentos`, `cliente` e `desconto`, aceita `vendedor`, `cpf`, `supervisor` e `senha_supervisor` (desconto acima de `LOJ_DESC_MAX`). Em `itens`, `produto` pode ser o código de barras ou a etiqueta da balança. Em `pagamentos`, a forma `VALE` leva o número do vale em `documento`.
+**Venda da loja (`loja/venda`):** além de `sessao`, `itens`, `pagamentos`, `cliente` e `desconto`, aceita `vendedor`, `cpf`, `supervisor`, `senha_supervisor` (desconto acima de `LOJ_DESC_MAX`) e `regime` (`FISCAL` padrão ou `COMPROVANTE`). Em `itens`, `produto` pode ser o código de barras ou a etiqueta da balança. Em `pagamentos`, a forma `VALE` leva o número do vale em `documento`; a forma `CRYPTO` leva `"MOEDA|ENDERECO"` em `documento` (ex.: `BTC|bc1q...`), exige `CRY_CONTA` configurada e wallet ativa da moeda — a cotação BRL→crypto é buscada no CoinGecko na hora e o QR code é montado no caixa (`/api/pdv/crypto/previa`). Com `regime=COMPROVANTE` a venda não emite NFC-e. Com `LOJ_REG_ATIVO=S`, o teto de desconto passa a depender do regime: `COMPROVANTE` pago em dinheiro usa `LOJ_REG_DESCC`, qualquer outro caso usa `LOJ_REG_DESCF`.
 
 **Entrada de compra (`compras/entrada`):** além de `nota`, `pedido`, `itens`, `frete` e `data`, aceita `retencoes` (códigos da GRT1 separados por vírgula, ex.: `ISS5,IR15`).
 
