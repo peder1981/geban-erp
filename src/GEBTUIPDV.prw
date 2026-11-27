@@ -80,7 +80,7 @@ Return {BOCOL(aHit[1]:S), BOCOL(aHit[1]:C)}
     @since 21/11/2026
 /*/
 Static Function TUIPdvVenda(oApp, oPai, aSt, cUsu)
-    Local aUi   := Array(16) as Array
+    Local aUi   := Array(17) as Array
     Local oWCx  := PoWidget():New(oPai, "Caixa")
     Local oWIt  := PoWidget():New(oPai, "Itens da venda")
     Local oWTot := PoWidget():New(oPai, "Total R$ 0,00")
@@ -135,14 +135,14 @@ Static Function TUIPdvVenda(oApp, oPai, aSt, cUsu)
     aUi[8] := PoInfo():New(oWTot, "Falta / troco", "R$ 0,00")
 
     oWPg:SetCols(8)
-    oFor := PoSelect():New(oWPg, "Forma", {{"Dinheiro", "DINHEIRO"}, {"PIX", "PIX"}, {"Debito", "DEBITO"}, {"Credito", "CREDITO"}, {"Fiado", "FIADO"}, {"Vale-troca", "VALE"}}, "DINHEIRO")
+    oFor := PoSelect():New(oWPg, "Forma", {{"Dinheiro", "DINHEIRO"}, {"PIX", "PIX"}, {"Debito", "DEBITO"}, {"Credito", "CREDITO"}, {"Fiado", "FIADO"}, {"Vale-troca", "VALE"}, {"Crypto", "CRYPTO"}}, "DINHEIRO")
     oFor:SetCols(3)
     oVal := PoNumber():New(oWPg, "Valor", 0)
     oVal:SetCols(3)
     aUi[10] := oVal
     oPar := PoNumber():New(oWPg, "Parcelas", 1)
     oPar:SetCols(2)
-    oVale := PoInput():New(oWPg, "Vale")
+    oVale := PoInput():New(oWPg, "Vale / MOEDA|endere")
     oVale:SetCols(2)
     oB := PoButton():New(oWPg, "Incluir", {|| TUIPdvPaga(oApp, aSt, aUi, BOSTR(oFor:GetValue()), BOVAL(oVal:GetValue()), BOVAL(oPar:GetValue()), BOCOL(oVale:GetValue())), ;
         oVale:SetValue("")})
@@ -163,6 +163,7 @@ Static Function TUIPdvVenda(oApp, oPai, aSt, cUsu)
     aUi[14] := PoInput():New(oWFim, "Cliente (fiado ou orcamento)")
     aUi[15] := PoInput():New(oWFim, "Orcamento (finalizar no caixa)")
     aUi[16] := {PoInput():New(oWFim, "Supervisor (desconto acima do limite)"), PoPassword():New(oWFim, "Senha do supervisor")}
+    aUi[17] := PoSelect():New(oWFim, "Regime", {{"Fiscal (documento fiscal)", "FISCAL"}, {"Comprovante (sem documento fiscal)", "COMPROVANTE"}}, "FISCAL")
     oB := PoButton():New(oWFim, "Finalizar venda", {|| TUIPdvFinaliza(oApp, aSt, aUi, cUsu)})
     oB:Set("kind", "primary")
     oB:Set("icon", "an an-check-circle")
@@ -258,6 +259,12 @@ Static Function TUIPdvPaga(oApp, aSt, aUi, cForma, nValor, nParc, cVale)
     If cForma == "VALE"
         If Empty(cVale)
             oApp:Notify("Informe o numero do vale-troca.", "warning")
+            Return .F.
+        EndIf
+    EndIf
+    If cForma == "CRYPTO"
+        If Empty(cVale) .Or. !("|" $ cVale)
+            oApp:Notify("Crypto: informe MOEDA|ENDERECO (ex.: BTC|bc1q...).", "warning")
             Return .F.
         EndIf
     EndIf
@@ -403,7 +410,7 @@ Static Function TUIPdvPagtos(aSt)
     Local nI  := 0 as Numeric
 
     For nI := 1 To Len(aSt[4])
-        If aSt[4][nI][1] == "VALE"
+        If aSt[4][nI][1] $ "VALE|CRYPTO"
             aAdd(aPg, {aSt[4][nI][1], aSt[4][nI][2], aSt[4][nI][3], aSt[4][nI][4]})
         Else
             aAdd(aPg, {aSt[4][nI][1], aSt[4][nI][2], aSt[4][nI][3]})
@@ -445,9 +452,10 @@ Static Function TUIPdvFinaliza(oApp, aSt, aUi, cUsu)
             Return .F.
         EndIf
         aR := GEBLOJVEN(aSt[1], TUIPdvItens(aSt), TUIPdvPagtos(aSt), BOCOL(aUi[14]:GetValue()), aTot[2], BOCOL(aUi[13]:GetValue()), ;
-            BOCOL(aUi[12]:GetValue()), BOCOL(aUi[16][1]:GetValue()), BOSTR(aUi[16][2]:GetValue()))
+            BOCOL(aUi[12]:GetValue()), BOCOL(aUi[16][1]:GetValue()), BOSTR(aUi[16][2]:GetValue()), "", BOSTR(aUi[17]:GetValue()))
     Else
-        aR := GEBLOJORCFIN(aSt[1], cOrc, TUIPdvPagtos(aSt), BOCOL(aUi[12]:GetValue()), BOCOL(aUi[16][1]:GetValue()), BOSTR(aUi[16][2]:GetValue()))
+        aR := GEBLOJORCFIN(aSt[1], cOrc, TUIPdvPagtos(aSt), BOCOL(aUi[12]:GetValue()), BOCOL(aUi[16][1]:GetValue()), BOSTR(aUi[16][2]:GetValue()), ;
+            BOSTR(aUi[17]:GetValue()))
     EndIf
     If !aR[1]
         If "desconto_acima_do_limite" $ BOSTR(aR[2])

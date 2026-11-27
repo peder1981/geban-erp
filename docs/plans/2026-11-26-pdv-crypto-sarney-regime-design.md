@@ -138,8 +138,13 @@ reajuste".
   `GFT3_REGIME`.
 - Teto do desconto % do pedido segue a mesma regra de parâmetros.
 - `GEBFATFAT` lê o regime do pedido: `COMPROVANTE` **não** chama
-  `GEBDFENFE` (não emite NF-e) mesmo com `DFE_NFE=S`; o documento interno
-  (GF3/GFT5) continua sendo gerado.
+  `GEBDFENFE` (não emite NF-e) mesmo com `DFE_NFE=S`.
+  **Atualização (auditoria transversal):** `COMPROVANTE` também **não**
+  grava GF3/GF4 — um GF3 `NFE/AUTORIZADA` entraria na apuração de DAS
+  (`GEBSN`) e no débito IBS/CBS (`GEBFIS_APU`). O comprovante interno fica
+  só em GFT5/GFT6 (com `GFT5_IBS`/`GFT5_CBS` = 0). Mesma regra no PDV:
+  `GEBLOJVEN` pula `GEBFATNOTA` no regime COMPROVANTE (devolução usa
+  GLJ4/GLJH, não GF4).
 
 ### TUI
 
@@ -155,3 +160,46 @@ reajuste".
   cotação CoinGecko só se houver rede (assert tolerante).
 - `tests/T_GEBLOJREG.prw` — venda com regime COMPROVANTE (sem NFC-e),
   tetos de desconto por regime e registro em GLJ3_REGIME.
+
+## Auditoria transversal (propagação por módulo)
+
+Verificação módulo a módulo após a implementação inicial — lacunas
+encontradas e corrigidas:
+
+| Módulo | Lacuna | Correção |
+|---|---|---|
+| Contábil (`GEBCTX`) | evento `LOJ_CRYPTO` inexistente → `evento_sem_lancamento_padrao` silencioso | `CTXEventos()` ganhou `{"LOJ_CRYPTO","1.01.002","3.01.001"}` |
+| Cancelamento (`GEBLOJCAN`) | CRYPTO caía no `Else` genérico (estornava como cartão, sem devolver `CRY_CONTA`) | ramo próprio: `GEBFXMOVCONTA(CRY_CONTA,"D",…)` + `GEBCTXREV("LOJ_CRYPTO",…)` |
+| Cotação | CoinGecko chamada 2x por venda crypto (validação + liquidação) | cotação cacheada em `aCryQ[nI]` entre as duas passagens |
+| Fiscal NFC-e | `tPag=99` saía com `xPag="Outros"` genérico | `LOJPagDfe` devolve 7ª posição `xPag` ("Crypto BTC" etc.); `GEBDFENFCE` usa `DFEPadrao2(aPag,7,"Outros")` |
+| Fiscal livro | COMPROVANTE gravava GF3 `NFE/AUTORIZADA` → contaminaria DAS (`GEBSN`) e `ApuDebito` (`GEBFIS_APU`) | `GEBLOJVEN` e `GEBFATFAT` pulam `GEBFATNOTA` no regime COMPROVANTE |
+| Relatório | `GEBLOJRESUMO` tinha lista fixa de formas sem CRYPTO | `aFormas` inclui `CRYPTO` |
+| API legada | rota `loja/venda` (GEBBO) não repassava `regime`; `loja/orcamento-finalizar` idem | `BOQ(o,"regime")` adicionado às duas rotas; `GEBLOJORCFIN` ganhou `cRegime` (7º parâmetro) |
+| PDV TUI | `GEBTUIPDV` sem forma CRYPTO, sem doc `MOEDA\|ENDERECO`, sem regime | select CRYPTO, validação `MOEDA\|ENDERECO`, select Regime (FISCAL/COMPROVANTE) passado a `GEBLOJVEN`/`GEBLOJORCFIN` |
+
+Testes estendidos em `tests/T_GEBLOJREG.prw`: COMPROVANTE sem GF3
+(PDV e faturamento), `GFT5_IBS/CBS` = 0, evento `LOJ_CRYPTO` lançável
+via `GEBCTXLP`, e `forma CRYPTO` no `GEBLOJRESUMO`.
+
+## Evidências de validação (suite)
+
+Rodado com `advplc run` contra `geban_test` (Postgres docker) +
+emuladores SEFAZ (`:18766`) e Cielo (`:18765`) com
+`ADVPP_HTTP_INSECURE=1`:
+
+| Teste | Veredito | Observação |
+|---|---|---|
+| `T_GEBLOJREG` | PASS (34 asserts) | incl. comp pdv/fat sem GF3, `GFT5_IBS/CBS`=0, `ctx crypto`, `resumo crypto` |
+| `T_GEBLOJ` | PASS | regressão PDV |
+| `T_GEBFAT` | PASS | regressão faturamento |
+| `T_GEBPDV_API` | PASS | API REST do PDV |
+| `T_GESSAR` | PASS | gatilho Sarney |
+| `T_GEBCRY` | PASS | cotação CoinGecko SKIP (sem rede no ambiente) |
+| `T_GEBTUIPDV` | PASS | PDV TUI (forma CRYPTO + regime) |
+| `T_GeExp_CTX` | PASS | contábil |
+| `T_GEBDFE` | PASS | NFC-e ponta a ponta no emulador SEFAZ (xPag incluso) |
+| `T_GEBFIS_APU` | PASS | apuração IBS/CBS |
+| `T_GEBSN` | PASS | apuração DAS |
+| `T_GEBWEB_API` | PASS | |
+| `T_GEBLOJ_OPE` | PASS | |
+| `T_GEBWEB_OPS` | FAIL | falha pré-existente de ambiente (idêntica no baseline sem estas mudanças) |

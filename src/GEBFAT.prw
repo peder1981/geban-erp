@@ -407,7 +407,13 @@ User Function GEBFATFAT(cNum, aItens, cData, cNota)
         EndIf
         cNota := aR[3][1]
     EndIf
-    aNF := GEBFATNOTA(cNota, aFat, cData)
+    If aP[8] == "COMPROVANTE"
+        // Comprovante interno nao e' documento fiscal: sem GF3/GF4, sem IBS/CBS.
+        // (GF3 com STATUS='AUTORIZADA' entraria na apuracao de DAS e IBS/CBS.)
+        aNF := {"COMPROVANTE", 0, 0, 0}
+    Else
+        aNF := GEBFATNOTA(cNota, aFat, cData)
+    EndIf
     If BOPARM("DFE_NFE", "N") == "S" .And. !(aP[8] == "COMPROVANTE")
         TCSqlExec("UPDATE GF3 SET GF3_STATUS = 'AUTORIZADA' WHERE GF3_FILIAL = " + GEBDBQuote(FWxFilial("GF3")) + " AND GF3_CHAVE = " + GEBDBQuote(cNota) + ;
             " AND D_E_L_E_T_ = ' '")

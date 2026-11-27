@@ -61,6 +61,14 @@ User Function T_GEBLOJREG()
     Local cSes := ""
     Local cNumC := ""
     Local cNumF := ""
+    Local cNotaC := ""
+    Local cNotaF := ""
+    Local cCupomF := ""
+    Local cNotaFatC := ""
+    Local aR2 := {}
+    Local cItem := ""
+    Local nValC := 0
+    Local nI := 0
     Local cEnd := "1A1zP1eBV4YqeZqSypBkMYbB"
 
     If !GEBDBConecta()
@@ -91,13 +99,19 @@ User Function T_GEBLOJREG()
     lOk := Chk(!aR[1] .And. ("regime_invalido" $ BOSTR(aR[2])), "regime invalido", lOk)
     aR := GEBLOJVEN(cSes, {{"P1", 1}}, {{"DINHEIRO", 10}}, "", 0, "", "", "", "", "", "COMPROVANTE")
     lOk := Chk(aR[1], "venda comprovante", lOk)
+    cNotaC := aR[3][4]
     lOk := Chk(Len(TCSqlQuery("SELECT GLJ3_REGIME AS R FROM GLJ3 WHERE GLJ3_CUPOM = " + GEBDBQuote(aR[3][1]))[1]:R) > 0, "cupom gravado", lOk)
     aR := TCSqlQuery("SELECT GLJ3_REGIME AS R, GLJ3_NOTA AS N FROM GLJ3 WHERE GLJ3_CUPOM = " + GEBDBQuote(aR[3][1]))
     lOk := Chk(BOCOL(aR[1]:R) == "COMPROVANTE", "regime gravado", lOk)
+    // COMPROVANTE nao grava documento fiscal (GF3/GF4): nao entra na apuracao de DAS/IBS-CBS.
+    lOk := Chk(Len(TCSqlQuery("SELECT GF3_CHAVE AS K FROM GF3 WHERE GF3_CHAVE = " + GEBDBQuote(cNotaC) + " AND D_E_L_E_T_ = ' '")) == 0, "comp pdv sem gf3", lOk)
     aR := GEBLOJVEN(cSes, {{"P1", 1}}, {{"DINHEIRO", 10}}, "", 0)
     lOk := Chk(aR[1], "venda padrao", lOk)
-    aR := TCSqlQuery("SELECT GLJ3_REGIME AS R FROM GLJ3 WHERE GLJ3_CUPOM = " + GEBDBQuote(aR[3][1]))
+    cCupomF := aR[3][1]
+    cNotaF := aR[3][4]
+    aR := TCSqlQuery("SELECT GLJ3_REGIME AS R FROM GLJ3 WHERE GLJ3_CUPOM = " + GEBDBQuote(cCupomF))
     lOk := Chk(BOCOL(aR[1]:R) == "FISCAL", "regime padrao fiscal", lOk)
+    lOk := Chk(Len(TCSqlQuery("SELECT GF3_CHAVE AS K FROM GF3 WHERE GF3_CHAVE = " + GEBDBQuote(cNotaF) + " AND D_E_L_E_T_ = ' '")) == 1, "fiscal pdv grava gf3", lOk)
 
     // 2. Teto de desconto por regime (bruto = 10,00; desconto em R$).
     BOSETPARM("LOJ_REG_ATIVO", "S")
@@ -124,6 +138,9 @@ User Function T_GEBLOJREG()
     lOk := Chk(!aR[1] .And. ("conta_crypto" $ BOSTR(aR[2])), "crypto sem conta", lOk)
     BOSETPARM("CRY_CONTA", "CRYPTO")
     lOk := Chk(GEBCRYWAL("BTC", cEnd, "S")[1], "wallet btc", lOk)
+    // Evento contabil LOJ_CRYPTO tem lancamento padrao (deb 1.01.002 / cred 3.01.001).
+    aR := GEBCTXLP("LOJ_CRYPTO", 10, "TESTE-CRY", "20261126", "", "", "")
+    lOk := Chk(aR[1], "ctx crypto", lOk)
     // Sem carteira de outro lado: XMR nao tem wallet -> recusa deterministica.
     aR := GEBLOJVEN(cSes, {{"P1", 1}}, {{"CRYPTO", 10, 1, "XMR|4" + cEnd}}, "", 0, "", "", "", "", "", "FISCAL")
     lOk := Chk(!aR[1] .And. ("crypto" $ BOSTR(aR[2])), "crypto sem wallet", lOk)
@@ -171,9 +188,33 @@ User Function T_GEBLOJREG()
     BOSETPARM("DFE_NFE", "S")
     aR := GEBFATFAT(cNumC, {}, "20261126", "")
     lOk := Chk(aR[1], "fat comprovante sem nf-e", lOk)
+    If aR[1]
+        // COMPROVANTE: sem GF3/GF4 e sem IBS/CBS no GFT5 (nada entra na apuracao).
+        cNotaFatC := aR[3][1]
+        lOk := Chk(Len(TCSqlQuery("SELECT GF3_CHAVE AS K FROM GF3 WHERE GF3_CHAVE = " + GEBDBQuote(cNotaFatC) + " AND D_E_L_E_T_ = ' '")) == 0, "comp fat sem gf3", lOk)
+        aR2 := TCSqlQuery("SELECT GFT5_IBS AS I, GFT5_CBS AS C FROM GFT5 WHERE GFT5_NOTA = " + GEBDBQuote(cNotaFatC) + " AND D_E_L_E_T_ = ' '")
+        lOk := Chk(Len(aR2) == 1 .And. (BOVAL(aR2[1]:I) == 0) .And. (BOVAL(aR2[1]:C) == 0), "comp fat sem ibs/cbs", lOk)
+    EndIf
     aR := GEBFATFAT(cNumF, {}, "20261126", "")
     lOk := Chk(!aR[1], "fat fiscal tenta nf-e", lOk)
     BOSETPARM("DFE_NFE", "N")
+
+    // Resumo da sessao consolida CRYPTO junto das demais formas.
+    TCSqlExec("INSERT INTO GLJ5 (D_E_L_E_T_, GLJ5_FILIAL, GLJ5_CUPOM, GLJ5_FORMA, GLJ5_VALOR, GLJ5_TROCO, GLJ5_TAXA, GLJ5_DOC, GLJ5_PARC, GLJ5_TEF) VALUES (' ', " + ;
+        GEBDBQuote(FWxFilial("GLJ5")) + ", " + GEBDBQuote(cCupomF) + ", 'CRYPTO', 4, 0, 0, 'BTC|end', 1, '')")
+    aR := GEBLOJRESUMO(cSes)
+    lOk := Chk(aR[1], "resumo sessao", lOk)
+    If aR[1]
+        cItem := ""
+        nValC := 0
+        For nI := 1 To Len(aR[3])
+            If BOCOL(aR[3][nI][1]) == "forma CRYPTO"
+                cItem := "forma CRYPTO"
+                nValC := BOVAL(aR[3][nI][2])
+            EndIf
+        Next nI
+        lOk := Chk(nValC == 4, "resumo crypto", lOk)
+    EndIf
 
     TCSqlExec("SET search_path TO test_geblojreg")
     TCSqlExec("DROP SCHEMA IF EXISTS test_geblojreg CASCADE")

@@ -952,7 +952,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBLOJCX` | `GEBLOJCX(cCod, cNome, cConta, cLocal, cCC)` | Cadastra/altera um caixa. |
 | `GEBLOJABRE` | `GEBLOJABRE(cCaixa, cOper, nFundo, cData)` | Abre a sessao do caixa (uma aberta por caixa). |
 | `GEBLOJVEN` | `GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc, cRegime)` | Venda no caixa (cupom). `cRegime` = `FISCAL` (padrao) ou `COMPROVANTE` (sem NFC-e; teto de desconto por regime quando `LOJ_REG_ATIVO=S`). Forma de pagamento `CRYPTO` recebe doc `"MOEDA|ENDERECO"` (BTC/ETH/XMR/USDC/USDT, cotacao CoinGecko, QR no PDV). |
-| `GEBLOJCAN` | `GEBLOJCAN(cCupom, cMotivo)` | Cancela um cupom da sessao aberta. |
+| `GEBLOJCAN` | `GEBLOJCAN(cCupom, cMotivo)` | Cancela um cupom da sessao aberta. Estorna cada forma: `CRYPTO` devolve o valor a `CRY_CONTA` e estorna o evento contabil `LOJ_CRYPTO` (a transacao on-chain e' manual, como no PIX). |
 | `GEBLOJSAN` | `GEBLOJSAN(cSessao, cTipo, nValor, cMotivo, cConta)` | Sangria (SANGRIA: caixa -> cofre) ou suprimento (SUPRIMENTO: cofre -> caixa). |
 | `GEBLOJFECHA` | `GEBLOJFECHA(cSessao, nContado)` | Fecha a sessao com o dinheiro contado. |
 | `GEBLOJRESUMO` | `GEBLOJRESUMO(cSessao)` | Relatorio: resumo da sessao (cupons, cancelados, total por forma de pagamento, sangrias, suprimentos, fundo, dinheiro esperado, contado e diferenca). |
@@ -981,7 +981,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GEBLOJORC` | `GEBLOJORC(aItens, cCli, cVend, nDesc, cData)` | Grava o orcamento. |
-| `GEBLOJORCFIN` | `GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup)` | Finaliza o orcamento no caixa: vira cupom (GEBLOJVEN) com os precos do orcamento. |
+| `GEBLOJORCFIN` | `GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup, cRegime)` | Finaliza o orcamento no caixa: vira cupom (GEBLOJVEN) com os precos do orcamento. `cRegime` segue para `GEBLOJVEN` (`FISCAL`/`COMPROVANTE`). |
 | `GEBLOJORCCAN` | `GEBLOJORCCAN(cOrc)` | Cancela o orcamento aberto. |
 | `GEBLOJORCS` | `GEBLOJORCS(cStatus)` | Relatorio: orcamentos pelo status (vazio = ABERTO). |
 | `GEBLOJDEV` | `GEBLOJDEV(cSessao, cCupom, aItens, cModo, cMotivo, oCons)` | Devolucao/troca no caixa (sessao aberta) de itens de um cupom vendido. |
@@ -1386,7 +1386,7 @@ nunca em código/log/commit. Conta `super` provisionada via `GEBSECCRIAUSU` com
 | `GEBFNX.prw` | `GEBFXCOND`, `GEBFXPARC`, `GEBFXTIT`, `GEBFXCALC`, `GEBFXBAI`, `GEBFXTRF`, `GEBFXMOV`, `GEBFXMOVCONTA`, relatórios `GEBFXPOSICAO`/`GEBFXEXTRATO`/`GEBFXFLUXO` |
 | `GEBCPX.prw` | `GEBCPXSC`, `GEBCPXGERA`, `GEBCPXPED`, `GEBCPXAPR`, `GEBCPXENT`, relatórios `GEBCPXABERTOS`/`GEBCPXPORFORN`/`GEBCPXSCPEND` |
 | `GEBFAT.prw` | `GEBFATCLI`, `GEBFATPRC`, `GEBFATPRECO`, `GEBFATPED`, `GEBFATLIB`, `GEBFATCAN`, `GEBFATFAT`, `GEBFATNOTA` (nota com vários itens), `GEBFATDEV`, relatórios `GEBFATREL`/`GEBFATCARTEIRA`/`GEBFATABC` |
-| `GEBLOJ.prw` | `GEBLOJCX`, `GEBLOJABRE`, `GEBLOJVEN` (código de barras, promoção, vendedor, CPF, limite de desconto, pagamento `VALE`), `GEBLOJCAN`, `GEBLOJSAN`, `GEBLOJFECHA`, relatórios `GEBLOJRESUMO`/`GEBLOJVENDAS`; `GEBLOJSES`/`GEBLOJCXA`/`GEBLOJESP` (sessão, caixa, dinheiro esperado) |
+| `GEBLOJ.prw` | `GEBLOJCX`, `GEBLOJABRE`, `GEBLOJVEN` (código de barras, promoção, vendedor, CPF, limite de desconto, pagamento `VALE`/`CRYPTO`, regime `FISCAL`/`COMPROVANTE`), `GEBLOJCAN`, `GEBLOJSAN`, `GEBLOJFECHA`, relatórios `GEBLOJRESUMO`/`GEBLOJVENDAS`; `GEBLOJSES`/`GEBLOJCXA`/`GEBLOJESP` (sessão, caixa, dinheiro esperado) |
 | `GEBLOJ_CAD.prw` | `GEBLOJCADMIG` (GLJ8–GLJH), `GEBLOJBAR` (código de barras/PLU), `GEBLOJEANOK`, `GEBLOJRESOLVE` (produto, GTIN ou etiqueta de balança), `GEBLOJPROMO`, `GEBLOJPRECO` (melhor promoção vigente), `GEBLOJVEND`/`GEBLOJVENDOK`, `GEBLOJCPFOK`, `GEBLOJDIGITOS` |
 | `GEBLOJ_OPE.prw` | `GEBLOJORC`/`GEBLOJORCFIN`/`GEBLOJORCCAN` (orçamento), `GEBLOJDEV` (devolução no caixa), `GEBLOJVALE`, `GEBLOJCUPOM` (segunda via), `GEBLOJCONS` (consulta de preço), relatórios `GEBLOJORCS`/`GEBLOJGER`/`GEBLOJCOMIS` |
 | `GEBBO.prw` | `GEBBOROTAS` (tabela de rotas e permissões), `GEBBOROTA`, `GEBBOEXEC` |
@@ -1418,7 +1418,9 @@ Todas as funções de negócio devolvem `{lOk, cMsg, xDados}`. Os relatórios de
 
 **Contas e eventos da integração** (inseridos se faltarem): 2.01.004 IBS/CBS a recolher, 2.01.005 tributos retidos a recolher, 2.01.006 ICMS/ISS a recolher (fora do DAS), 3.02.002 IBS/CBS sobre vendas, 4.02.007 ICMS/ISS fora do DAS; eventos `APU_IBSCBS`, `SN_FORA`, `RET_FORN`, `FIN_RECEITA` (o `SN_DAS` passou a ser usado). Ver docs/02 §20. Frente de loja: `LOJ_VALE` (D 2.01.003 / C 3.01.001, venda paga com vale-troca).
 
-**Venda da loja (`loja/venda`):** além de `sessao`, `itens`, `pagamentos`, `cliente` e `desconto`, aceita `vendedor`, `cpf`, `supervisor`, `senha_supervisor` (desconto acima de `LOJ_DESC_MAX`) e `regime` (`FISCAL` padrão ou `COMPROVANTE`). Em `itens`, `produto` pode ser o código de barras ou a etiqueta da balança. Em `pagamentos`, a forma `VALE` leva o número do vale em `documento`; a forma `CRYPTO` leva `"MOEDA|ENDERECO"` em `documento` (ex.: `BTC|bc1q...`), exige `CRY_CONTA` configurada e wallet ativa da moeda — a cotação BRL→crypto é buscada no CoinGecko na hora e o QR code é montado no caixa (`/api/pdv/crypto/previa`). Com `regime=COMPROVANTE` a venda não emite NFC-e. Com `LOJ_REG_ATIVO=S`, o teto de desconto passa a depender do regime: `COMPROVANTE` pago em dinheiro usa `LOJ_REG_DESCC`, qualquer outro caso usa `LOJ_REG_DESCF`.
+**Venda da loja (`loja/venda`):** além de `sessao`, `itens`, `pagamentos`, `cliente` e `desconto`, aceita `vendedor`, `cpf`, `supervisor`, `senha_supervisor` (desconto acima de `LOJ_DESC_MAX`) e `regime` (`FISCAL` padrão ou `COMPROVANTE`; `loja/orcamento-finalizar` aceita `regime` também). Em `itens`, `produto` pode ser o código de barras ou a etiqueta da balança. Em `pagamentos`, a forma `VALE` leva o número do vale em `documento`; a forma `CRYPTO` leva `"MOEDA|ENDERECO"` em `documento` (ex.: `BTC|bc1q...`), exige `CRY_CONTA` configurada e wallet ativa da moeda — a cotação BRL→crypto é buscada no CoinGecko uma única vez por pagamento e o QR code é montado no caixa (`/api/pdv/crypto/previa`). Com `regime=COMPROVANTE` a venda não emite NFC-e **nem grava GF3/GF4** (o comprovante interno não entra na apuração de DAS nem de IBS/CBS; o faturamento `GEBFATFAT` segue a mesma regra e zera `GFT5_IBS`/`GFT5_CBS`). Com `LOJ_REG_ATIVO=S`, o teto de desconto passa a depender do regime: `COMPROVANTE` pago em dinheiro usa `LOJ_REG_DESCC`, qualquer outro caso usa `LOJ_REG_DESCF`.
+
+**Propagação da forma CRYPTO pelos módulos:** PDV web (`pdv.html` + `GEBPDV_API`) e PDV TUI (`GEBTUIPDV`, campo `MOEDA|ENDERECO`) → `GEBLOJVEN` valida conta `CRY_CONTA`, wallet e cotação; na liquidação credita `CRY_CONTA` (`GEBFXMOVCONTA`), grava auditoria `GCK2` (moeda, endereço, BRL, quantidade, cotação) e lançamento contábil `LOJ_CRYPTO` (evento padrão débito `1.01.002` / crédito `3.01.001`, conta financeira real no débito); NFC-e leva `tPag=99` com `xPag="Crypto <MOEDA>"`; cancelamento (`GEBLOJCAN`) estorna a conta e o evento; `GEBLOJRESUMO` consolida `forma CRYPTO` por sessão.
 
 **Entrada de compra (`compras/entrada`):** além de `nota`, `pedido`, `itens`, `frete` e `data`, aceita `retencoes` (códigos da GRT1 separados por vírgula, ex.: `ISS5,IR15`).
 

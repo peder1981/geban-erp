@@ -203,7 +203,7 @@ User Function GEBDFENFCE(cDoc, aItens, aPag, cCPF)
         oP["TBAND"] := DFEPadrao2(aPag[nI], 5, "")
         oP["CAUT"] := DFEPadrao2(aPag[nI], 6, "")
         If aPag[nI][1] == "99"
-            oP["XPAG"] := "Outros"
+            oP["XPAG"] := DFEPadrao2(aPag[nI], 7, "Outros")
         EndIf
         aAdd(aPg, oP)
     Next nI

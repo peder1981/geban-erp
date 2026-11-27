@@ -336,7 +336,7 @@ User Function GEBBOEXEC(cMetodo, cRota, o, cUsu)
     ElseIf cRota == "loja/venda"
         aRes := GEBLOJVEN(BOQ(o, "sessao"), BOQITENS(o, "itens", {"produto", "quantidade", "preco"}, {"quantidade", "preco"}), ;
             BOQITENS(o, "pagamentos", {"forma", "valor", "parcelas", "documento"}, {"valor", "parcelas"}), BOQ(o, "cliente"), BOQN(o, "desconto"), ;
-            BOQ(o, "vendedor"), BOQ(o, "cpf"), BOQ(o, "supervisor"), BOSTR(o["SENHA_SUPERVISOR"]))
+            BOQ(o, "vendedor"), BOQ(o, "cpf"), BOQ(o, "supervisor"), BOSTR(o["SENHA_SUPERVISOR"]), BOQ(o, "regime"))
     ElseIf cRota == "loja/cancelar"
         aRes := GEBLOJCAN(BOQ(o, "cupom"), BOQ(o, "motivo"))
     ElseIf cRota == "loja/sangria"
@@ -362,7 +362,7 @@ User Function GEBBOEXEC(cMetodo, cRota, o, cUsu)
         aRes := GEBLOJORCS(BOQ(o, "status"))
     ElseIf cRota == "loja/orcamento-finalizar"
         aRes := GEBLOJORCFIN(BOQ(o, "sessao"), BOQ(o, "orcamento"), BOQITENS(o, "pagamentos", {"forma", "valor", "parcelas", "documento"}, {"valor", "parcelas"}), ;
-            BOQ(o, "cpf"), BOQ(o, "supervisor"), BOSTR(o["SENHA_SUPERVISOR"]))
+            BOQ(o, "cpf"), BOQ(o, "supervisor"), BOSTR(o["SENHA_SUPERVISOR"]), BOQ(o, "regime"))
     ElseIf cRota == "loja/devolucao"
         aRes := GEBLOJDEV(BOQ(o, "sessao"), BOQ(o, "cupom"), BOQITENS(o, "itens", {"produto", "quantidade"}, {"quantidade"}), BOQ(o, "modo"), BOQ(o, "motivo"), BOConsumidor(o))
     ElseIf cRota == "loja/cupom"

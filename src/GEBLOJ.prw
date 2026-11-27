@@ -165,6 +165,7 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     Local cMoeda := ""
     Local cEndereco := ""
     Local aCry := {}
+    Local aCryQ := {}
     Local lDin := .F.
     Local nBruto := 0
     Local nTot := 0
@@ -335,6 +336,9 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     cPix := BOPARM("LOJ_CONTA_PIX", "BANCO")
     cCryConta := BOPARM("CRY_CONTA", "")
     For nI := 1 To Len(aPagtos)
+        aAdd(aCryQ, {})
+    Next nI
+    For nI := 1 To Len(aPagtos)
         If Upper(BOCOL(aPagtos[nI][1])) == "PIX" .And. Len(TCSqlQuery("SELECT GFN1_CONTA FROM GFN1 WHERE GFN1_FILIAL = " + ;
                 GEBDBQuote(FWxFilial("GFN1")) + " AND GFN1_CONTA = " + GEBDBQuote(cPix) + " AND D_E_L_E_T_ = ' '")) == 0
             Return {.F., "conta_pix_inexistente: " + cPix, {}}
@@ -346,10 +350,13 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
             EndIf
             aCry := StrTokArr(LOJDocPg(aPagtos[nI]), "|")
             cMoeda := Upper(BOCOL(aCry[1]))
-            aR := GEBCRYQRCODE(cMoeda, BOVAL(aPagtos[nI][2]))
+            // Uma chamada ao CoinGecko por pagamento: a liquidacao reusa a
+            // cotacao guardada aqui (aR[3] = {uri, endereco, qtd, cot}).
+            aR := GEBCRYQRCODE(cMoeda, Round(BOVAL(aPagtos[nI][2]), 2))
             If !aR[1]
                 Return {.F., "crypto: " + aR[2], {}}
             EndIf
+            aCryQ[nI] := aR
         EndIf
     Next nI
 
@@ -406,7 +413,13 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
     For nI := 1 To Len(aIt)
         aAdd(aR, {aIt[nI][1], aIt[nI][2], Round(aIt[nI][4] / aIt[nI][2], 6)})
     Next nI
-    aNF := GEBFATNOTA(cNota, aR, cData)
+    If cRegime == "COMPROVANTE"
+        // Comprovante interno nao e' documento fiscal: sem GF3/GF4 (nao entra
+        // na apuracao de IBS/CBS nem no DAS). Devolucao usa GLJ4, nao GF4.
+        aNF := {"comprovante", 0, 0, 0}
+    Else
+        aNF := GEBFATNOTA(cNota, aR, cData)
+    EndIf
     If cStDfe == "CONTINGENCIA"
         // Livro interno: so' entra na apuracao quando a SEFAZ autorizar (GEBDFETRANSMITE).
         TCSqlExec("UPDATE GF3 SET GF3_STATUS = 'CONTINGENCIA' WHERE GF3_FILIAL = " + GEBDBQuote(FWxFilial("GF3")) + " AND GF3_CHAVE = " + ;
@@ -454,9 +467,9 @@ User Function GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSup
             cDoc := LOJDocPg(aPagtos[nI])
             aCry := StrTokArr(cDoc, "|")
             cMoeda := Upper(BOCOL(aCry[1]))
-            aR := GEBCRYQRCODE(cMoeda, nVal)
-            If !aR[1]
-                Return {.F., "crypto: " + aR[2], {}}
+            aR := aCryQ[nI]
+            If Len(aR) == 0 .Or. !aR[1]
+                Return {.F., "crypto: cotacao_nao_revalidada", {}}
             EndIf
             GEBFXMOVCONTA(cCryConta, "C", nVal, "Crypto " + cMoeda + " " + cCupom, cCupom, cData)
             GEBCTXLP("LOJ_CRYPTO", nVal, cCupom, cData, GEBCTXFIN(cCryConta), "", aCx[4])
@@ -527,9 +540,10 @@ Static Function LOJItensDfe(aIt, aBrutoIt)
     Next nI
 Return aR
 
-// Pagamentos da NFC-e: {cTPag, nValor, cTpIntegra, cCNPJCredenciadora, cBandeira, cAutorizacao}.
+// Pagamentos da NFC-e: {cTPag, nValor, cTpIntegra, cCNPJCredenciadora, cBandeira, cAutorizacao, cXPag}.
 Static Function LOJPagDfe(aPagtos, aTefAut)
     Local aR := {}
+    Local aAux := {}
     Local aForma := {{"DINHEIRO", "01"}, {"CREDITO", "03"}, {"DEBITO", "04"}, {"FIADO", "05"}, {"VALE", "05"}, {"PIX", "17"}}
     Local cForma := ""
     Local cTp := ""
@@ -544,9 +558,20 @@ Static Function LOJPagDfe(aPagtos, aTefAut)
         EndIf
         If Len(aTefAut[nI]) >= 4 .And. Upper(BOPARM("LOJ_TEF_PROVEDOR", "SIMULADOR")) == "CIELO"
             // Cartao integrado (TEF): credenciadora, bandeira e autorizacao vao para a nota.
-            aAdd(aR, {cTp, Round(BOVAL(aPagtos[nI][2]), 2), "1", "01027058000191", LOJBandeira(aTefAut[nI][4]), aTefAut[nI][3]})
+            aAdd(aR, {cTp, Round(BOVAL(aPagtos[nI][2]), 2), "1", "01027058000191", LOJBandeira(aTefAut[nI][4]), aTefAut[nI][3], ""})
         Else
-            aAdd(aR, {cTp, Round(BOVAL(aPagtos[nI][2]), 2), "2", "", "", ""})
+            // 7a posicao = xPag (obrigatorio quando tPag = 99). Crypto leva a moeda.
+            cDoc := ""
+            If cTp == "99"
+                cDoc := cForma
+                If cForma == "CRYPTO"
+                    aAux := StrTokArr(LOJDocPg(aPagtos[nI]), "|")
+                    If Len(aAux) >= 1 .And. !(BOCOL(aAux[1]) == "")
+                        cDoc := "Crypto " + Upper(BOCOL(aAux[1]))
+                    EndIf
+                EndIf
+            EndIf
+            aAdd(aR, {cTp, Round(BOVAL(aPagtos[nI][2]), 2), "2", "", "", "", cDoc})
         EndIf
     Next nI
 Return aR
@@ -584,6 +609,7 @@ User Function GEBLOJCAN(cCupom, cMotivo)
     Local aDfe := {}
     Local cData := ""
     Local cForma := ""
+    Local cCryConta := ""
     Local cJust := ""
     Local cAviso := ""
     Local lDfeCanc := .F.
@@ -673,6 +699,14 @@ User Function GEBLOJCAN(cCupom, cMotivo)
             TCSqlExec("UPDATE GLJF SET GLJF_SALDO = GLJF_SALDO + " + BONUM(BOVAL(aPg[nI]:V), 2) + ", GLJF_STATUS = 'ABERTO' WHERE GLJF_FILIAL = " + ;
                 GEBDBQuote(FWxFilial("GLJF")) + " AND GLJF_VALE = " + GEBDBQuote(BOCOL(aPg[nI]:D)) + " AND D_E_L_E_T_ = ' '")
             GEBCTXREV("LOJ_VALE", BOVAL(aPg[nI]:V), cCupom, cData, "", "", aCx[4])
+        ElseIf cForma == "CRYPTO"
+            // Estorno: o valor em BRL sai da conta crypto (a transacao on-chain
+            // e' responsabilidade do operador, como no PIX estornado).
+            cCryConta := BOPARM("CRY_CONTA", "")
+            If !(cCryConta == "")
+                GEBFXMOVCONTA(cCryConta, "D", BOVAL(aPg[nI]:V), "Estorno crypto " + cCupom, cCupom, cData)
+            EndIf
+            GEBCTXREV("LOJ_CRYPTO", BOVAL(aPg[nI]:V), cCupom, cData, GEBCTXFIN(cCryConta), "", aCx[4])
         Else
             TCSqlExec("UPDATE GFN2 SET GFN2_SALDO = 0, GFN2_STATUS = 'CANCELADO' WHERE GFN2_FILIAL = " + GEBDBQuote(FWxFilial("GFN2")) + ;
                 " AND (GFN2_DOC = " + GEBDBQuote(BOCOL(aPg[nI]:D)) + " OR GFN2_DOC LIKE " + GEBDBQuote(BOCOL(aPg[nI]:D) + "/%") + ") AND D_E_L_E_T_ = ' '")
@@ -791,7 +825,7 @@ User Function GEBLOJRESUMO(cSessao)
     Local aHit := {}
     Local aLin := {}
     Local aRel := {{"item", "valor"}}
-    Local aFormas := {"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE"}
+    Local aFormas := {"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE", "CRYPTO"}
     Local nI := 0
     cSessao := Upper(BOCOL(cSessao))
     If !GEBLOJMIG()

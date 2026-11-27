@@ -105,7 +105,7 @@ Return {.T., "orcamento " + cOrc + " gravado (valido ate " + cValid + ")", {cOrc
     @since 19/10/2026
     @return {lOk, cMsg, {cCupom, nTotal, nTroco, cNota}}
 /*/
-User Function GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup)
+User Function GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup, cRegime)
     Local aO := {}
     Local aSes := {}
     Local aHit := {}
@@ -132,7 +132,7 @@ User Function GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup)
     For nI := 1 To Len(aHit)
         aAdd(aIt, {BOCOL(aHit[nI]:P), BOVAL(aHit[nI]:Q), BOVAL(aHit[nI]:PR)})
     Next nI
-    aR := GEBLOJVEN(cSessao, aIt, aPagtos, BOCOL(aO[1]:CL), BOVAL(aO[1]:DE), BOCOL(aO[1]:VE), cCPF, cSuperv, cSenhaSup, cOrc)
+    aR := GEBLOJVEN(cSessao, aIt, aPagtos, BOCOL(aO[1]:CL), BOVAL(aO[1]:DE), BOCOL(aO[1]:VE), cCPF, cSuperv, cSenhaSup, cOrc, cRegime)
     If aR[1]
         TCSqlExec("UPDATE GLJD SET GLJD_STATUS = 'FINALIZADO', GLJD_CUPOM = " + GEBDBQuote(aR[3][1]) + " WHERE GLJD_FILIAL = " + ;
             GEBDBQuote(FWxFilial("GLJD")) + " AND GLJD_ORC = " + GEBDBQuote(cOrc) + " AND D_E_L_E_T_ = ' '")
