@@ -72,7 +72,11 @@ Três recursos da operação de balcão, propagados por PDV, faturamento, fiscal
 | ![Gatilho Sarney](docs/img/21-faturamento-sarney.jpg) **Gatilho Sarney** — regras de reajuste no Faturamento | ![Wallets crypto](docs/img/22-faturamento-wallets-crypto.jpg) **Wallets crypto** — endereços por moeda |
 | ![Regime no pedido](docs/img/23-faturamento-pedido-regime.jpg) **Regime no pedido** — comprovante ou fiscal | ![PDV crypto](docs/img/24-pdv-crypto.jpg) **PDV crypto** — forma CRYPTO com QR Code |
 | ![PDV web crypto](docs/img/25-pdv-web-crypto.jpg) **PDV web** — cotação BTC e regime comprovante | ![Venda comprovante](docs/img/26-pdv-web-venda-finalizada.jpg) **Venda finalizada** — comprovante sem documento fiscal |
-| ![Aba Caixa](docs/img/27-pdv-web-aba-caixa.jpg) **PDV web — Caixa** — abrir/fechar, sangria, cancelar cupom | ![Aba Orçamentos](docs/img/28-pdv-web-aba-orcamentos.jpg) **PDV web — Orçamentos** — salvar, finalizar e cancelar |
+| ![Aba Venda](docs/img/29-pdv-web-aba-venda.jpg) **PDV web — Venda** — carrinho, formas e regime | ![Aba Caixa](docs/img/27-pdv-web-aba-caixa.jpg) **PDV web — Caixa** — abrir/fechar, sangria, resumo |
+| ![Aba Orçamentos](docs/img/28-pdv-web-aba-orcamentos.jpg) **PDV web — Orçamentos** — lista com ações | ![Finalizar orçamento](docs/img/30-pdv-web-orcamento-finalizar.jpg) **Orçamento → cupom** — pagamento, CPF e regime |
+| ![Aba Devolução](docs/img/31-pdv-web-aba-devolucao.jpg) **PDV web — Devolução** — itens, modo e consumidor | ![Aba Consultas](docs/img/32-pdv-web-aba-consultas.jpg) **PDV web — Consultas** — preço, vale, fiado, 2ª via |
+| ![Aba Cadastros](docs/img/33-pdv-web-aba-cadastros.jpg) **PDV web — Cadastros** — caixa, PLU, promo, vendedor | ![Aba Relatórios](docs/img/34-pdv-web-aba-relatorios.jpg) **PDV web — Relatórios** — vendas do dia e TEF |
+| ![Aba TEF/NFC-e](docs/img/35-pdv-web-aba-tef.jpg) **PDV web — TEF/NFC-e** — config, desfazer, contingência | |
 
 ## Como funciona
 

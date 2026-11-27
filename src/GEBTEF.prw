@@ -402,7 +402,7 @@ Static Function TEFJs(cTxt)
 Return StrTran(StrTran(BOSTR(cTxt), "\", ""), '"', "")
 
 Static Function TEFCampo(oResp, cNome)
-    If oResp == Nil .Or. !(ValType(oResp) == "O")
+    If oResp == Nil .Or. !(ValType(oResp) $ "OJ")
         Return ""
     EndIf
     If !(oResp[cNome] == Nil)

@@ -794,9 +794,12 @@ Return PDVRES(aR[1], aR[2], aR)
 /*/
 User Function GEBPDVDEVOLUC(cUsuario, aBody)
     Local aR := {}
+    Local aIt := {}
+    Local xIt := Nil
     Local oCons := Nil
     Local oC := Nil
     Local aM := {}
+    Local nI := 0
 
     If !GEBSECRBAC(cUsuario, "PDV", "01")
         Return PDVRES(.F., "sem_permissao", {})
@@ -804,7 +807,19 @@ User Function GEBPDVDEVOLUC(cUsuario, aBody)
     If BOCOL(aBody:SESSAO) == "" .Or. BOCOL(aBody:CUPOM) == "" .Or. aBody:ITENS == Nil .Or. Len(aBody:ITENS) == 0
         Return PDVRES(.F., "parametros_obrigatorios: sessao, cupom, itens", {})
     EndIf
-    If ValType(aBody:CONSUMIDOR) == "O" .And. !(BOQ(aBody:CONSUMIDOR, "DOC") == "")
+    // Itens aceitos como arrays posicionais {produto,qtd} ou objetos {produto,quantidade}.
+    For nI := 1 To Len(aBody:ITENS)
+        xIt := aBody:ITENS[nI]
+        If ValType(xIt) $ "OJ"
+            aAdd(aIt, {BOCOL(xIt:produto), BOVAL(xIt:quantidade)})
+        ElseIf ValType(xIt) == "A"
+            aAdd(aIt, xIt)
+        EndIf
+    Next nI
+    If Len(aIt) == 0
+        Return PDVRES(.F., "itens_invalidos", {})
+    EndIf
+    If ValType(aBody:CONSUMIDOR) $ "OJ" .And. !(BOQ(aBody:CONSUMIDOR, "DOC") == "")
         oC := aBody:CONSUMIDOR
         // Municipio: aceita codigo IBGE (7 digitos) ou nome na UF.
         If !(GEBDFEDIG(BOQ(oC, "MUNICIPIO")) == "") .Or. BOQ(oC, "MUNICIPIO") == ""
@@ -818,7 +833,7 @@ User Function GEBPDVDEVOLUC(cUsuario, aBody)
             oCons := oC
         EndIf
     EndIf
-    aR := GEBLOJDEV(BOCOL(aBody:SESSAO), BOCOL(aBody:CUPOM), aBody:ITENS, BOCOL(aBody:MODO), BOCOL(aBody:MOTIVO), oCons)
+    aR := GEBLOJDEV(BOCOL(aBody:SESSAO), BOCOL(aBody:CUPOM), aIt, BOCOL(aBody:MODO), BOCOL(aBody:MOTIVO), oCons)
 Return PDVRES(aR[1], aR[2], aR)
 
 // ===== CONSULTAS =====

@@ -235,7 +235,7 @@ Static Function NFSErros(oJ)
         For nI := 1 To Len(aE)
             cR += IIFS(nI > 1, "; ", "") + BOCOL(aE[nI]["codigo"]) + " - " + BOCOL(aE[nI]["descricao"]) + " " + BOCOL(aE[nI]["complemento"])
         Next nI
-    ElseIf ValType(aE) == "O"
+    ElseIf ValType(aE) $ "OJ"
         cR := BOCOL(aE["codigo"]) + " - " + BOCOL(aE["descricao"])
     EndIf
     If cR == ""

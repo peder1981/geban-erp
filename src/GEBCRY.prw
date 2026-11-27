@@ -150,7 +150,7 @@ User Function GEBCRYCOT(cMoedas)
     EndIf
     For nI := 1 To Len(aMap)
         oSub := oJ[aIds[nI]]
-        If ValType(oSub) == "O"
+        If ValType(oSub) $ "OJ"
             xV := oSub["brl"]
             If xV == Nil
                 xV := oSub["BRL"]

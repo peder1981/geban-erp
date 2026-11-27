@@ -3779,7 +3779,7 @@ Return {"400", GEBRESTJSONRESP(.F., Nil, {aRes[2]})}
 Static Function GEBRESTBO(cMetodo, cRota, aParams, cUsuario)
     Local oReq := Nil
     Local aRes := {}
-    If Len(aParams) >= 1 .And. ValType(aParams[1]) == "O"
+    If Len(aParams) >= 1 .And. ValType(aParams[1]) $ "OJ"
         oReq := aParams[1]
     Else
         oReq := JsonObject():New()

@@ -347,6 +347,42 @@ também precisam permitir.
 
 > **Nota:** a frente de caixa é o **PDV web** (`/pdv` no servidor GEBWEB, porta 8090 — ex.: `http://servidor:8090/pdv`), com login próprio (empresa/usuário/senha) e abas equivalentes às do antigo módulo: **Venda** (carrinho, formas de pagamento inclusive crypto com QR Code), **Caixa** (abrir/fechar, sangria/suprimento, cancelar cupom, resumo), **Orçamentos**, **Devolução**, **Consultas** (preço, vale, fiado, 2ª via, DANFE), **Cadastros** (caixa, barras/PLU, promoção, vendedor), **Relatórios** e **TEF / NFC-e**. O antigo módulo "Frente de loja" do TUI foi descontinuado; as seções abaixo descrevem as mesmas operações de caixa — no PDV web elas aparecem nas abas correspondentes.
 
+### As abas do PDV web
+
+![PDV web — aba Venda](img/pdv-web-aba-venda.png)
+
+A aba **Venda** concentra a operação: leitor de código/barras, carrinho com quantidades, desconto, regime da venda (Fiscal ou Comprovante) e as formas de pagamento — Dinheiro (com troco), PIX, Débito, Crédito (parcelas), Fiado (com verificação de limite), Vale e **CRYPTO** (escolhe a moeda, mostra a cotação e gera o QR Code).
+
+![PDV web — aba Caixa](img/pdv-web-aba-caixa.png)
+
+A aba **Caixa** abre e fecha a sessão (com dinheiro contado e diferença), registra **sangria/suprimento**, cancela cupom e mostra o **resumo da sessão** (fundo, esperado, contado, movimentos).
+
+![PDV web — aba Orçamentos](img/pdv-web-aba-orcamentos.png)
+
+A aba **Orçamentos** salva o carrinho atual como orçamento (cliente, vendedor, desconto), lista por status e permite **finalizar** em cupom (pagamento, CPF na nota e regime) ou **cancelar**.
+
+![PDV web — finalizar orçamento](img/pdv-web-orcamento-finalizar.png)
+
+![PDV web — aba Devolução](img/pdv-web-aba-devolucao.png)
+
+A aba **Devolução** registra a devolução/troca de itens de um cupom (modo dinheiro ou **vale-troca**), com os dados do consumidor quando o cupom teve NFC-e (a devolução emite NF-e de entrada — o município aceita nome ou código IBGE).
+
+![PDV web — aba Consultas](img/pdv-web-aba-consultas.png)
+
+A aba **Consultas** mostra preço do produto (com promoção aplicada e saldo), saldo de **vale-troca**, saldo de **fiado** do cliente, a **segunda via** do cupom em texto e o link do **DANFE NFC-e**.
+
+![PDV web — aba Cadastros](img/pdv-web-aba-cadastros.png)
+
+A aba **Cadastros** mantém caixa, código de barras/PLU de balança, promoção e vendedor — direto do caixa, sem entrar no ERP.
+
+![PDV web — aba Relatórios](img/pdv-web-aba-relatorios.png)
+
+A aba **Relatórios** gera as **vendas do dia** (produto × quantidade × valor × custo × margem, com totais), as **transações TEF** e os relatórios gerencial/comissão em CSV.
+
+![PDV web — aba TEF/NFC-e](img/pdv-web-aba-tef.png)
+
+A aba **TEF / NFC-e** configura o provedor TEF, desfaz transação pendente (queda de energia/comunicação) e transmite as NFC-e emitidas em contingência.
+
 ### Preparar a loja (uma vez)
 
 **Frente de loja → aba Cadastros → Cadastrar caixa.**
