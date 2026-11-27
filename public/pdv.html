@@ -6,17 +6,17 @@
 <title>GEBAN PDV</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#1a1a2e;--surface:#16213e;--surface2:#0f3460;--accent:#e94560;--accent2:#533483;--text:#eee;--text2:#aaa;--success:#0f0;--warn:#fa0;--danger:#f00;--radius:8px;--pad:12px}
+:root{--bg:#f2f6f5;--surface:#ffffff;--surface2:#eef3f2;--accent:#0f766e;--accent2:#0d9488;--bd:#d9e2e0;--text:#1d2330;--text2:#5d6677;--success:#18794e;--warn:#b7791f;--danger:#c0262d;--radius:8px;--pad:12px}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
 button{cursor:pointer;border:none;border-radius:var(--radius);font-size:1rem;font-weight:600;transition:all .15s}
 button:active{transform:scale(.96)}
-input,select{background:var(--surface2);border:1px solid #333;color:var(--text);border-radius:var(--radius);padding:10px 14px;font-size:1rem;width:100%}
+input,select{background:#fff;border:1px solid var(--bd);color:var(--text);border-radius:var(--radius);padding:10px 14px;font-size:1rem;width:100%}
 input:focus,select:focus{outline:none;border-color:var(--accent)}
 label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 
 /* LOGIN */
 #login-screen{display:flex;align-items:center;justify-content:center;height:100vh}
-.login-box{background:var(--surface);padding:40px;border-radius:16px;width:360px;max-width:90vw}
+.login-box{background:var(--surface);border:1px solid var(--bd);padding:40px;border-radius:12px;width:360px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.08)}
 .login-box h1{text-align:center;margin-bottom:24px;color:var(--accent)}
 .login-box input{margin-bottom:16px}
 .login-box button{width:100%;padding:14px;background:var(--accent);color:#fff;font-size:1.1rem}
@@ -26,14 +26,14 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 
 /* MAIN LAYOUT */
 #pdv-screen{display:none;flex-direction:column;height:100vh}
-.topbar{background:var(--surface);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--surface2);flex-shrink:0}
+.topbar{background:var(--surface);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);flex-shrink:0}
 .topbar .brand{font-size:1.4rem;font-weight:700;color:var(--accent)}
 .topbar .info{display:flex;gap:20px;font-size:.85rem;color:var(--text2)}
 .topbar .info span{display:flex;align-items:center;gap:6px}
 .topbar .perif-status{display:flex;gap:8px}
 .perif-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .perif-dot.ok{background:var(--success)}
-.perif-dot.no{background:#555}
+.perif-dot.no{background:#cbd2da}
 
 .main-area{display:flex;flex:1;overflow:hidden}
 
@@ -44,17 +44,17 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 .search-bar button{padding:14px 24px;background:var(--accent);color:#fff;font-size:1rem}
 
 .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;overflow-y:auto;flex:1;padding-bottom:8px}
-.product-card{background:var(--surface);border:2px solid transparent;border-radius:var(--radius);padding:12px;text-align:center;cursor:pointer;transition:all .15s}
+.product-card{background:var(--surface);border:1px solid var(--bd);border-radius:var(--radius);padding:12px;text-align:center;cursor:pointer;transition:all .15s}
 .product-card:hover{border-color:var(--accent);transform:translateY(-2px)}
 .product-card .code{font-size:.7rem;color:var(--text2);word-break:break-all}
 .product-card .name{font-size:.85rem;margin:4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .product-card .price{font-size:1.1rem;font-weight:700;color:var(--accent)}
 
 /* CART */
-.cart-panel{background:var(--surface);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;max-height:45vh;flex-shrink:0}
+.cart-panel{background:var(--surface);border:1px solid var(--bd);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;max-height:45vh;flex-shrink:0}
 .cart-panel h3{margin-bottom:10px;color:var(--accent);font-size:1rem}
 .cart-items{flex:1;overflow-y:auto;font-size:.85rem}
-.cart-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #333}
+.cart-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)}
 .cart-item .ci-left{flex:1}
 .cart-item .ci-right{display:flex;align-items:center;gap:8px}
 .cart-item button{padding:2px 8px;font-size:.8rem;background:var(--surface2);color:var(--text)}
@@ -63,7 +63,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 .cart-summary .total{font-size:1.4rem;font-weight:700;color:var(--accent);padding:8px 0}
 
 /* RIGHT: Payment */
-.right-panel{width:380px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex-shrink:0}
+.right-panel{width:380px;background:var(--surface);border:1px solid var(--bd);padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex-shrink:0}
 .right-panel h2{font-size:1rem;color:var(--text2);text-align:center}
 
 .payment-methods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -79,13 +79,13 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 .action-buttons{display:flex;flex-direction:column;gap:8px;margin-top:auto}
 .action-buttons button{padding:16px;font-size:1.1rem;border-radius:var(--radius)}
 .btn-finalizar{background:var(--accent);color:#fff}
-.btn-cancelar{background:#555;color:var(--text)}
-.btn-sangria{background:var(--warn);color:#000}
+.btn-cancelar{background:#9aa5ad;color:#fff}
+.btn-sangria{background:var(--warn);color:#fff}
 
 /* MODALS */
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100;display:none}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(29,35,48,.45);display:flex;align-items:center;justify-content:center;z-index:100;display:none}
 .modal-overlay.show{display:flex}
-.modal{background:var(--surface);border-radius:16px;padding:24px;width:420px;max-width:90vw;max-height:90vh;overflow-y:auto}
+.modal{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:24px;width:420px;max-width:90vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .modal h2{margin-bottom:16px;color:var(--accent)}
 .modal .fields{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
 .modal .fields input,.modal .fields select{width:100%}
@@ -102,20 +102,20 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 #config-panel.show{display:block}
 .config-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .config-header h2{color:var(--accent)}
-.config-section{background:var(--surface);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.config-section{background:var(--surface);border:1px solid var(--bd);border-radius:var(--radius);padding:20px;margin-bottom:16px}
 .config-section h3{margin-bottom:12px;color:var(--text2);font-size:.9rem;text-transform:uppercase}
 .config-table{width:100%;border-collapse:collapse;font-size:.85rem}
-.config-table th{text-align:left;padding:8px;border-bottom:2px solid var(--surface2);color:var(--text2)}
-.config-table td{padding:8px;border-bottom:1px solid #333}
+.config-table th{text-align:left;padding:8px;border-bottom:2px solid var(--bd);color:var(--text2);background:var(--surface2)}
+.config-table td{padding:8px;border-bottom:1px solid var(--bd)}
 .config-table .status-ok{color:var(--success)}
-.config-table .status-no{color:#555}
+.config-table .status-no{color:#9aa5ad}
 .config-table button{padding:4px 12px;font-size:.75rem;margin-right:4px}
 .perif-form{display:flex;flex-direction:column;gap:10px;max-width:400px}
 .perif-form button{padding:12px;background:var(--accent);color:#fff}
 
 /* TOAST */
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:var(--radius);font-size:.9rem;z-index:200;animation:toast-in .3s ease}
-.toast.ok{background:var(--success);color:#000}
+.toast.ok{background:var(--success);color:#fff}
 .toast.err{background:var(--danger);color:#fff}
 .toast.info{background:var(--surface2);color:var(--text)}
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -211,7 +211,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
       <div class="payment-inputs" id="payment-inputs">
         <div class="field">
           <label>Regime da venda</label>
-          <select id="regime-venda" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border,#333);background:var(--surface2);color:var(--text)">
+          <select id="regime-venda" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:var(--surface2);color:var(--text)">
             <option value="FISCAL">Fiscal (com documento)</option>
             <option value="COMPROVANTE">Apenas comprovante</option>
           </select>
@@ -236,7 +236,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
         </div>
         <div class="field" id="fi-crypto" style="display:none">
           <label>Moeda crypto</label>
-          <select id="cry-moeda" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border,#333);background:var(--surface2);color:var(--text)"></select>
+          <select id="cry-moeda" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:var(--surface2);color:var(--text)"></select>
           <button onclick="cryptoQr()" style="width:100%;margin-top:8px;padding:8px;background:var(--surface2);color:var(--text);border-radius:6px;cursor:pointer">Gerar QR Code</button>
           <div id="cry-info" style="font-size:.8rem;margin-top:6px;color:var(--text2)"></div>
           <div id="cry-qr" style="margin-top:8px;text-align:center"></div>
@@ -273,7 +273,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
       <div><label>Abrir Caixa</label><input id="mc-caixa-abrir" placeholder="Código do caixa"></div>
       <div><label>Operador</label><input id="mc-operador" placeholder="Nome do operador"></div>
       <div><label>Fundo de troco (R$)</label><input id="mc-fundo" type="number" value="100" min="0" step="10"></div>
-      <hr style="border-color:#333;margin:8px 0">
+      <hr style="border-color:var(--bd);margin:8px 0">
       <div><label>Fechar Caixa — Dinheiro Contado (R$)</label><input id="mc-contado" type="number" value="0" min="0" step="0.01" placeholder="Valor contado na gaveta"></div>
       <div id="cr-diff-info" style="font-size:.8rem;color:var(--text2);display:none">Diferença: <b id="cr-diff-val" style="color:var(--success)">R$ 0,00</b></div>
     </div>
@@ -330,7 +330,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
         <select id="cf-driver"></select>
       </div>
       <div><label>Nome</label><input id="cf-nome" placeholder="Ex: Impressora Caixa 1"></div>
-      <div><label>Config JSON</label><textarea id="cf-config" rows="4" style="width:100%;background:var(--surface2);border:1px solid #333;color:var(--text);border-radius:var(--radius);padding:10px;font-family:monospace;font-size:.85rem"></textarea></div>
+      <div><label>Config JSON</label><textarea id="cf-config" rows="4" style="width:100%;background:var(--surface2);border:1px solid var(--bd);color:var(--text);border-radius:var(--radius);padding:10px;font-family:monospace;font-size:.85rem"></textarea></div>
       <button onclick="registerPeriferico()">Registrar</button>
     </div>
   </div>
