@@ -26,19 +26,19 @@ User Function T_GEBSECLOGIN_CATALOG()
         Return .F.
     EndIf
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebseclogin_catalog CASCADE")
-    TCSqlExec("CREATE SCHEMA test_gebseclogin_catalog")
-    TCSqlExec("SET search_path TO test_gebseclogin_catalog")
+    TCSqlExec("SET search_path TO public")
 
     If !GEBDBProvisionaCatalogo()
         lOk := .F.
     EndIf
 
-    // Confirma que GEH NAO existe neste ponto (nenhuma GEBDBProvisionaEmpresa/
-    // GEBEXPCriaAuditoria foi chamada) -- prova que o teste exercita o
-    // cenario real do bug original.
-    If lOk .AND. GEBDBTableExistsHere("GEH")
-        lOk := .F.
-        ConOut("FAIL: GEH nao deveria existir em nivel de catalogo")
+    // O cenario do bug original: login em nivel de catalogo SEM GEH (ela
+    // so' e' criada por GEBDBProvisionaEmpresa/GEBEXPCriaAuditoria, por
+    // empresa). Como o codigo agora usa o catalogo real (public.<tabela>),
+    // esconde a GEH real por renome durante o login e restaura depois.
+    Local lGeh := GEBDBTableExistsHere("GEH")
+    If lGeh
+        TCSqlExec("ALTER TABLE public.GEH RENAME TO GEH_BAK_T")
     EndIf
 
     cFil := FWxFilial("GE2")
@@ -60,7 +60,9 @@ User Function T_GEBSECLOGIN_CATALOG()
 
     TCSqlExec("DELETE FROM GE2_SEC WHERE SEC_USUARIO = 'T_CATLOGIN'")
     TCSqlExec("DELETE FROM GE2 WHERE GE2_COD = 'T_CATLOGIN'")
-    TCSqlExec("DROP SCHEMA IF EXISTS test_gebseclogin_catalog CASCADE")
+    If lGeh
+        TCSqlExec("ALTER TABLE public.GEH_BAK_T RENAME TO GEH")
+    EndIf
 
     If lOk
         ConOut("T_GEBSECLOGIN_CATALOG PASS")

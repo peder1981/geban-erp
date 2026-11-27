@@ -35,8 +35,8 @@ User Function T_GEBSEC_ACESSO_EMP()
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebsec_acc CASCADE")
     TCSqlExec("DROP SCHEMA IF EXISTS emp_tst CASCADE")
-    TCSqlExec("CREATE SCHEMA test_gebsec_acc")
-    TCSqlExec("SET search_path TO test_gebsec_acc")
+    // catalogo real (public): codigo agora usa public.<tabela>
+    TCSqlExec("SET search_path TO public")
 
     If !TEST_INIT()
         ConOut("TEST_INIT failed")
@@ -66,8 +66,12 @@ User Function T_GEBSEC_ACESSO_EMP()
 
     // Sessao na empresa tst (tenant = schema emp_tst).
     TCSqlExec("CREATE SCHEMA emp_tst")
-    TCSqlExec("SET search_path TO emp_tst, test_gebsec_acc")
+    TCSqlExec("SET search_path TO emp_tst, public")
     lOk := Chk(GEBDBTenantAtual() == "tst", "tenant atual = tst") .And. lOk
+
+    // SEC_PERM agora e' o catalogo real (public): limpa fixtures de runs
+    // anteriores, senao uma linha empresa-especifica velha sobrepoe o '*'.
+    TCSqlExec("DELETE FROM SEC_PERM WHERE SEC_PERM_PERFIL = 'USUARIO'")
 
     // 2. Sem permissao explicita, negado (regra padrao).
     lOk := Chk(!GEBSECRBAC("t_usu", "FATURAMENTO", "LIBERA"), "sem permissao: negado") .And. lOk
@@ -97,7 +101,8 @@ User Function T_GEBSEC_ACESSO_EMP()
     // 7. Super: sempre permitido, mesmo sem vinculo.
     lOk := Chk(GEBSECRBAC("super", "FATURAMENTO", "LIBERA"), "super: permitido sem vinculo") .And. lOk
 
-    TCSqlExec("SET search_path TO test_gebsec_acc")
+    TCSqlExec("SET search_path TO public")
+    TCSqlExec("DELETE FROM SEC_PERM WHERE SEC_PERM_PERFIL = 'USUARIO'")
     TCSqlExec("DROP SCHEMA IF EXISTS emp_tst CASCADE")
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebsec_acc CASCADE")
 

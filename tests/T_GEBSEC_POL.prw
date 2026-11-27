@@ -42,8 +42,8 @@ User Function T_GEBSEC_POL()
     EndIf
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebsec_pol CASCADE")
-    TCSqlExec("CREATE SCHEMA test_gebsec_pol")
-    TCSqlExec("SET search_path TO test_gebsec_pol")
+    // catalogo real (public): codigo agora usa public.<tabela>
+    TCSqlExec("SET search_path TO public")
 
     If !TEST_INIT()
         ConOut("TEST_INIT failed")

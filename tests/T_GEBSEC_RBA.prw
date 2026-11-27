@@ -39,8 +39,8 @@ User Function T_GEBSEC_RBA()
     EndIf
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebsec_rba CASCADE")
-    TCSqlExec("CREATE SCHEMA test_gebsec_rba")
-    TCSqlExec("SET search_path TO test_gebsec_rba")
+    // catalogo real (public): codigo agora usa public.<tabela>
+    TCSqlExec("SET search_path TO public")
 
     If !TEST_INIT()
         ConOut("TEST_INIT failed")
@@ -82,7 +82,7 @@ User Function T_GEBSEC_RBA()
     // Perfil e' por empresa: a regra de acesso exige contexto de empresa (emp_rba) e vinculo.
     TCSqlExec("DROP SCHEMA IF EXISTS emp_rba CASCADE")
     TCSqlExec("CREATE SCHEMA emp_rba")
-    TCSqlExec("SET search_path TO emp_rba, test_gebsec_rba")
+    TCSqlExec("SET search_path TO emp_rba, public")
     TCSqlExec("DELETE FROM GE2_EMP WHERE GE2_EMP_USUARIO IN ('ADMIN-RBA','OP-RBA','CAIXA-RBA')")
     TCSqlExec("INSERT INTO GE2_EMP (D_E_L_E_T_, GE2_EMP_FILIAL, GE2_EMP_USUARIO, GE2_EMP_EMPRESA, GE2_EMP_PERFIL) VALUES (' ', '', 'ADMIN-RBA', 'rba', 'ADMIN'), (' ', '', 'OP-RBA', 'rba', 'OPERADOR'), (' ', '', 'CAIXA-RBA', 'rba', 'CAIXA')")
 

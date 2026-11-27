@@ -34,8 +34,8 @@ User Function T_GEBSEC_CICLO()
 
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebsec_cic CASCADE")
     TCSqlExec("DROP SCHEMA IF EXISTS emp_tst CASCADE")
-    TCSqlExec("CREATE SCHEMA test_gebsec_cic")
-    TCSqlExec("SET search_path TO test_gebsec_cic")
+    // catalogo real (public): codigo agora usa public.<tabela>
+    TCSqlExec("SET search_path TO public")
     If !TEST_INIT()
         ConOut("TEST_INIT failed")
         Return .F.
@@ -49,7 +49,7 @@ User Function T_GEBSEC_CICLO()
 
     // Empresa de teste e usuarios.
     TCSqlExec("CREATE SCHEMA emp_tst")
-    TCSqlExec("SET search_path TO emp_tst, test_gebsec_cic")
+    TCSqlExec("SET search_path TO emp_tst, public")
     lOk := Chk(GEBSECCRIAUSU("t_usu", cSenha, {"tst"}, "Usuario", "USUARIO", .F., "01"), "cria t_usu vinculado a tst", lOk)
     lOk := Chk(GEBSECCRIAUSU("t_adm", cSenha, {"tst"}, "Admin", "ADMIN", .F., "01"), "cria t_adm ADMIN de tst", lOk)
     lOk := Chk(GEBSECCRIAUSU("u_nunca", cSenha, {"tst"}, "Nunca Acessou", "USUARIO", .F., "01"), "cria u_nunca (nunca acessou)", lOk)
@@ -100,7 +100,7 @@ User Function T_GEBSEC_CICLO()
     GEBSECCRIAUSU("t_usu", cSenha, {"tst"}, "Usuario", "USUARIO", .F., "01")
 
     // 8. Admin elimina acessos: so' os vinculos da propria empresa; usuario nao fica bloqueado.
-    TCSqlExec("SET search_path TO emp_tst, test_gebsec_cic")
+    TCSqlExec("SET search_path TO emp_tst, public")
     aRes := GEBSECELIMINAACESSOS("t_adm", "t_usu")
     lOk := Chk(aRes[1] .And. Len(TCSqlQuery("SELECT GE2_EMP_USUARIO FROM GE2_EMP WHERE GE2_EMP_USUARIO = 't_usu' AND LOWER(GE2_EMP_EMPRESA) = 'tst' AND D_E_L_E_T_ = ' '")) == 0, "admin elimina acessos da propria empresa", lOk)
     lOk := Chk(GEBSECLOGIN("t_usu", cSenha, "test") == "OK", "eliminar acessos nao bloqueia a conta globalmente", lOk)
@@ -118,7 +118,7 @@ User Function T_GEBSEC_CICLO()
     aRes := GEBSECEXCLUI("super", "u_nunca")
     lOk := Chk(aRes[1] .And. Len(TCSqlQuery("SELECT GE2_COD FROM GE2 WHERE GE2_COD = 'u_nunca' AND D_E_L_E_T_ = ' '")) == 0, "super exclui usuario que nunca acessou", lOk)
 
-    TCSqlExec("SET search_path TO test_gebsec_cic")
+    TCSqlExec("SET search_path TO public")
     TCSqlExec("DROP SCHEMA IF EXISTS emp_tst CASCADE")
     TCSqlExec("DROP SCHEMA IF EXISTS test_gebsec_cic CASCADE")
 
