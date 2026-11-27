@@ -1,81 +1,40 @@
 #include "totvs.ch"
 
 /*/{Protheus.doc} GEBTUIPDV
-    Frente de loja embutida no TUI: o PDV web completo (public/pdv.html)
-    abre dentro da propria sessao do ERP via FwCallApp — mesmo login,
-    mesma permissao LOJA, todas as 8 abas e funcionalidades do PDV
-    original (venda, caixa, orcamentos, devolucao, consultas, cadastros,
-    relatorios, TEF/NFC-e, crypto, vale/fiado, perifericos).
+    Frente de loja: abre o PDV web completo (public/pdv.html, rota /pdv)
+    numa nova aba do navegador, ja autenticado com um token real da
+    sessao TUI — mesmo usuario/empresa/filial, sem segundo login. O PDV
+    traz as 8 abas e funcionalidades originais (venda, caixa,
+    orcamentos, devolucao, consultas, cadastros, relatorios, TEF/NFC-e,
+    crypto, vale/fiado, perifericos) chamando a API /api/pdv/* por HTTP
+    normal — sem ponte de traducao, sem duplicacao de regras.
 
-    Como funciona: o item "Frente de loja" do menu lateral (e o atalho
-    da pagina Inicio) e' um modulo de acao direta — o clique dispara
-    FwCallApp("pdv"), que abre src/pdv/ (index.html = symlink para
-    public/pdv.html) numa nova aba da sessao. No load, o shim injetado
-    (window.twebchannel) manda "PDV-INIT"; o JsToAdvpl abaixo devolve um
-    token real GEBSECTOKEN da sessao TUI. A partir dai o pdv.html roda
-    INALTERADO: apiGet/apiPost/apiDelete, WebSocket de perifericos e
-    DANFE seguem HTTP normal para a API /api/pdv/* — sem ponte de
-    traducao, sem duplicacao de regras.
+    FWOPENTAB emite o evento open-tab e RETORNA: a aba do ERP nunca
+    bloqueia (o FwCallApp anterior prendia a sessao no laco do canal
+    poui ate a aba fechar — a guia do ERP ficava morta e nao voltava).
 
-    FwCallApp bloqueia ate a aba do PDV fechar; ao voltar, o token
-    emitido e' revogado (GEBSECTOKENDEL).
+    O token viaja no fragmento #tok= — nao chega ao servidor, nao fica
+    em log nem em referer; o pdv.html le, limpa a barra de endereco e
+    entra direto na venda. Expira pelo TTL normal do GEBSECTOKEN.
     @type function
     @author Peder Munksgaard
     @since 27/11/2026
 /*/
 
-// Contexto da sessao para o JsToAdvpl (canal nao recebe parametros extras).
-Static s_cPdvUsu := ""
-Static s_cPdvEmp := ""
-Static s_cPdvFil := ""
-Static s_cPdvTok := ""
-
 /*/{Protheus.doc} TUIPdvAbre
-    Acao direta do menu/atalho "Frente de loja": abre o app PO-UI "pdv"
-    (src/pdv/ = public/pdv.html) numa aba da sessao. FwCallApp bloqueia
-    ate a aba fechar; ao voltar revoga o token emitido para o PDV.
+    Acao direta do menu/atalho "Frente de loja": gera token real da
+    sessao (GEBSECTOKEN) e abre /pdv#tok=... numa aba nova.
     @type function
     @param cUsu, character, usuario logado
     @param cEmp, character, empresa da sessao
     @param cFil, character, filial da sessao
 /*/
 User Function TUIPdvAbre(cUsu, cEmp, cFil)
-    s_cPdvUsu := cUsu
-    s_cPdvEmp := cEmp
-    s_cPdvFil := cFil
-    FwCallApp("pdv", Nil, Nil, Nil, Nil, "GEBTUIPDV.prw")
-    If !Empty(s_cPdvTok)
-        GEBSECTOKENDEL(s_cPdvTok)
-        s_cPdvTok := ""
-    EndIf
-Return Nil
+    Local cTok := GEBSECTOKEN(cUsu, cEmp, cFil, "tui-pdv")
 
-/*/{Protheus.doc} JsToAdvpl
-    Canal JS->AdvPL do app PDV (resolvido pelo FwCallApp via cSource).
-    "PDV-INIT": emite token real da sessao TUI (GEBSECTOKEN) e devolve
-    via AdvPLToJS("pdv-init") para o pdv.html pular o login local e usar
-    a API /api/pdv/* por HTTP normal.
-    @type function
-    @param oWebChannel, object, canal TWebChannel da sessao
-    @param cType, character, tipo da mensagem JS
-    @param cContent, character, conteudo (nao usado no handshake)
-/*/
-Static Function JsToAdvpl(oWebChannel, cType, cContent)
-    Local cJson := ""
-
-    If Upper(AllTrim(cType)) == "PDV-INIT"
-        If !Empty(s_cPdvTok)
-            GEBSECTOKENDEL(s_cPdvTok)
-        EndIf
-        s_cPdvTok := GEBSECTOKEN(s_cPdvUsu, s_cPdvEmp, s_cPdvFil, "tui-pdv")
-        If Empty(s_cPdvTok)
-            oWebChannel:AdvPLToJS("pdv-init", '{"ok":false,"erro":"falha_token"}')
-        Else
-            cJson := '{"ok":true,"token":"' + s_cPdvTok + ;
-                '","empresa":"' + AllTrim(s_cPdvEmp) + ;
-                '","usuario":"' + AllTrim(s_cPdvUsu) + ;
-                '","filial":"' + AllTrim(s_cPdvFil) + '"}'
-            oWebChannel:AdvPLToJS("pdv-init", cJson)
-        EndIf
+    If Empty(cTok)
+        MsgStop("Nao foi possivel abrir a Frente de loja: falha ao gerar o token da sessao.", "PDV")
+        Return Nil
     EndIf
+    FWOPENTAB("/pdv#tok=" + cTok + "&u=" + AllTrim(cUsu) + "&emp=" + AllTrim(cEmp))
 Return Nil

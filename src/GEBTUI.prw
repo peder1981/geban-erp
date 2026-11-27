@@ -356,7 +356,7 @@ Static Function TUIMenuItem(oApp, oMenu, cRot, cIcone, oPg, aNav)
 Return
 
 // Item de menu de acao direta (modulo sem pagina, ex.: Frente de loja que
-// abre o PDV via FwCallApp). Funcao propria para o bloco capturar o bloco
+// abre o PDV via FWOPENTAB). Funcao propria para o bloco capturar o bloco
 // certo, nao a variavel do laco.
 Static Function TUIMenuItemAcao(oApp, oMenu, cRot, cIcone, bAcao)
     oMenu:AddItem(cRot, cIcone, {|| Eval(bAcao)})

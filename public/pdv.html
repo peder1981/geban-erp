@@ -14,8 +14,10 @@ input,select{background:#fff;border:1px solid var(--bd);color:var(--text);border
 input:focus,select:focus{outline:none;border-color:var(--accent)}
 label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 
-/* LOGIN */
-#login-screen{display:flex;align-items:center;justify-content:center;height:100vh}
+/* LOGIN — oculto por padrao: o bootstrap no fim da pagina decide entre
+   login (standalone /pdv) e venda direta (sessao embutida via #tok=).
+   Sem isso o login piscava por uma fracao de segundo antes da troca. */
+#login-screen{display:none;align-items:center;justify-content:center;height:100vh}
 .login-box{background:var(--surface);border:1px solid var(--bd);padding:40px;border-radius:12px;width:360px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.08)}
 .login-box h1{text-align:center;margin-bottom:24px;color:var(--accent)}
 .login-box input{margin-bottom:16px}
@@ -1744,33 +1746,29 @@ async function nfceTransmitir() {
 }
 
 // ============================================================
-// MODO EMBUTIDO — PDV dentro do ERP (TUI/FwCallApp)
-// Quando servido pelo advplc como app PO-UI, o shim injetado cria
-// window.twebchannel: mandamos PDV-INIT e o JsToAdvpl do ERP devolve
-// um token real da sessão TUI. O login local é pulado e todas as
-// chamadas (apiGet/apiPost/WS/DANFE) seguem HTTP normal, inalteradas.
-// Sem o shim (PDV web standalone em /pdv) este bloco não faz nada.
+// MODO EMBUTIDO — PDV aberto pela "Frente de loja" do ERP (TUI)
+// O token real da sessão TUI chega no fragmento #tok= (não vai ao
+// servidor, não fica em log/referer). Lemos, limpamos a barra de
+// endereço e entramos direto na venda — sem tela de login. Sem o
+// fragmento (PDV standalone em /pdv, totens) mostramos o login local.
 // ============================================================
 (function () {
-  var tc = window.twebchannel;
-  if (!tc || !tc.jsToAdvpl || !tc.eventTarget) return;
-  document.getElementById('login-screen').style.display = 'none';
-  tc.eventTarget.addEventListener('pdv-init', function (ev) {
-    var d;
-    try { d = JSON.parse(ev.protheusResponse); } catch (e) { return; }
-    if (!d || !d.ok) {
-      document.getElementById('login-screen').style.display = 'flex';
-      var m = document.getElementById('m-login');
-      if (m) { m.textContent = 'Sessão do PDV indisponível — feche e reabra a aba'; m.className = 'msg err'; }
-      return;
-    }
-    S.token = d.token; S.empresa = d.empresa; S.usuario = d.usuario; S.filial = d.filial || '';
-    document.getElementById('pdv-screen').style.display = 'flex';
-    document.getElementById('t-empresa').textContent = 'Emp: ' + d.empresa;
-    document.getElementById('t-operador').textContent = 'Op: ' + d.usuario;
-    initPDV();
-  });
-  tc.jsToAdvpl('PDV-INIT', '');
+  var m = /[#&]tok=([^&]+)/.exec(location.hash || '');
+  if (!m) {
+    document.getElementById('login-screen').style.display = 'flex';
+    return;
+  }
+  var get = function (k) {
+    var r = new RegExp('[#&]' + k + '=([^&]*)').exec(location.hash);
+    return r ? decodeURIComponent(r[1]) : '';
+  };
+  try { S.token = decodeURIComponent(m[1]); } catch (e) { S.token = m[1]; }
+  S.usuario = get('u'); S.empresa = get('emp'); S.filial = get('fil');
+  history.replaceState(null, '', location.pathname + location.search);
+  document.getElementById('pdv-screen').style.display = 'flex';
+  document.getElementById('t-empresa').textContent = 'Emp: ' + S.empresa;
+  document.getElementById('t-operador').textContent = 'Op: ' + S.usuario;
+  initPDV();
 })();
 </script>
 </body>
