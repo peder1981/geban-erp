@@ -128,9 +128,9 @@ A conexão (`GEBDBConecta()`, `src/GEBDB_TENANT.prw`) lê `GEBAN_PG_HOST`, `GEBA
                               │  login, menu,  │
                               │  formularios,  │
                               │  Inicio, rastro│
-                              │ GEBTUIPDV:     │
-                              │  frente de loja│
                               └────────────────┘
+            PDV web: GEBWEB (API :8090) serve public/pdv.html
+            com backend GEBPDV_API/GEBLOJ* (capítulo 4.1)
     Dependências reais (chamadas sem prefixo U_):
     GEBFEMI → GEBMNT + GEBCFG + GEBFPRO + GEBFALI + CALCIBS + GEBFILA + CTBLAN
     GEBFAPU → GEBCFG + GF3/GF4/GF5 + GE1(regime) · GEBDGER → GF5 saldo → GD1
@@ -230,7 +230,7 @@ literais (ver §7 — gap BeginSql).
 
 ### 4.1 Interface — `src/GEBTUI.prw`
 
-**Fontes:** `src/GEBTUI.prw` (aplicação, formulários e páginas), `src/GEBTUIPDV.prw` (frente de loja),
+**Fontes:** `src/GEBTUI.prw` (aplicação, formulários e páginas),
 `src/GEBTUIBO.prw` (DANFE da NFC-e), `src/GEBEXP_TRAK.prw` (rastreabilidade). Componentes PO-UI do
 runtime AdvPP (`PoApp`, `PoMenu`, `PoPage`, `PoTabs`, `PoWidget`, `PoTable`, `PoChart`, `PoTree`...).
 **Entrada:** `advplc serve src/GEBTUI.prw --port 8081` → `User Function GEBTUI()`; cada janela do
@@ -268,14 +268,14 @@ funções de negócio da API REST — a validação fica na regra de negócio, n
 remover item; o bloco recebe os itens).
 
 **Testes:** `T_GEBTUI_OPS` (executa todos os formulários com valores padrão + verificações
-dirigidas), `T_GEBTUIPDV` (venda, devolução, orçamento e caixa), `T_GEBTUI_FLUXOS`, `T_GEBTUI_PERM`,
-`T_GEBTUIBO`; lints `tests/local/T_LOCAL_FUNCOES.sh` (função inexistente),
+dirigidas), `T_GEBTUI_FLUXOS`, `T_GEBTUI_PERM`, `T_GEBTUIBO`, `T_GEBTUITROCA`, `T_GEBPDV_API`,
+`T_GEBWEB_API`, `T_GEBWEB_OPS`; lints `tests/local/T_LOCAL_FUNCOES.sh` (função inexistente),
 `T_NOMES_RESERVADOS.sh` (variável com nome de palavra-chave) e `T_LOCAL_APOS_RETURN.sh`, rodados
 pelo `o script de publicacao` antes de publicar.
 
 ### 4.2 Núcleo — `src/GENUC_MIG.prw`, `src/GENUC_CAD.prw`, `src/GENUC_MNT.prw`
 
-- `GENMIG()` → `.T.`/`.F.` — cria `geban.db` + GE1–GE5 idempotente (propaga `TCSqlExec`).
+- `GENMIG()` → `.T.`/`.F.` — cria GE1–GE5 no schema corrente, idempotente (propaga `TCSqlExec`).
 - `GEBCFG(cChave)` → modo do evento em GE4 ou `""` (GE4 ausente incluído).
 - `GEBAUD(cUsuario, cEvento, cMotivo)` → `.T.` — trilha real em GE3 (filial + `D_E_L_E_T_`;
   `DbAppend()` **antes** de `RecLock("GE3", .T.)` — obrigatório em tabela vazia).
@@ -410,7 +410,7 @@ pelo `o script de publicacao` antes de publicar.
 
 ---
 
-## 6. Padrões de código (obrigatórios, verificados nos 27 fontes)
+## 6. Padrões de código (obrigatórios, verificados nos 84 fontes)
 
 `totvs.ch` único · `User`/`Static` só · `If Nil` p/ defaults · `GetArea`/`RestArea` guardados ·
 alias literal · workarea p/ leitura · `DbAppend()+RecLock(.T.)+MsUnlock()` p/ insert ·
@@ -424,7 +424,7 @@ alias literal · workarea p/ leitura · `DbAppend()+RecLock(.T.)+MsUnlock()` p/ 
 
 | # | Gap (runtime AdvPP) | Workaround aplicado nos fontes | Evidência |
 |---|---------------------|--------------------------------|-----------|
-| 1 | `FWLogMsg()` **não existe** no runtime | Log via `ConOut()` | Todos os 38 `src/*.prw` |
+| 1 | `FWLogMsg()` **não existe** no runtime | Log via `ConOut()` | Todos os 84 `src/*.prw` |
 | 2 | `GetNextAlias()` **não existe** | Alias literal (`"GE4"`, `"GF2"`, …) | ex. `src/GENUC_MIG.prw` `GEBCFG()` |
 | 3 | `Default` **sobrescreve incondicionalmente** | `If x == Nil` em vez de `Default` | Todos os `User Function` com params |
 | 4 | `GetArea()` retorna `""` sem workarea aberta; `RestArea("")` **aborta** | Guarda `If Len(aArea) > 0` em **todas** as saídas | ex. `src/GEBSEC_LOGIN.prw` |

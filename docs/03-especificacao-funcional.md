@@ -1,7 +1,7 @@
 # 03 — Especificação Funcional — ERP GEBAN (República das Bananas / Bananias)
 
 > **Data:** 23/09/2026 · **Idioma:** PT-BR · **Autor:** Peder Munksgaard
-> **Base real:** `src/*.prw` (38 fontes) + `documentacao interna` + `documentacao interna`
+> **Base real:** `src/*.prw` (84 fontes) + `documentacao interna` + `documentacao interna`
 > **Atualização 21/11/2026:** este é o documento de especificação original. Desde então: o banco é
 > **Postgres** multi-empresa (um schema por empresa); a entrada é `advplc serve src/GEBTUI.prw`
 > (interface PO-UI, capítulo 9), mais a API REST (`src/GEBWEB.prw`) e o agendador
@@ -62,7 +62,7 @@ GE5 fila (`FILIAL/CHAVE/PAYLD/STATUS`).
 
 ### 1.2 Pré-condições
 
-1. `geban.db` acessível; migração `GENMIG()` executada (idempotente, `CREATE TABLE/INDEX IF NOT EXISTS`).
+1. Postgres acessível, schema da empresa provisionado; migração `GENMIG()` executada (idempotente, `CREATE TABLE/INDEX IF NOT EXISTS`).
 2. Para `GEBAUD`: GE3 existe. Para `GEBUSR`: GE2 existe (senão `.F.`). Para `GEBCFG`/`GEBFILA`: GE4/GE5 existem (senão `""`/`.F.`).
 
 ### 1.3 Fluxo principal (numerado)
@@ -98,7 +98,7 @@ GE5 fila (`FILIAL/CHAVE/PAYLD/STATUS`).
 
 | Regra | Mensagem (`ConOut`) |
 |-------|---------------------|
-| GENMIG inicia | `GENMIG criando GE1-GE5 em geban.db` |
+| GENMIG inicia | `GENMIGCatalogo criando GE1-GE2 (public)` + `GENMIGEmpresa criando GE3-GE5` |
 | GEBAN OK / FAIL | `GEBAN Nucleo online - Bananias` / `GEBAN Nucleo FAIL - GENMIG falhou` |
 | Auditoria gravada | `AUD <usuario> <evento> <motivo>` |
 | Mentor trava / libera / libera com BO | `Mentor travou <ev>` / `Mentor liberou <ev>` / `Mentor liberou com BO <ev>` |
@@ -184,7 +184,7 @@ GF5 apuração (`COMP YYYYMM/DEB/CRED/SALDO/REGIME`), GF6 créditos (`COMP/ORIG/
 
 | Regra | Mensagem |
 |-------|----------|
-| Migração | `GEBFMIG criando GF1-GF6 em geban.db` |
+| Migração | `GEBFMIG criando GF1-GF6` |
 | Emissão | `EMI AUTORIZADA <chave>` / `EMI EM_FILA <chave>` / `EMI EM_FILA puro <chave>` |
 | Split | `SPL <total> x<partes>` / `SPL <total> x1` |
 | Apuração | `APU AUTO/MANUAL/DIRETA <comp> <regime>`, `APU <comp> DEB <valor>` |
@@ -262,7 +262,7 @@ GD3 cobrança (`GUIA/ACAO/DATA/STATUS`).
 
 | Regra | Mensagem |
 |-------|----------|
-| Migração | `GEBDMIG criando GD1-GD3 em geban.db` |
+| Migração | `GEBDMIG criando GD1-GD3` |
 | Guia gerada / existente | `GER guia <guia> <saldo>` / `GER guia existente <guia>` |
 | Juros | `JUR <guia> <total>` |
 | Parcelamento | `PAR <guia> <nParc>` |
@@ -338,7 +338,7 @@ GV3 fiado (`CLI/VALOR/JUROS/MULTA/TOTAL/STATUS`).
 
 | Regra | Mensagem |
 |-------|----------|
-| Migração | `GEBVMIG criando GV1-GV3 em geban.db` |
+| Migração | `GEBVMIG criando GV1-GV3` |
 | Estoque | `EST <prod>` / `EST MINIMO <prod>` |
 | Venda | `VEN VENDIDA <venda>` / `VEN BLOQUEADA <venda>` / `VEN SEM_ESTOQUE <venda>` |
 | Fiado | `FIA <cli>` / `FIA LIMITE <cli>` / `JUR FIA <cli>` |
@@ -418,7 +418,7 @@ GC3 pernas (`LOTE/DC D-C/CONTA/VALOR`), GC4 params (`EVENTO→CTADEB/CTACRED/PER
 
 | Regra | Mensagem |
 |-------|----------|
-| Migração | `GEBCMIG criando GC1-GC4 em geban.db` |
+| Migração | `GEBCMIG criando GC1-GC4` |
 | Lançamento | `CTB <origem> <valor>` / `CTBGRV <lote> <tipo>` / `CTB desbalanceado <lote>` / `CTB stub <origem> <valor>` |
 | Direta | `DIR <lote> <valor>` / `DIR negado flag|perfil|GC4|mentor` |
 | Balancete/DRE | `BAL <comp> <nContas>` / `DRE <comp> <resultado>` |
@@ -509,7 +509,7 @@ GFN3 pagar (`DOC/FORN/VALOR/SALDO/VENC/STATUS ABERTO/PAGA`), GFN4 movimento (`CO
 
 | Regra | Mensagem (`ConOut`) |
 |-------|---------------------|
-| Migração | `GEBFNMIG criando GFN1-GFN4 em geban.db` |
+| Migração | `GEBFNMIG criando GFN1-GFN4` |
 | Conta | `CON <conta>` / `CON existe <conta>` |
 | Receber | `REC <doc> <valor>` / `REC duplicado <doc>` |
 | Pagar | `PAG <doc> <valor>` / `PAG duplicado <doc>` / `PAG bloqueado <doc>` |
@@ -601,7 +601,7 @@ GCP5 entrada (`NF/PED/STATUS RECEBIDA`).
 
 | Regra | Mensagem |
 |-------|----------|
-| Migração | `GEBCMMIG criando GCP1-GCP5 em geban.db` |
+| Migração | `GEBCMMIG criando GCP1-GCP5` |
 | Fornecedor | `FOR <cod>` / `FOR existe <cod>` |
 | Cotação/menor | `COT <prod> <preco>` / `MEL <prod> <menor>` |
 | Pedido/item | `PED ABERTO <ped>` / `PED existe <ped>` / `PED bloqueado <ped>` / `ITEM <ped> <prod>` / `ITEM sem pedido <ped>` |
@@ -621,7 +621,9 @@ GCP5 entrada (`NF/PED/STATUS RECEBIDA`).
 
 Planos: `documentacao interna`.
 Convencao: testes `T_*` incluem os fontes e validam `check` + `run` + `rerun` + regressao, com `DELETE` cleanup.
-Total: **46 testes** (25 legados + 5 FIN + 5 COM + 6 EXPANSAO + 5 GUI).
+Total: **91 testes** `tests/T_*.prw` (a matriz req→função→teste abaixo é a da especificação original;
+novos módulos — segurança RBAC, DF-e, PDV/loja, crypto, Sarney, lote, backoffice — estão cobertos
+pelos testes listados em `docs/05-referencia-tecnica.md` §9).
 
 | Req (plano) | Funções (`src/`) | Testes (`tests/`) | Tabelas |
 |-------------|------------------|-------------------|---------|
@@ -665,12 +667,12 @@ Total: **46 testes** (25 legados + 5 FIN + 5 COM + 6 EXPANSAO + 5 GUI).
 | EXPANSAO T5: relatorios negocio + trackers | `GEBRELFISCAL`, `GEBRELDERRAMA`, `GEBRELFIN`, `GEBRELSTOQUE`, `GEBRELCOMPRAS`, `GEBRELCONTABIL`, `GEBRELGERAL`, `GEBTRAKCOMPRA`, `GEBTRAKVENDA`, `GEBTRAKNOTAFISCAL`, `GEBTRAKDERRAMA` (`GEBEXP_REL_BIZ.prw` + `GEBEXP_TRAK.prw`) | `T_GeExp_REL_BIZ.prw` (11 asserts: cada relatorio retorna array com len correta + trackers rastreiam cadeia completa) | Todas negocio |
 | EXPANSAO T6: massa multi-empresa | (todas expansao) | `T_GeExp_MASSA.prw` (3 empresas isoladas; 20 NFs cada + 5 guias + 10 pedidos + 10 CTB; `GEBRELGERAL` confere; 5 trackers validados) | Todas |
 | INTERFACE: formulários | todas as operações (`TUIFormularios`, `TUIExecuta`) | `T_GEBTUI_OPS.prw` (executa todos os formulários + verificações dirigidas) | Todas |
-| INTERFACE: frente de loja | `TUIPdv*` (`GEBTUIPDV.prw`) | `T_GEBTUIPDV.prw` (abre caixa, vende, devolve, orçamento, fecha) | GLJ* |
+| INTERFACE: PDV web (frente de loja) | `GEBPDV*`/`GEBLOJ*` (`GEBPDV_API.prw`, `GEBLOJ*.prw`) | `T_GEBPDV_API.prw`, `T_GEBLOJ.prw`, `T_GEBLOJ_OPE.prw`, `T_GEBLOJREG.prw` (caixa, venda, devolução, orçamento, crypto, regime) | GLJ*, GCK* |
 | INTERFACE: fluxos e permissões | `TUIModulos`, `TUIPode` | `T_GEBTUI_FLUXOS.prw`, `T_GEBTUI_PERM.prw` | SEC_PERM |
 
 ## 9. MÓDULO INTERFACE — PO-UI (GEBTUI.prw)
 
-**Fontes:** `src/GEBTUI.prw` (aplicação, formulários e páginas), `src/GEBTUIPDV.prw` (frente de loja),
+**Fontes:** `src/GEBTUI.prw` (aplicação, formulários e páginas),
 `src/GEBTUIBO.prw` (DANFE da NFC-e), `src/GEBEXP_TRAK.prw` (rastreabilidade). Componentes PO-UI do
 runtime AdvPP (`PoApp`, `PoMenu`, `PoPage`, `PoTabs`, `PoWidget`, `PoTable`, `PoChart`, `PoTree`...).
 **Entrada:** `advplc serve src/GEBTUI.prw --port 8081` → `User Function GEBTUI()`; cada janela do
@@ -708,8 +710,8 @@ funções de negócio da API REST — a validação fica na regra de negócio, n
 remover item; o bloco recebe os itens).
 
 **Testes:** `T_GEBTUI_OPS` (executa todos os formulários com valores padrão + verificações
-dirigidas), `T_GEBTUIPDV` (venda, devolução, orçamento e caixa), `T_GEBTUI_FLUXOS`, `T_GEBTUI_PERM`,
-`T_GEBTUIBO`; lints `tests/local/T_LOCAL_FUNCOES.sh` (função inexistente),
+dirigidas), `T_GEBTUI_FLUXOS`, `T_GEBTUI_PERM`, `T_GEBTUIBO`, `T_GEBTUITROCA`, `T_GEBPDV_API`,
+`T_GEBWEB_API`, `T_GEBWEB_OPS`; lints `tests/local/T_LOCAL_FUNCOES.sh` (função inexistente),
 `T_NOMES_RESERVADOS.sh` (variável com nome de palavra-chave) e `T_LOCAL_APOS_RETURN.sh`, rodados
 pelo `o script de publicacao` antes de publicar.
 

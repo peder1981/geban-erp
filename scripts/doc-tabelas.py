@@ -79,7 +79,7 @@ def curadas(doc):
     b = s.index("\n## 5.", a)
     desc = {}
     for linha in s[a:b].split("\n"):
-        m = re.match(r"\| (`[^|]+`) \| ([^|]+) \| (.+) \|$", linha)
+        m = re.match(r"\| (`[^|]+`) \| ([^|]+) \| ([^|]+) \|", linha)
         if m:
             nomes = re.findall(r"`([A-Z0-9_]+)`", m.group(1))
             texto = m.group(3).strip()

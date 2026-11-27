@@ -134,7 +134,7 @@ flowchart LR
 
 - **Horário e dia:** diário ou dia do mês (1 a 28).
 - **Atraso:** se o horário passou, roda na próxima passada, uma vez por dia.
-- **Rotinas disponíveis:** coleta de DF-e por NSU e apuração do Simples do mês anterior.
+- **Rotinas disponíveis:** coleta de DF-e por NSU e apuração do Simples do mês anterior. O gatilho Sarney de reajuste de preços também roda a cada minuto, fora da agenda.
 - **Segurança:** só rotinas de uma lista fechada, e só o super ou o ADMIN da empresa agendam.
 
 ![Núcleo](docs/img/09-modulo-nucleo.jpg)
@@ -199,7 +199,15 @@ Depois:
 
 ## Testes
 
-Cada teste em `tests/T_*.prw` cria um schema descartável e o remove ao final. Rode em um banco de teste dedicado, nunca no banco de produção.
+91 suítes em `tests/T_*.prw`. Cada teste cria schemas descartáveis e os remove ao final; o catálogo de identidade (`GE1`, `GE2*`) é global em `public` e os fixtures limpam depois de si.
+
+```bash
+GEBAN_PG_HOST=localhost GEBAN_PG_PORT=5432 GEBAN_PG_DB=geban_test \
+GEBAN_PG_USER=postgres GEBAN_PG_PASSWORD=senha ADVPP_HTTP_INSECURE=1 \
+  tests/run-all.sh [filtro]
+```
+
+Rode em um banco de teste dedicado, nunca no banco de produção. Testes que tocam SEFAZ/Cielo precisam dos emuladores de `tests/emuladores/` no ar (:18766 e :18765).
 
 ## Estado atual
 

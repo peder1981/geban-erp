@@ -703,7 +703,7 @@ Fontes: `GEBBOLIB`, `GEBCTX`, `GEBEST`, `GEBFNX`, `GEBCPX`, `GEBFAT`, `GEBLOJ`, 
 - inventário rotativo;
 - terminal físico de cartão (o provedor `CIELO` usa a API de e-commerce).
 
-*Documento gerado a partir do design aprovado, dos planos e dos 38 fontes `src/*.prw`. Divergência entre este texto e o fonte? Abra o `.prw` indicado — ele é a Constituição; isto aqui é o jornal das Bananias.*
+*Documento gerado a partir do design aprovado, dos planos e dos 84 fontes `src/*.prw`. Divergência entre este texto e o fonte? Abra o `.prw` indicado — ele é a Constituição; isto aqui é o jornal das Bananias.*
 
 ## 20. Integração entre os módulos (19/10/2026)
 

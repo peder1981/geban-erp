@@ -1,10 +1,10 @@
 # 05 — Referência Técnica Completa do ERP GEBAN
 
 > **Autor:** Peder Munksgaard · **Data:** 26/09/2026 · **Idioma:** PT-BR
-> **Fontes primárias:** `src/*.prw` (83 arquivos, 590 `User Function` — todas catalogadas na seção 8,
+> **Fontes primárias:** `src/*.prw` (84 arquivos, 650 `User Function` — todas catalogadas na seção 8,
 > gerada por `scripts/doc-funcoes.py`), `docs/02-regras-negocio.md`, planos e ledgers em `documentacao interna`.
-> **Estado verificado (21/11/2026):** suíte completa **89/89 PASS** contra Postgres real sob o runtime
-> **AdvPP advplc v4.8.5**. Interface em componentes PO-UI (`src/GEBTUI.prw`), todas as operações
+> **Estado verificado:** suíte completa **91/91 PASS** contra Postgres real (`geban_test`) sob o runtime
+> **AdvPP advplc** — ver seção 9. Interface em componentes PO-UI (`src/GEBTUI.prw`), todas as operações
 > em formulários de tela única.
 > PDFs gerados com o template `jmpm` (`md2pdf.py --template jmpm --cover`).
 
@@ -58,7 +58,7 @@ Function` (externa) vs `Static Function` (interna); sem `IIF()`, sem `Function` 
 SonarQube: CA4000/CA1002/CA1000/CA1004 e segurança CA2050–CA2052. Toda API externa deve
 ser validada antes do uso; toda geração fecha com gap analysis.
 
-## 4. Inventário de tabelas (119 tabelas)
+## 4. Inventário de tabelas (124 tabelas)
 
 Gerado por `scripts/doc-tabelas.py` a partir das definições nos fontes (`CREATE TABLE`,
 `BOTAB`, `SNTab` e `ALTER TABLE ... ADD COLUMN`). Toda tabela tem ainda `R_E_C_N_O_`
@@ -78,6 +78,8 @@ ficam no schema `public`; as demais, no schema de cada empresa.
 | `GC4` | Contábil | Parâmetros evento → conta débito/crédito (+ `LANC_DIRETO`) | `GC4_FILIAL`, `GC4_EVENTO`, `GC4_CTADEB`, `GC4_CTACRED`, `GC4_PERM` |
 | `GCC1` | Backoffice | — | `GCC1_FILIAL`, `GCC1_COD`, `GCC1_DESC`, `GCC1_BLOQ` |
 | `GCC2` | Backoffice | — | `GCC2_FILIAL`, `GCC2_COD`, `GCC2_CC`, `GCC2_PCT` |
+| `GCK1` | Outros | — | `GCK1_FILIAL`, `GCK1_MOEDA`, `GCK1_ENDERECO`, `GCK1_ATIVO` |
+| `GCK2` | Outros | — | `GCK2_FILIAL`, `GCK2_CUPOM`, `GCK2_MOEDA`, `GCK2_ENDERECO`, `GCK2_BRL`, `GCK2_QTD`, `GCK2_COT` |
 | `GCP1` | Compras | Fornecedores (`COD`, `NOME`, `CNPJ`) | `GCP1_FILIAL`, `GCP1_COD`, `GCP1_NOME`, `GCP1_CNPJ` |
 | `GCP2` | Compras | Cotações (`FORN`, `PROD`, `PRECO`) | `GCP2_FILIAL`, `GCP2_FORN`, `GCP2_PROD`, `GCP2_PRECO` |
 | `GCP3` | Compras | Pedidos (`NUM`, `FORN`, `ABERTO/BLOQUEADO/RECEBIDO`) / itens | `GCP3_FILIAL`, `GCP3_NUM`, `GCP3_FORN`, `GCP3_STATUS` |
@@ -143,7 +145,7 @@ ficam no schema `public`; as demais, no schema de cada empresa.
 | `GFN4` | Financeiro | Movimentos de caixa | `GFN4_FILIAL`, `GFN4_CONTA`, `GFN4_TIPO`, `GFN4_VALOR`, `GFN4_DATA` |
 | `GFT1` | Backoffice | — | `GFT1_FILIAL`, `GFT1_COD`, `GFT1_NOME`, `GFT1_DOC`, `GFT1_UF`, `GFT1_LIMITE`, `GFT1_COND`, `GFT1_TABELA` |
 | `GFT2` | Backoffice | — | `GFT2_FILIAL`, `GFT2_TAB`, `GFT2_PROD`, `GFT2_PRECO` |
-| `GFT3` | Backoffice | — | `GFT3_FILIAL`, `GFT3_NUM`, `GFT3_CLI`, `GFT3_COND`, `GFT3_EMISSAO`, `GFT3_LOCAL`, `GFT3_DESC`, `GFT3_STATUS`, `GFT3_MOTIVO`, `GFT3_CC` |
+| `GFT3` | Backoffice | — | `GFT3_FILIAL`, `GFT3_NUM`, `GFT3_CLI`, `GFT3_COND`, `GFT3_EMISSAO`, `GFT3_LOCAL`, `GFT3_DESC`, `GFT3_STATUS`, `GFT3_MOTIVO`, `GFT3_CC`, `GFT3_REGIME` |
 | `GFT4` | Backoffice | — | `GFT4_FILIAL`, `GFT4_NUM`, `GFT4_PROD`, `GFT4_QTD`, `GFT4_PRECO`, `GFT4_QTDFAT` |
 | `GFT5` | Backoffice | — | `GFT5_FILIAL`, `GFT5_NOTA`, `GFT5_PED`, `GFT5_CLI`, `GFT5_DATA`, `GFT5_TOTAL`, `GFT5_CUSTO`, `GFT5_IBS`, `GFT5_CBS` |
 | `GFT6` | Backoffice | — | `GFT6_FILIAL`, `GFT6_NOTA`, `GFT6_PROD`, `GFT6_QTD`, `GFT6_PRECO`, `GFT6_VALOR`, `GFT6_CUSTO`, `GFT6_QTDDEV` |
@@ -154,7 +156,7 @@ ficam no schema `public`; as demais, no schema de cada empresa.
 | `GFX4` | Backoffice | — | `GFX4_FILIAL`, `GFX4_CONTA`, `GFX4_DATA`, `GFX4_DC`, `GFX4_VALOR`, `GFX4_HIST`, `GFX4_DOC` |
 | `GLJ1` | Loja | — | `GLJ1_FILIAL`, `GLJ1_COD`, `GLJ1_NOME`, `GLJ1_CONTA`, `GLJ1_LOCAL`, `GLJ1_CC` |
 | `GLJ2` | Loja | — | `GLJ2_FILIAL`, `GLJ2_SESSAO`, `GLJ2_CAIXA`, `GLJ2_OPER`, `GLJ2_ABERT`, `GLJ2_HORA`, `GLJ2_FUNDO`, `GLJ2_STATUS`, `GLJ2_FECH`, `GLJ2_CONTADO`, `GLJ2_ESPERADO`, `GLJ2_DIFER` |
-| `GLJ3` | Loja | — | `GLJ3_FILIAL`, `GLJ3_CUPOM`, `GLJ3_SESSAO`, `GLJ3_CLI`, `GLJ3_DATA`, `GLJ3_BRUTO`, `GLJ3_DESC`, `GLJ3_TOTAL`, `GLJ3_CUSTO`, `GLJ3_STATUS`, `GLJ3_NOTA` |
+| `GLJ3` | Loja | — | `GLJ3_FILIAL`, `GLJ3_CUPOM`, `GLJ3_SESSAO`, `GLJ3_CLI`, `GLJ3_DATA`, `GLJ3_BRUTO`, `GLJ3_DESC`, `GLJ3_TOTAL`, `GLJ3_CUSTO`, `GLJ3_STATUS`, `GLJ3_NOTA`, `GLJ3_REGIME` |
 | `GLJ4` | Loja | — | `GLJ4_FILIAL`, `GLJ4_CUPOM`, `GLJ4_PROD`, `GLJ4_QTD`, `GLJ4_PRECO`, `GLJ4_VALOR`, `GLJ4_CUSTO` |
 | `GLJ5` | Loja | — | `GLJ5_FILIAL`, `GLJ5_CUPOM`, `GLJ5_FORMA`, `GLJ5_VALOR`, `GLJ5_TROCO`, `GLJ5_TAXA`, `GLJ5_DOC`, `GLJ5_PARC`, `GLJ5_TEF` |
 | `GLJ6` | Loja | — | `GLJ6_FILIAL`, `GLJ6_SESSAO`, `GLJ6_TIPO`, `GLJ6_VALOR`, `GLJ6_MOTIVO`, `GLJ6_DATA` |
@@ -170,6 +172,9 @@ ficam no schema `public`; as demais, no schema de cada empresa.
 | `GLJH` | Loja | — | `GLJH_FILIAL`, `GLJH_DEV`, `GLJH_CUPOM`, `GLJH_SESSAO`, `GLJH_PROD`, `GLJH_QTD`, `GLJH_VALOR`, `GLJH_CUSTO`, `GLJH_DATA`, `GLJH_MODO`, `GLJH_VALE` |
 | `GRT1` | Fiscal | — | `GRT1_FILIAL`, `GRT1_COD`, `GRT1_TRIB`, `GRT1_ALIQ`, `GRT1_DESC` |
 | `GRT2` | Fiscal | — | `GRT2_FILIAL`, `GRT2_DOC`, `GRT2_FORN`, `GRT2_COD`, `GRT2_TRIB`, `GRT2_BASE`, `GRT2_ALIQ`, `GRT2_VALOR`, `GRT2_DATA`, `GRT2_COMP`, `GRT2_GUIA` |
+| `GSK1` | Outros | — | `GSK1_FILIAL`, `GSK1_COD`, `GSK1_DESCR`, `GSK1_PCT`, `GSK1_VEZES`, `GSK1_HORAS`, `GSK1_FEITAS`, `GSK1_ULTHORA`, `GSK1_ATIVO` |
+| `GSK2` | Outros | — | `GSK2_FILIAL`, `GSK2_CFG`, `GSK2_PROD`, `GSK2_PCT` |
+| `GSK3` | Outros | — | `GSK3_FILIAL`, `GSK3_CFG`, `GSK3_DATA`, `GSK3_HORA`, `GSK3_PROD`, `GSK3_PCT`, `GSK3_ANT`, `GSK3_NOV` |
 | `GSN1` | Fiscal | — | `GSN1_FILIAL`, `GSN1_COMP`, `GSN1_ATIV`, `GSN1_FOLHA`, `GSN1_REC` |
 | `GSN2` | Fiscal | — | `GSN2_FILIAL`, `GSN2_COMP`, `GSN2_ANEXO`, `GSN2_RBT12`, `GSN2_RBTEXP`, `GSN2_RBA`, `GSN2_FOL12`, `GSN2_FATORR`, `GSN2_FAIXA`, `GSN2_ALIQEF`, `GSN2_RECMES`, `GSN2_DAS`, `GSN2_FORA`, `GSN2_VENC`, `GSN2_ALERTA` |
 | `GSN3` | Fiscal | — | `GSN3_FILIAL`, `GSN3_COD`, `GSN3_DESC`, `GSN3_ANEXO` |
@@ -214,7 +219,7 @@ ficam no schema `public`; as demais, no schema de cada empresa.
   (`AVISA_E_TRAVA` / `AVISA_E_LIBERA_COM_BO` / `DESLIGADO`), `GEBFILA` (fila GE5),
   `GEBMON*` (monitor), `CTBLAN`/`CTBGRV` (partida dobrada + stub compatível).
 
-## 6. Camada HTTP/REST (`GEBREST` + `GEBWEB_API`, 120 funções)
+## 6. Camada HTTP/REST (`GEBREST` + `GEBWEB_API`, 121 funções)
 
 Envelope JSON `{status, timestamp, dados[], erros[]}`; auth por `?token=…&empresa=…`
 (validado em `GE2_TOK`, mesma empresa); `POST /api/login` emite token
@@ -227,6 +232,7 @@ gravação real, token/chave com aspas = 400 sem SQL. Rotas (método + path → 
 | Método | Path | Handler |
 |---|---|---|
 | POST | `/api/login` | `U_GEBWEB_LOGINAPI` |
+| POST | `/api/pdv/login` | `U_GEBWEB_LOGINAPI` |
 | GET | `/api/health` | `U_GEBWAPI_HEALTH` |
 | GET | `/api/public/empresas` | `U_GEBWAPI_PUBEMP` |
 | GET | `/api/usuarios` | `U_GEBWAPI_USRLST` |
@@ -277,25 +283,103 @@ gravação real, token/chave com aspas = 400 sem SQL. Rotas (método + path → 
 | POST | `/api/compras/entradas` | `U_GEBWAPI_COMENT` |
 | POST | `/api/fiscal/apurar` | `U_GEBWAPI_FISAPU` |
 | POST | `/api/fiscal/creditos` | `U_GEBWAPI_FISCRE` |
+| POST | `/api/fiscal/simples/config` | `U_GEBWAPI_SNCFG` |
+| POST | `/api/fiscal/simples/folha` | `U_GEBWAPI_SNFOL` |
+| POST | `/api/fiscal/simples/apurar` | `U_GEBWAPI_SNAPU` |
+| POST | `/api/fiscal/simples/atividade` | `U_GEBWAPI_SNATV` |
+| POST | `/api/fiscal/simples/produto` | `U_GEBWAPI_SNPRD` |
+| POST | `/api/fiscal/simples/exportacao` | `U_GEBWAPI_SNEXP` |
+| POST | `/api/fiscal/simples/feriado` | `U_GEBWAPI_SNFER` |
+| GET | `/api/fiscal/simples/extrato/{comp}` | `U_GEBWAPI_SNEXT` |
+| GET | `/api/fiscal/simples/anual/{ano}` | `U_GEBWAPI_SNANU` |
+| POST | `/api/bo/{modulo}/{acao}` | `U_GEBWAPI_BOPOST` |
+| GET | `/api/bo/{modulo}/{acao}` | `U_GEBWAPI_BOGET` |
+| GET | `/api/dfe/configurar` | `U_GEBWAPI_DFEPAG` |
+| GET | `/api/dfe/danfe` | `U_GEBWAPI_DFEDANFE` |
+| GET | `/api/dfe/efd` | `U_GEBWAPI_DFEEFD` |
+| GET | `/api/pdv/caixa/lista` | `U_GEBWAPI_PDVCAIXALST` |
+| GET | `/api/pdv/caixa/sessoes` | `U_GEBWAPI_PDVCAIXASS` |
+| POST | `/api/pdv/caixa/abrir` | `U_GEBWAPI_PDVCAIXAABR` |
+| POST | `/api/pdv/caixa/fechar` | `U_GEBWAPI_PDVCAIXAFECH` |
+| GET | `/api/pdv/caixa/resumo/{sessao}` | `U_GEBWAPI_PDVCAIXARESUMO` |
+| POST | `/api/pdv/caixa/sangria` | `U_GEBWAPI_PDVSANGRIA` |
+| POST | `/api/pdv/cupom/novo` | `U_GEBWAPI_PDVCUPOMNOV` |
+| GET | `/api/pdv/cupom/{id}` | `U_GEBWAPI_PDVCUPOMGET` |
+| POST | `/api/pdv/cupom/{id}/cancelar` | `U_GEBWAPI_PDVCUPCANC` |
+| GET | `/api/pdv/produto/busca` | `U_GEBWAPI_PDVPRODUTBUSC` |
+| GET | `/api/pdv/relatorio/gerencial` | `U_GEBWAPI_PDVRELGER` |
+| GET | `/api/pdv/relatorio/gerencial/csv` | `U_GEBWAPI_PDVRELGERCSV` |
+| GET | `/api/pdv/relatorio/comissao` | `U_GEBWAPI_PDVRELCOM` |
+| GET | `/api/pdv/relatorio/comissao/csv` | `U_GEBWAPI_PDVRELCOMCSV` |
+| GET | `/api/pdv/perifericos` | `U_GEBWAPI_PDVPERIFLIST` |
+| POST | `/api/pdv/perifericos` | `U_GEBWAPI_PDVPERIFREG` |
+| DELETE | `/api/pdv/perifericos/{id}` | `U_GEBWAPI_PDVPERIFDEL` |
+| GET | `/api/pdv/crypto/cotacao` | `U_GEBWAPI_PDVCRYCOT` |
+| GET | `/api/pdv/crypto/wallets` | `U_GEBWAPI_PDVCRYWALLST` |
+| GET | `/api/pdv/crypto/previa` | `U_GEBWAPI_PDVCRYPREV` |
+| POST | `/api/pdv/crypto/wallet` | `U_GEBWAPI_PDVCRYWAL` |
+| POST | `/api/pdv/orcamento` | `U_GEBWAPI_PDVORCNOV` |
+| GET | `/api/pdv/orcamentos` | `U_GEBWAPI_PDVORCLST` |
+| POST | `/api/pdv/orcamento/finalizar` | `U_GEBWAPI_PDVORCFIN` |
+| POST | `/api/pdv/orcamento/cancelar` | `U_GEBWAPI_PDVORCCAN` |
+| POST | `/api/pdv/devolucao` | `U_GEBWAPI_PDVDEV` |
+| GET | `/api/pdv/consulta` | `U_GEBWAPI_PDVCONS` |
+| GET | `/api/pdv/vale/{numero}` | `U_GEBWAPI_PDVVALE` |
+| GET | `/api/pdv/fiado/saldo` | `U_GEBWAPI_PDVFIAS` |
+| POST | `/api/pdv/cadastro/caixa` | `U_GEBWAPI_PDVCADCX` |
+| POST | `/api/pdv/cadastro/barras` | `U_GEBWAPI_PDVCADBAR` |
+| POST | `/api/pdv/cadastro/promocao` | `U_GEBWAPI_PDVCADPROMO` |
+| POST | `/api/pdv/cadastro/vendedor` | `U_GEBWAPI_PDVCADVEND` |
+| GET | `/api/pdv/relatorio/vendas` | `U_GEBWAPI_PDVRELVEN` |
+| GET | `/api/pdv/relatorio/tef` | `U_GEBWAPI_PDVRELTEF` |
+| POST | `/api/pdv/tef/config` | `U_GEBWAPI_PDVTEFCFG` |
+| POST | `/api/pdv/tef/desfazer` | `U_GEBWAPI_PDVTEFRES` |
+| POST | `/api/pdv/nfce/transmitir` | `U_GEBWAPI_PDVNFETR` |
+| GET | `/pdv` | `U_GEBPDVHTML` |
+| GET | `/pdv/ws` | `U_GEBPDVWS` |
 
+`POST /api/bo/{modulo}/{acao}` (`U_GEBWAPI_BOPOST`) é o dispatcher do backoffice (telas `GEBBO*`): ~117 ações em um único path. `GET /pdv` serve `public/pdv.html` (`U_GEBPDVHTML`) e `GET /pdv/ws` o websocket do PDV (`U_GEBPDVWS`).
 ## 7. TUI serve — mapa de menus (`GEBTUI`, porta 8081)
 
 Login: usuário/senha → empresa (menu) → filial (menu); super entra direto na matriz
 com vínculo garantido; **catálogo vazio: o super cria a primeira empresa na hora
-(bootstrap)**. Menu principal: Fiscal, Financeiro, Derrama, Estoque, Contabil,
-Compras, Núcleo, Sair. Submenus:
+(bootstrap)**. Menu principal (só os módulos permitidos pelo RBAC aparecem):
+**Início, Fiscal, Financeiro, Derrama, Estoque, Contábil, Compras, Faturamento,
+Núcleo, Rastreabilidade, Minha senha, Sair**.
 
-- **Fiscal:** Produtos, Notas, + Novo produto, Emitir nota, Apurar competência, Lançar crédito, Voltar.
-- **Financeiro:** Contas, + Nova conta, Baixar título, Voltar.
-- **Derrama:** Guias, + Gerar guia, Baixar guia, Parcelar guia, Calcular juros, Protestar guia, Voltar.
-- **Estoque:** Saldos, Vendas, Vender, Vender fiado, Juros fiado, Voltar.
-- **Contábil:** Plano, Lançamentos, Lançar, Ver balancete, Ver DRE, Voltar.
-- **Compras:** Fornecedores, Pedidos, + Novo fornecedor, Abrir pedido, Adicionar item, Dar entrada, Voltar.
-- **Núcleo (só ADMIN da empresa ou super; os demais só trocam a própria senha):** Empresas, Unidades, Filiais, Usuários, + Nova empresa (só super), + Nova unidade, + Nova filial, + Novo usuário, Vincular usuário (só na empresa da sessão), **Trocar senha** (`GEBTUITROCASENHA`: política e confirmação; outro usuário só via `GEBSECPODE`; ninguém muda o próprio perfil; derruba as sessões do alvo), Voltar.
-- **Fiscal** ganhou **+ Nova aliquota (NCM)** (`GEBRESTALISC`: IBS/CBS em %, vigência AAAAMMDD sem sobreposição) — sem alíquota a NCM tributa a zero.
-- Browses `FWMBrowse`: as grades do catálogo (GE1, GEU1, GEF1, GE2) são **somente leitura** (`SetMenuDef("")`, AdvPP 4.4.0-geban); as demais seguem editáveis.
+Cada módulo é uma página com duas faixas: **abas de tabelas ao vivo** (PoTable;
+clicar numa linha preenche os campos ligados dos formulários) e **abas de
+formulários** agrupadas por prefixo do título — `Operações`, `Relatórios`,
+`Banco`, `Simples Nacional`, `Documentos eletrônicos`, `NF-e de fornecedores`,
+`Sarney` e `Crypto` (`TUIGrupo`). Não há mais submenus de "Novo/Baixar/Voltar":
+toda operação é um formulário de tela única (`TUIFormularios`/`TUIExecuta`) que
+chama a mesma função de negócio da API REST, com a permissão conferida antes.
 
-## 8. Referência completa de funções por arquivo (590 funções)
+- **Fiscal:** abas Produtos (GF1), Notas (GF3), Apurações do Simples (GSN2),
+  Atividades do Simples (GSN3); formulários de produto/NCM/alíquota IBS-CBS,
+  emissão, apuração, créditos, EFD, DF-e e relatórios.
+- **Financeiro:** abas Contas (GFN1); contas, títulos, baixas com juros/multa,
+  fluxo, aging, boletos, CNAB, OFX e conciliação.
+- **Derrama:** abas Guias (GD1); gerar, baixar, parcelar, juros, protesto,
+  retenções e relatórios.
+- **Estoque:** abas Saldos (GV1), Vendas (GV2); entradas/saídas, custos, lotes
+  e séries (FEFO), endereços, inventário e relatórios.
+- **Contábil:** abas Plano de contas (GC1), Lançamentos (GC2); partidas
+  dobradas, centros de custo, balancete, DRE e Razão.
+- **Compras:** abas Fornecedores (GCP1), Pedidos (GCP3); cotação, pedido,
+  alçada de aprovação, recebimento/NF-e de fornecedor.
+- **Faturamento:** abas Clientes (GFT1), Preços (GFT2), Pedidos de venda (GFT3),
+  Regras Sarney (GSK1), Histórico Sarney (GSK3), Wallets crypto (GCK1),
+  Pagamentos crypto (GCK2); pedidos, faturamento, devolução, regime
+  fiscal/comprovante e gatilho Sarney.
+- **Núcleo (só ADMIN da empresa ou super; os demais só trocam a própria senha):**
+  abas Empresas (GE1), Unidades (GEU1), Filiais (GEF1), Usuários (GE2);
+  formulários de empresa/unidade/filial/usuário, vínculo usuário↔empresa↔filial,
+  perfil e permissões (`SEC_PERM`), agendador de rotinas e **Trocar senha**
+  (`GEBTUITROCASENHA`: política e confirmação; outro usuário só via `GEBSECPODE`;
+  ninguém muda o próprio perfil; derruba as sessões do alvo).
+
+## 8. Referência completa de funções por arquivo (650 funções)
 
 Gerada por `scripts/doc-funcoes.py` a partir dos fontes: assinatura exata da
 declaração e propósito da primeira linha do `Protheus.doc` (ou do comentário
@@ -322,7 +406,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBDBTableExistsHere` | `GEBDBTableExistsHere(cTabela)` | schema do tenant -- mascarando a necessidade de cria-la ali. |
 | `GEBDBColumnExists` | `GEBDBColumnExists(cTabela, cColuna)` | GEBDBColumnExists(cTabela, cColuna) -> .T./.F. |
 | `GEBDBTableEnsure` | `GEBDBTableEnsure(cTabela, cDDL, aColsObrigatorias)` | as que faltarem (tabela ja existente) sao adicionadas como TEXT. |
-| `GEBDBMoedaFix` | `GEBDBMoedaFix()` | Migracao: rodar uma vez por empresa (ver o runbook de operacao (interno)), nao a cada login. |
+| `GEBDBMoedaFix` | `GEBDBMoedaFix()` | Migracao: rodar uma vez por empresa (ver docs/07-runbook.md), nao a cada login. |
 
 **`src/GEBDB_TENANT.prw`** — 7 funções
 
@@ -913,7 +997,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBFATMIG` | `GEBFATMIG()` | — |
 | `GEBFATCLI` | `GEBFATCLI(cCod, cNome, cDoc, cUF, nLimite, cCond, cTab)` | Cadastra/altera cliente. |
 | `GEBFATPRC` | `GEBFATPRC(cTab, cProd, nPreco)` | Preco do produto numa tabela (vazia = PADRAO). |
-| `GEBFATPED` | `GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC, cRegime)` | Pedido de venda. `cRegime` = `FISCAL` (padrao) ou `COMPROVANTE` (DIFAL extraoficial: teto de desconto por `LOJ_REG_DESCF`/`LOJ_REG_DESCC` e sem NF-e no faturamento). |
+| `GEBFATPED` | `GEBFATPED(cNum, cCli, aItens, cCond, nDesc, cLocal, cData, cCC, cRegime)` | Pedido de venda. |
 | `GEBFATLIB` | `GEBFATLIB(cNum, lForca)` | Liberacao do pedido (credito e estoque). |
 | `GEBFATCAN` | `GEBFATCAN(cNum)` | Cancela pedido sem nenhum faturamento. |
 | `GEBFATFAT` | `GEBFATFAT(cNum, aItens, cData, cNota)` | Documento de saida do pedido liberado. |
@@ -951,8 +1035,8 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBLOJMIG` | `GEBLOJMIG()` | — |
 | `GEBLOJCX` | `GEBLOJCX(cCod, cNome, cConta, cLocal, cCC)` | Cadastra/altera um caixa. |
 | `GEBLOJABRE` | `GEBLOJABRE(cCaixa, cOper, nFundo, cData)` | Abre a sessao do caixa (uma aberta por caixa). |
-| `GEBLOJVEN` | `GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc, cRegime)` | Venda no caixa (cupom). `cRegime` = `FISCAL` (padrao) ou `COMPROVANTE` (sem NFC-e; teto de desconto por regime quando `LOJ_REG_ATIVO=S`). Forma de pagamento `CRYPTO` recebe doc `"MOEDA|ENDERECO"` (BTC/ETH/XMR/USDC/USDT, cotacao CoinGecko, QR no PDV). |
-| `GEBLOJCAN` | `GEBLOJCAN(cCupom, cMotivo)` | Cancela um cupom da sessao aberta. Estorna cada forma: `CRYPTO` devolve o valor a `CRY_CONTA` e estorna o evento contabil `LOJ_CRYPTO` (a transacao on-chain e' manual, como no PIX). |
+| `GEBLOJVEN` | `GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, cSuperv, cSenhaSup, cOrc, cRegime)` | Venda no caixa (cupom). |
+| `GEBLOJCAN` | `GEBLOJCAN(cCupom, cMotivo)` | Cancela um cupom da sessao aberta. |
 | `GEBLOJSAN` | `GEBLOJSAN(cSessao, cTipo, nValor, cMotivo, cConta)` | Sangria (SANGRIA: caixa -> cofre) ou suprimento (SUPRIMENTO: cofre -> caixa). |
 | `GEBLOJFECHA` | `GEBLOJFECHA(cSessao, nContado)` | Fecha a sessao com o dinheiro contado. |
 | `GEBLOJRESUMO` | `GEBLOJRESUMO(cSessao)` | Relatorio: resumo da sessao (cupons, cancelados, total por forma de pagamento, sangrias, suprimentos, fundo, dinheiro esperado, contado e diferenca). |
@@ -981,7 +1065,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GEBLOJORC` | `GEBLOJORC(aItens, cCli, cVend, nDesc, cData)` | Grava o orcamento. |
-| `GEBLOJORCFIN` | `GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup, cRegime)` | Finaliza o orcamento no caixa: vira cupom (GEBLOJVEN) com os precos do orcamento. `cRegime` segue para `GEBLOJVEN` (`FISCAL`/`COMPROVANTE`). |
+| `GEBLOJORCFIN` | `GEBLOJORCFIN(cSessao, cOrc, aPagtos, cCPF, cSuperv, cSenhaSup, cRegime)` | Finaliza o orcamento no caixa: vira cupom (GEBLOJVEN) com os precos do orcamento. |
 | `GEBLOJORCCAN` | `GEBLOJORCCAN(cOrc)` | Cancela o orcamento aberto. |
 | `GEBLOJORCS` | `GEBLOJORCS(cStatus)` | Relatorio: orcamentos pelo status (vazio = ABERTO). |
 | `GEBLOJDEV` | `GEBLOJDEV(cSessao, cCupom, aItens, cModo, cMotivo, oCons)` | Devolucao/troca no caixa (sessao aberta) de itens de um cupom vendido. |
@@ -991,12 +1075,12 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBLOJGER` | `GEBLOJGER(cIni, cFim, cAgrupa)` | Relatorio gerencial da loja no periodo, agrupado por DIA (padrao), CAIXA, OPERADOR ou VENDEDOR. |
 | `GEBLOJCOMIS` | `GEBLOJCOMIS(cIni, cFim)` | Relatorio: comissao por vendedor no periodo. |
 
-**`src/GEBPDV_API.prw`** — 17 funções
+**`src/GEBPDV_API.prw`** — 38 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GEBPDVCAIXALST` | `GEBPDVCAIXALST(cUsuario)` | Lista caixas cadastrados via API REST. |
-| `GEBPDVCAIXASS` | `GEBPDVCAIXASS(cUsuario)` | Lista sessoes de caixa abertas (GLJ2) — o PDV web retoma sessao sem reabrir caixa. |
+| `GEBPDVCAIXASS` | `GEBPDVCAIXASS(cUsuario)` | Lista sessoes de caixa abertas (GLJ2) via API REST -- permite ao PDV web retomar uma sessao ja aberta em vez de depender so do GLJ1. |
 | `GEBPDVCAIXAABR` | `GEBPDVCAIXAABR(cUsuario, aBody)` | Abre sessao de caixa via API REST. |
 | `GEBPDVCAIXAFECH` | `GEBPDVCAIXAFECH(cUsuario, aBody)` | Fecha sessao de caixa via API REST. |
 | `GEBPDVCUPOMNOV` | `GEBPDVCUPOMNOV(cUsuario, aBody)` | Cria novo cupom via API REST. |
@@ -1012,6 +1096,27 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBPDVRELGERCSV` | `GEBPDVRELGERCSV(cUsuario, aBody)` | Relatorio gerencial exportado como CSV. |
 | `GEBPDVRELCOMCSV` | `GEBPDVRELCOMCSV(cUsuario, aBody)` | Relatorio de comissao exportado como CSV. |
 | `GEBPDVCAIXARESUMO` | `GEBPDVCAIXARESUMO(cUsuario, cSessao)` | Resumo completo da sessao de caixa (para fechamento). |
+| `GEBPDVCRYCOT` | `GEBPDVCRYCOT(cUsuario)` | Cotacao crypto das moedas com wallet ativa (para o caixa montar o QR). |
+| `GEBPDVCRYWALLST` | `GEBPDVCRYWALLST(cUsuario)` | — |
+| `GEBPDVCRYPREV` | `GEBPDVCRYPREV(cUsuario, cMoeda, nBRL)` | Previa do pagamento crypto: cotacao + URI do QR para o caixa exibir antes de finalizar. |
+| `GEBPDVCRYWAL` | `GEBPDVCRYWAL(cUsuario, aBody)` | Cadastra/altera a wallet de uma moeda (CONFIG). |
+| `GEBPDVORCNOV` | `GEBPDVORCNOV(cUsuario, aBody)` | Salva o carrinho como orcamento via API REST (POST /api/pdv/orcamento). |
+| `GEBPDVORCLST` | `GEBPDVORCLST(cUsuario, cStatus)` | Lista orcamentos por status (GET /api/pdv/orcamentos?status=ABERTO). |
+| `GEBPDVORCFIN` | `GEBPDVORCFIN(cUsuario, aBody)` | Finaliza um orcamento no caixa (POST /api/pdv/orcamento/finalizar). |
+| `GEBPDVORCCAN` | `GEBPDVORCCAN(cUsuario, aBody)` | Cancela um orcamento aberto (POST /api/pdv/orcamento/cancelar {orcamento}). |
+| `GEBPDVDEVOLUC` | `GEBPDVDEVOLUC(cUsuario, aBody)` | Devolucao/troca no caixa (POST /api/pdv/devolucao). |
+| `GEBPDVCONSULTA` | `GEBPDVCONSULTA(cUsuario, cCodigo)` | Consulta de preco do produto (GET /api/pdv/consulta?codigo=). |
+| `GEBPDVVALESALDO` | `GEBPDVVALESALDO(cUsuario, cVale)` | Saldo do vale-troca (GET /api/pdv/vale/{numero}). |
+| `GEBPDVFIASALDO` | `GEBPDVFIASALDO(cUsuario, cCli)` | Saldo de fiado do cliente (GET /api/pdv/fiado/saldo?cliente=): soma do TOTAL das linhas GV3 ABERTA. |
+| `GEBPDVCADCAIXA` | `GEBPDVCADCAIXA(cUsuario, aBody)` | Cadastra/altera caixa (POST /api/pdv/cadastro/caixa). |
+| `GEBPDVCADBAR` | `GEBPDVCADBAR(cUsuario, aBody)` | Codigo de barras / PLU de balanca (POST /api/pdv/cadastro/barras). |
+| `GEBPDVCADPROMO` | `GEBPDVCADPROMO(cUsuario, aBody)` | Cadastra promocao (POST /api/pdv/cadastro/promocao). |
+| `GEBPDVCADVEND` | `GEBPDVCADVEND(cUsuario, aBody)` | Cadastra vendedor (POST /api/pdv/cadastro/vendedor). |
+| `GEBPDVRELVENDAS` | `GEBPDVRELVENDAS(cUsuario, cData, cCaixa)` | Relatorio de vendas do dia (GET /api/pdv/relatorio/vendas?data=&caixa=). |
+| `GEBPDVRELTEF` | `GEBPDVRELTEF(cUsuario, cData)` | Relatorio de transacoes TEF do dia (GET /api/pdv/relatorio/tef?data=). |
+| `GEBPDVTEFCFG` | `GEBPDVTEFCFG(cUsuario, aBody)` | Configura o provedor TEF (POST /api/pdv/tef/config). |
+| `GEBPDVTEFRES` | `GEBPDVTEFRES(cUsuario)` | Desfaz transacao TEF pendente (POST /api/pdv/tef/desfazer). |
+| `GEBPDVNFETRANSMITE` | `GEBPDVNFETRANSMITE(cUsuario)` | Transmite as NFC-e emitidas em contingencia (POST /api/pdv/nfce/transmitir). |
 
 **`src/GEBPDV_HTML.prw`** — 2 funções
 
@@ -1227,13 +1332,14 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBRESTUNILST` | `GEBRESTUNILST(cUsuario)` | Endpoint GET /unidades. |
 | `GEBRESTUNILSC` | `GEBRESTUNILSC(cUsuario, aBody)` | Endpoint POST /unidades. |
 
-**`src/GEBWEB.prw`** — 18 funções
+**`src/GEBWEB.prw`** — 40 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GEBWEB` | `GEBWEB(nPorta)` | Servidor HTTP real (WSRestServer, AdvPP nativo): API REST do ERP (integracoes). |
 | `GEBWEB_LOGINAPI` | `GEBWEB_LOGINAPI(oReq)` | POST /api/login -- autentica de verdade. |
 | `GEBWAPI_PDVCAIXALST` | `GEBWAPI_PDVCAIXALST(oReq)` | — |
+| `GEBWAPI_PDVCAIXASS` | `GEBWAPI_PDVCAIXASS(oReq)` | — |
 | `GEBWAPI_PDVCAIXAABR` | `GEBWAPI_PDVCAIXAABR(oReq)` | — |
 | `GEBWAPI_PDVCAIXAFECH` | `GEBWAPI_PDVCAIXAFECH(oReq)` | — |
 | `GEBWAPI_PDVCAIXARESUMO` | `GEBWAPI_PDVCAIXARESUMO(oReq)` | — |
@@ -1249,6 +1355,27 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBWAPI_PDVPERIFLIST` | `GEBWAPI_PDVPERIFLIST(oReq)` | — |
 | `GEBWAPI_PDVPERIFREG` | `GEBWAPI_PDVPERIFREG(oReq)` | — |
 | `GEBWAPI_PDVPERIFDEL` | `GEBWAPI_PDVPERIFDEL(oReq)` | — |
+| `GEBWAPI_PDVCRYCOT` | `GEBWAPI_PDVCRYCOT(oReq)` | — |
+| `GEBWAPI_PDVCRYWALLST` | `GEBWAPI_PDVCRYWALLST(oReq)` | — |
+| `GEBWAPI_PDVCRYPREV` | `GEBWAPI_PDVCRYPREV(oReq)` | — |
+| `GEBWAPI_PDVCRYWAL` | `GEBWAPI_PDVCRYWAL(oReq)` | — |
+| `GEBWAPI_PDVORCNOV` | `GEBWAPI_PDVORCNOV(oReq)` | — |
+| `GEBWAPI_PDVORCLST` | `GEBWAPI_PDVORCLST(oReq)` | — |
+| `GEBWAPI_PDVORCFIN` | `GEBWAPI_PDVORCFIN(oReq)` | — |
+| `GEBWAPI_PDVORCCAN` | `GEBWAPI_PDVORCCAN(oReq)` | — |
+| `GEBWAPI_PDVDEV` | `GEBWAPI_PDVDEV(oReq)` | — |
+| `GEBWAPI_PDVCONS` | `GEBWAPI_PDVCONS(oReq)` | — |
+| `GEBWAPI_PDVVALE` | `GEBWAPI_PDVVALE(oReq)` | — |
+| `GEBWAPI_PDVFIAS` | `GEBWAPI_PDVFIAS(oReq)` | — |
+| `GEBWAPI_PDVCADCX` | `GEBWAPI_PDVCADCX(oReq)` | — |
+| `GEBWAPI_PDVCADBAR` | `GEBWAPI_PDVCADBAR(oReq)` | — |
+| `GEBWAPI_PDVCADPROMO` | `GEBWAPI_PDVCADPROMO(oReq)` | — |
+| `GEBWAPI_PDVCADVEND` | `GEBWAPI_PDVCADVEND(oReq)` | — |
+| `GEBWAPI_PDVRELVEN` | `GEBWAPI_PDVRELVEN(oReq)` | — |
+| `GEBWAPI_PDVRELTEF` | `GEBWAPI_PDVRELTEF(oReq)` | — |
+| `GEBWAPI_PDVTEFCFG` | `GEBWAPI_PDVTEFCFG(oReq)` | — |
+| `GEBWAPI_PDVTEFRES` | `GEBWAPI_PDVTEFRES(oReq)` | — |
+| `GEBWAPI_PDVNFETR` | `GEBWAPI_PDVNFETR(oReq)` | — |
 
 **`src/GEBWEB_API.prw`** — 64 funções
 
@@ -1321,25 +1448,52 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 
 ### OUTROS
 
+**`src/GEBCRY.prw`** — 8 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBCRYMIG` | `GEBCRYMIG()` | Cria as tabelas crypto no tenant corrente (idempotente). |
+| `GEBCRYMOEDAS` | `GEBCRYMOEDAS()` | Lista fechada de moedas aceitas: {moeda, id CoinGecko, contrato ERC-20}. |
+| `GEBCRYWAL` | `GEBCRYWAL(cMoeda, cEndereco, cAtivo)` | Cadastra/altera a wallet de uma moeda. |
+| `GEBCRYWALLST` | `GEBCRYWALLST()` | Lista as wallets da filial (ativas primeiro). |
+| `GEBCRYCOT` | `GEBCRYCOT(cMoedas)` | Cotacao BRL das moedas informadas (ou das que tem wallet ativa) via CoinGecko. |
+| `GEBCRYQRCODE` | `GEBCRYQRCODE(cMoeda, nBRL)` | Monta o pagamento crypto: wallet ativa da moeda + cotacao BRL do valor. |
+| `GEBCRYPAGA` | `GEBCRYPAGA(cCupom, cMoeda, cEndereco, nBRL, nQtd, nCot)` | Grava o pagamento crypto do cupom em GCK2 (auditoria/segunda via). |
+| `GEBCRYPAGOS` | `GEBCRYPAGOS(cCupom)` | Pagamentos crypto de um cupom (para a segunda via). |
+
+**`src/GESSAR.prw`** — 8 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GESSARMIG` | `GESSARMIG()` | Cria as tabelas do Sarney no tenant corrente (idempotente). |
+| `GESSARCFG` | `GESSARCFG(cCod, cDescr, nPct, nVezes, cHoras, cAtivo)` | Cadastra/alterada a regra de reajuste. |
+| `GESSARPROD` | `GESSARPROD(cCfg, cProd, nPct)` | Define o percentual proprio de um produto dentro da regra (override do GSK1_PCT). |
+| `GESSARLISTA` | `GESSARLISTA()` | Lista as regras de reajuste (para tela e testes). |
+| `GESSARHIST` | `GESSARHIST(cCfg)` | Historico de aplicacoes da regra (mais recentes primeiro). |
+| `GESSARDEVE` | `GESSARDEVE(cHoje, cHora, aCfg)` | A regra deve ser aplicada neste horario? Funcao pura (sem banco): cHoje AAAAMMDD, cHora/hora do slot HHMM, aCfg = linha de GSK1 como array {cod, descr, pct, vezes, horas,... |
+| `GESSARAPLICA` | `GESSARAPLICA(cHoje, cHora, aCfg)` | Aplica o reajuste de uma regra nos precos PADRAO. |
+| `GESSARRUN` | `GESSARRUN()` | Executor do Sarney, chamado pelo agendador a cada minuto (dentro da trava da empresa). |
+
 **`src/_init.prw`** — 1 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `TEST_INIT` | `TEST_INIT()` | — |
 
-## 9. Testes (72 suítes, 72/72 PASS em duas rodadas seguidas num `geban_test` vazio, 02/10/2026, advplc v4.4.0-geban)
+## 9. Testes (91 suítes `tests/T_*.prw`)
 
-Um comando: **`o runner de testes [T_NOME ...]`** — envia `src/`+`tests/` ao servidor de testes,
-roda cada `tests/T_*.prw` contra o banco **`geban_test`** (nunca `geban`; o script
-aborta se o alvo não for o de teste e compara a lista de schemas da produção antes e
-depois), com tempo-limite por teste (`GEBAN_TEST_TIMEOUT`, padrão 300 s) e stdin
-fechado; imprime `PASS/FAIL/ERRO/TIMEOUT` por teste e o placar; logs em
-`tests/.out/logs/`. `--selftest` testa o classificador localmente. `GEBAN_ADVPLC`
-troca o binário (ex.: testar um advplc novo antes de instalar).
-Suítes novas desta revisão: `T_GEBISO` (isolamento entre empresas sob concorrência),
-`T_GEBSEC_API` (token), `T_GEBSEC_ACESSO` (matriz de acesso, 21 casos),
-`T_GEBTUI_FLUXOS` (as 25 ações da tela contra docs/02), `T_GEBDB_MOEDA` (NUMERIC).
-Defeitos conhecidos e status: `documentacao interna`.
+Runner local: **`tests/run-all.sh`** — roda cada `tests/T_*.prw` via `advplc run` contra o
+Postgres de teste (`GEBAN_PG_*` apontando para `geban_test`, nunca produção), imprime
+`PASS/FAIL/ERRO/TIMEOUT` por teste e o placar final; aceita um filtro por nome
+(`./tests/run-all.sh GEBSEC`). Testes que tocam SEFAZ/Cielo precisam dos emuladores de
+`tests/emuladores/` no ar (`ADVPP_HTTP_INSECURE=1`): `sefaz_emulador.py` (:18766) e
+`cielo_emulador.py` (:18765). O emulador SEFAZ deduplica DPS em memória — se
+`T_GEBDFE_NFSE` falhar com rejeição de duplicidade, reinicie o emulador antes de rerodar.
+
+Cada suíte cria schemas descartáveis (`test_*`, `emp_*` de teste) e os remove ao final;
+o catálogo de identidade (`GE1`, `GE2*`, `GE2_TOK`) é global em `public` — fixtures gravam
+lá com prefixo `T_`/`REST-` e limpam depois. Rodada de referência: **91/91 PASS**
+(`geban_test`, advplc local).
 
 ## 10. Deploy e operação
 
