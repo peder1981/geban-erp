@@ -320,13 +320,20 @@ Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
     aForms := TUIFormularios(cEmp, cFil)
     For nI := 1 To Len(aMods)
         If TUIPode(cUsu, aMods[nI][3])
-            If Len(aMods[nI]) >= 5
-                oPg := Eval(aMods[nI][5], oApp)   // pagina propria (modulo com tela custom)
+            If Len(aMods[nI]) >= 6 .And. ValType(aMods[nI][6]) == "B"
+                // Modulo de acao direta (Frente de loja): menu e atalho
+                // disparam o bloco em vez de navegar para uma pagina.
+                aAdd(aAtalhos, {aMods[nI][1], aMods[nI][2], aMods[nI][6]})
+                TUIMenuItemAcao(oApp, oMenu, aMods[nI][1], aMods[nI][2], aMods[nI][6])
             Else
-                oPg := TUIModPg(oApp, aMods[nI], aForms, cUsu)
+                If Len(aMods[nI]) >= 5
+                    oPg := Eval(aMods[nI][5], oApp)   // pagina propria (modulo com tela custom)
+                Else
+                    oPg := TUIModPg(oApp, aMods[nI], aForms, cUsu)
+                EndIf
+                aAdd(aAtalhos, {aMods[nI][1], aMods[nI][2], oPg})
+                TUIMenuItem(oApp, oMenu, aMods[nI][1], aMods[nI][2], oPg, aNav)
             EndIf
-            aAdd(aAtalhos, {aMods[nI][1], aMods[nI][2], oPg})
-            TUIMenuItem(oApp, oMenu, aMods[nI][1], aMods[nI][2], oPg, aNav)
         EndIf
     Next nI
     oPg := PoPage():New(oApp, "Rastreabilidade")
@@ -346,6 +353,13 @@ Return
 // o bloco capturar a pagina certa, nao a variavel do laco.
 Static Function TUIMenuItem(oApp, oMenu, cRot, cIcone, oPg, aNav)
     oMenu:AddItem(cRot, cIcone, {|| aNav[1] := oPg, oApp:Navigate(oPg)})
+Return
+
+// Item de menu de acao direta (modulo sem pagina, ex.: Frente de loja que
+// abre o PDV via FwCallApp). Funcao propria para o bloco capturar o bloco
+// certo, nao a variavel do laco.
+Static Function TUIMenuItemAcao(oApp, oMenu, cRot, cIcone, bAcao)
+    oMenu:AddItem(cRot, cIcone, {|| Eval(bAcao)})
 Return
 
 /*/{Protheus.doc} TUIMenuRef
@@ -414,7 +428,7 @@ Return { ;
     {"Compras", "an an-shopping-cart", "COMPRAS", {{"GCP1", "Fornecedores"}, {"GCP3", "Pedidos"}}}, ;
     {"Faturamento", "an an-file-text", "FATURAMENTO", {{"GFT1", "Clientes"}, {"GFT2", "Precos"}, {"GFT3", "Pedidos de venda"}, {"GSK1", "Regras Sarney"}, ;
         {"GSK3", "Historico Sarney"}, {"GCK1", "Wallets crypto"}, {"GCK2", "Pagamentos crypto"}}}, ;
-    {"Frente de loja", "an an-cash-register", "LOJA", {}, {|oApp| TUIPdvPg(oApp, cUsu, cEmp, cFil)}}, ;
+    {"Frente de loja", "an an-cash-register", "LOJA", {}, Nil, {|| TUIPdvAbre(cUsu, cEmp, cFil)}}, ;
     {"Nucleo", "an an-gear", "ADMIN", {{"GE1", "Empresas"}, {"GEU1", "Unidades"}, {"GEF1", "Filiais"}, {"GE2", "Usuarios"}}} ;
     }
 
@@ -1662,7 +1676,13 @@ Static Function TUIKpi(oPg, cTitulo)
 Return {oV, oD}
 
 Static Function TUIAtalho(oApp, oPg, aAt, aNav)
-    Local oB := PoButton():New(oPg, aAt[1], {|| aNav[1] := aAt[3], oApp:Navigate(aAt[3])})
+    Local oB := Nil
+
+    If ValType(aAt[3]) == "B"
+        oB := PoButton():New(oPg, aAt[1], {|| Eval(aAt[3])})
+    Else
+        oB := PoButton():New(oPg, aAt[1], {|| aNav[1] := aAt[3], oApp:Navigate(aAt[3])})
+    EndIf
 
     oB:Set("icon", aAt[2])
     oB:Set("kind", "secondary")

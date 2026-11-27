@@ -7,16 +7,18 @@
     original (venda, caixa, orcamentos, devolucao, consultas, cadastros,
     relatorios, TEF/NFC-e, crypto, vale/fiado, perifericos).
 
-    Como funciona: a pagina do modulo "Frente de loja" tem um botao que
-    dispara FwCallApp("pdv"). O app e' o diretorio src/pdv/ (index.html
-    = symlink para public/pdv.html), servido pelo advplc numa nova aba
-    da sessao. No load, o shim injetado (window.twebchannel) manda
-    "PDV-INIT"; o JsToAdvpl abaixo devolve um token real GEBSECTOKEN da
-    sessao TUI. A partir dai o pdv.html roda INALTERADO: apiGet/apiPost/
-    apiDelete, WebSocket de perifericos e DANFE seguem HTTP normal para
-    a API /api/pdv/* — sem ponte de traducao, sem duplicacao de regras.
+    Como funciona: o item "Frente de loja" do menu lateral (e o atalho
+    da pagina Inicio) e' um modulo de acao direta — o clique dispara
+    FwCallApp("pdv"), que abre src/pdv/ (index.html = symlink para
+    public/pdv.html) numa nova aba da sessao. No load, o shim injetado
+    (window.twebchannel) manda "PDV-INIT"; o JsToAdvpl abaixo devolve um
+    token real GEBSECTOKEN da sessao TUI. A partir dai o pdv.html roda
+    INALTERADO: apiGet/apiPost/apiDelete, WebSocket de perifericos e
+    DANFE seguem HTTP normal para a API /api/pdv/* — sem ponte de
+    traducao, sem duplicacao de regras.
 
-    Ao fechar a aba do PDV o FwCallApp retorna e o token e' revogado.
+    FwCallApp bloqueia ate a aba do PDV fechar; ao voltar, o token
+    emitido e' revogado (GEBSECTOKENDEL).
     @type function
     @author Peder Munksgaard
     @since 27/11/2026
@@ -28,38 +30,19 @@ Static s_cPdvEmp := ""
 Static s_cPdvFil := ""
 Static s_cPdvTok := ""
 
-/*/{Protheus.doc} TUIPdvPg
-    Pagina do modulo "Frente de loja": lancador do PDV embutido.
-    O FwCallApp nao pode rodar na construcao do menu (a lambda do
-    modulo e' avaliada ali), entao a pagina mostra o botao de abertura.
+/*/{Protheus.doc} TUIPdvAbre
+    Acao direta do menu/atalho "Frente de loja": abre o app PO-UI "pdv"
+    (src/pdv/ = public/pdv.html) numa aba da sessao. FwCallApp bloqueia
+    ate a aba fechar; ao voltar revoga o token emitido para o PDV.
     @type function
-    @param oApp, object, aplicacao PO-UI da sessao
     @param cUsu, character, usuario logado
     @param cEmp, character, empresa da sessao
     @param cFil, character, filial da sessao
-    @return object, PoPage do modulo
 /*/
-User Function TUIPdvPg(oApp, cUsu, cEmp, cFil)
-    Local oPg := PoPage():New(oApp, "Frente de loja")
-    Local oW  := PoWidget():New(oPg, "Frente de loja (PDV)")
-    Local oB  := PoButton():New(oW, "Abrir Frente de loja")
-
+User Function TUIPdvAbre(cUsu, cEmp, cFil)
     s_cPdvUsu := cUsu
     s_cPdvEmp := cEmp
     s_cPdvFil := cFil
-
-    oW:SetCols(2)
-    oB:Set("kind", "primary")
-    oB:OnClick({|| TUIPdvAbre()})
-Return oPg
-
-/*/{Protheus.doc} TUIPdvAbre
-    Abre o app PO-UI "pdv" (src/pdv/ = public/pdv.html) numa aba da
-    sessao. FwCallApp bloqueia ate a aba fechar; ao voltar revoga o
-    token emitido para a sessao do PDV.
-    @type function
-/*/
-Static Function TUIPdvAbre()
     FwCallApp("pdv", Nil, Nil, Nil, Nil, "GEBTUIPDV.prw")
     If !Empty(s_cPdvTok)
         GEBSECTOKENDEL(s_cPdvTok)
