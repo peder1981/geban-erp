@@ -50,7 +50,18 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 
 ## PDV: crypto, Sarney e regime de venda
 
-A frente de caixa é o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv` — ex.: `http://servidor:8090/pdv`). O antigo módulo "Frente de loja" do TUI foi descontinuado. Três recursos da operação de balcão, propagados por PDV, faturamento, fiscal, financeiro e contábil:
+A frente de caixa é o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv` — ex.: `http://servidor:8090/pdv`). O antigo módulo "Frente de loja" do TUI foi descontinuado e suas funcionalidades portadas para o PDV web, organizado em abas:
+
+- **Venda** — carrinho, desconto, regime (fiscal/comprovante), pagamentos (dinheiro, PIX, cartões, fiado, vale, crypto) e QR Code
+- **Caixa** — abrir/fechar sessão, sangria/suprimento, cancelar cupom e resumo da sessão
+- **Orçamentos** — salvar o carrinho como orçamento, listar por status, finalizar em cupom e cancelar
+- **Devolução** — devolução/troca de itens do cupom, modo dinheiro ou vale-troca, dados do consumidor para NF-e de devolução
+- **Consultas** — preço, saldo de vale-troca, saldo de fiado, segunda via do cupom e DANFE NFC-e
+- **Cadastros** — caixa, código de barras/PLU de balança, promoção e vendedor
+- **Relatórios** — vendas do dia, transações TEF e gerencial/comissão (CSV)
+- **TEF / NFC-e** — configuração do provedor TEF, desfazer transação pendente e transmissão de NFC-e emitidas em contingência
+
+Três recursos da operação de balcão, propagados por PDV, faturamento, fiscal, financeiro e contábil:
 
 - **Crypto** — pagamento em BTC, ETH, XMR, USDC e USDT. O caixa escolhe a moeda, o sistema converte o total de BRL pela cotação e gera o QR Code para o cliente pagar. Exige wallet do estabelecimento cadastrada; o lançamento cai na conta crypto configurada e o cancelamento estorna a moeda.
 - **Gatilho Sarney** — reajuste automático de preços sem etiquetadora: percentual geral ou por produto, número de repetições e frequência diária, executado pelo agendador com histórico de cada rodada.
@@ -61,6 +72,7 @@ A frente de caixa é o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/
 | ![Gatilho Sarney](docs/img/21-faturamento-sarney.jpg) **Gatilho Sarney** — regras de reajuste no Faturamento | ![Wallets crypto](docs/img/22-faturamento-wallets-crypto.jpg) **Wallets crypto** — endereços por moeda |
 | ![Regime no pedido](docs/img/23-faturamento-pedido-regime.jpg) **Regime no pedido** — comprovante ou fiscal | ![PDV crypto](docs/img/24-pdv-crypto.jpg) **PDV crypto** — forma CRYPTO com QR Code |
 | ![PDV web crypto](docs/img/25-pdv-web-crypto.jpg) **PDV web** — cotação BTC e regime comprovante | ![Venda comprovante](docs/img/26-pdv-web-venda-finalizada.jpg) **Venda finalizada** — comprovante sem documento fiscal |
+| ![Aba Caixa](docs/img/27-pdv-web-aba-caixa.jpg) **PDV web — Caixa** — abrir/fechar, sangria, cancelar cupom | ![Aba Orçamentos](docs/img/28-pdv-web-aba-orcamentos.jpg) **PDV web — Orçamentos** — salvar, finalizar e cancelar |
 
 ## Como funciona
 

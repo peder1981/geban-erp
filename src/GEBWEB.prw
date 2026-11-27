@@ -137,6 +137,25 @@ User Function GEBWEB(nPorta)
     oSrv:AddRoute("GET", "/api/pdv/crypto/wallets", "U_GEBWAPI_PDVCRYWALLST")
     oSrv:AddRoute("GET", "/api/pdv/crypto/previa", "U_GEBWAPI_PDVCRYPREV")
     oSrv:AddRoute("POST", "/api/pdv/crypto/wallet", "U_GEBWAPI_PDVCRYWAL")
+    // Orcamentos, devolucao, consultas, cadastros, relatorios e TEF/NFC-e
+    // (funcionalidades que a Frente de loja TUI tinha e o PDV web herda)
+    oSrv:AddRoute("POST", "/api/pdv/orcamento", "U_GEBWAPI_PDVORCNOV")
+    oSrv:AddRoute("GET", "/api/pdv/orcamentos", "U_GEBWAPI_PDVORCLST")
+    oSrv:AddRoute("POST", "/api/pdv/orcamento/finalizar", "U_GEBWAPI_PDVORCFIN")
+    oSrv:AddRoute("POST", "/api/pdv/orcamento/cancelar", "U_GEBWAPI_PDVORCCAN")
+    oSrv:AddRoute("POST", "/api/pdv/devolucao", "U_GEBWAPI_PDVDEV")
+    oSrv:AddRoute("GET", "/api/pdv/consulta", "U_GEBWAPI_PDVCONS")
+    oSrv:AddRoute("GET", "/api/pdv/vale/{numero}", "U_GEBWAPI_PDVVALE")
+    oSrv:AddRoute("GET", "/api/pdv/fiado/saldo", "U_GEBWAPI_PDVFIAS")
+    oSrv:AddRoute("POST", "/api/pdv/cadastro/caixa", "U_GEBWAPI_PDVCADCX")
+    oSrv:AddRoute("POST", "/api/pdv/cadastro/barras", "U_GEBWAPI_PDVCADBAR")
+    oSrv:AddRoute("POST", "/api/pdv/cadastro/promocao", "U_GEBWAPI_PDVCADPROMO")
+    oSrv:AddRoute("POST", "/api/pdv/cadastro/vendedor", "U_GEBWAPI_PDVCADVEND")
+    oSrv:AddRoute("GET", "/api/pdv/relatorio/vendas", "U_GEBWAPI_PDVRELVEN")
+    oSrv:AddRoute("GET", "/api/pdv/relatorio/tef", "U_GEBWAPI_PDVRELTEF")
+    oSrv:AddRoute("POST", "/api/pdv/tef/config", "U_GEBWAPI_PDVTEFCFG")
+    oSrv:AddRoute("POST", "/api/pdv/tef/desfazer", "U_GEBWAPI_PDVTEFRES")
+    oSrv:AddRoute("POST", "/api/pdv/nfce/transmitir", "U_GEBWAPI_PDVNFETR")
     // Interface PDV
     oSrv:AddRoute("GET", "/pdv", "U_GEBPDVHTML")
     oSrv:AddRoute("GET", "/pdv/ws", "U_GEBPDVWS")
@@ -489,3 +508,139 @@ User Function GEBWAPI_PDVCRYWAL(oReq)
         Return GEBWAPIDENY()
     EndIf
 Return GEBPDVCRYWAL(cUsu, oReq)
+
+User Function GEBWAPI_PDVORCNOV(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVORCNOV(cUsu, oReq)
+
+User Function GEBWAPI_PDVORCLST(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVORCLST(cUsu, GEBWAPIFIELD(oReq, "STATUS"))
+
+User Function GEBWAPI_PDVORCFIN(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVORCFIN(cUsu, oReq)
+
+User Function GEBWAPI_PDVORCCAN(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVORCCAN(cUsu, oReq)
+
+User Function GEBWAPI_PDVDEV(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVDEVOLUC(cUsu, oReq)
+
+User Function GEBWAPI_PDVCONS(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCONSULTA(cUsu, GEBWAPIFIELD(oReq, "CODIGO"))
+
+User Function GEBWAPI_PDVVALE(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVVALESALDO(cUsu, GEBWAPIFIELD(oReq, "NUMERO"))
+
+User Function GEBWAPI_PDVFIAS(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVFIASALDO(cUsu, GEBWAPIFIELD(oReq, "CLIENTE"))
+
+User Function GEBWAPI_PDVCADCX(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCADCAIXA(cUsu, oReq)
+
+User Function GEBWAPI_PDVCADBAR(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCADBAR(cUsu, oReq)
+
+User Function GEBWAPI_PDVCADPROMO(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCADPROMO(cUsu, oReq)
+
+User Function GEBWAPI_PDVCADVEND(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCADVEND(cUsu, oReq)
+
+User Function GEBWAPI_PDVRELVEN(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVRELVENDAS(cUsu, GEBWAPIFIELD(oReq, "DATA"), GEBWAPIFIELD(oReq, "CAIXA"))
+
+User Function GEBWAPI_PDVRELTEF(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVRELTEF(cUsu, GEBWAPIFIELD(oReq, "DATA"))
+
+User Function GEBWAPI_PDVTEFCFG(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVTEFCFG(cUsu, oReq)
+
+User Function GEBWAPI_PDVTEFRES(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVTEFRES(cUsu)
+
+User Function GEBWAPI_PDVNFETR(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVNFETRANSMITE(cUsu)

@@ -126,6 +126,24 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
   .right-panel{width:100%;max-height:40vh}
   .product-grid{max-height:30vh}
 }
+/* Navegacao por abas (Frente de loja portada) */
+.pdv-nav{display:flex;gap:4px;background:var(--surface);border-bottom:1px solid var(--bd);padding:0 12px;flex-shrink:0;overflow-x:auto}
+.pdv-nav button{background:transparent;color:var(--text2);border:none;border-bottom:3px solid transparent;padding:10px 16px;font-size:.9rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.pdv-nav button:hover{color:var(--text)}
+.pdv-nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.pdv-page{display:none;flex:1;overflow-y:auto;padding:16px;gap:12px}
+.pdv-page.active{display:flex;flex-direction:column}
+.pg-card{background:var(--surface);border:1px solid var(--bd);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.pg-card h3{margin:0 0 12px;font-size:.95rem}
+.pg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px}
+.form-row label{display:block;font-size:.78rem;color:var(--text2);margin-bottom:4px}
+.form-row input,.form-row select{width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:var(--surface2);color:var(--text)}
+.rel-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.rel-table th{background:var(--surface2);text-align:left;padding:8px;border-bottom:2px solid var(--bd);position:sticky;top:0}
+.rel-table td{padding:6px 8px;border-bottom:1px solid var(--bd)}
+.rel-table tr:hover td{background:var(--surface2)}
+.rel-scroll{max-height:60vh;overflow-y:auto;border:1px solid var(--bd);border-radius:8px}
 </style>
 </head>
 <body>
@@ -162,6 +180,18 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
     </div>
   </div>
 
+  <div class="pdv-nav">
+    <button class="active" data-pg="pg-venda" onclick="showPage('pg-venda',this)">Venda</button>
+    <button data-pg="pg-caixa" onclick="showPage('pg-caixa',this)">Caixa</button>
+    <button data-pg="pg-orc" onclick="showPage('pg-orc',this)">Orçamentos</button>
+    <button data-pg="pg-dev" onclick="showPage('pg-dev',this)">Devolução</button>
+    <button data-pg="pg-cons" onclick="showPage('pg-cons',this)">Consultas</button>
+    <button data-pg="pg-cad" onclick="showPage('pg-cad',this)">Cadastros</button>
+    <button data-pg="pg-rel" onclick="showPage('pg-rel',this)">Relatórios</button>
+    <button data-pg="pg-tef" onclick="showPage('pg-tef',this)">TEF / NFC-e</button>
+  </div>
+
+  <div class="pdv-page active" id="pg-venda">
   <div class="main-area">
     <!-- LEFT -->
     <div class="left-panel">
@@ -250,6 +280,248 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
           <button class="btn-sangria" onclick="abrirSangria()" style="flex:1">SANGRIA</button>
         </div>
         <button onclick="abrirCaixaModal()" style="padding:10px;background:var(--surface2);color:var(--text);font-size:.9rem">Outras Ações</button>
+      </div>
+    </div>
+  </div>
+  </div><!-- /pg-venda -->
+
+  <!-- PAGE: Caixa -->
+  <div class="pdv-page" id="pg-caixa">
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>Abrir Caixa</h3>
+        <div class="form-row">
+          <div><label>Caixa</label><input id="pcx-caixa" placeholder="Código"></div>
+          <div><label>Operador</label><input id="pcx-oper" placeholder="(usuário logado)"></div>
+          <div><label>Fundo de troco</label><input id="pcx-fundo" type="number" value="100" min="0" step="10"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cxAbrir()">Abrir</button>
+      </div>
+      <div class="pg-card">
+        <h3>Fechar Caixa</h3>
+        <div class="form-row">
+          <div><label>Dinheiro contado (R$)</label><input id="pcx-contado" type="number" min="0" step="0.01"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cxFechar()">Fechar sessão</button>
+      </div>
+      <div class="pg-card">
+        <h3>Sangria / Suprimento</h3>
+        <div class="form-row">
+          <div><label>Tipo</label>
+            <select id="pcx-tipo"><option value="SANGRIA">Sangria</option><option value="SUPRIMENTO">Suprimento</option></select></div>
+          <div><label>Valor (R$)</label><input id="pcx-valor" type="number" min="0.01" step="0.01"></div>
+          <div><label>Motivo</label><input id="pcx-motivo"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cxSangria()">Registrar</button>
+      </div>
+      <div class="pg-card">
+        <h3>Cancelar Cupom</h3>
+        <div class="form-row">
+          <div><label>Cupom</label><input id="pcx-cupom" placeholder="CP00000001"></div>
+          <div><label>Motivo</label><input id="pcx-cmotivo"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cxCancelar()">Cancelar cupom</button>
+      </div>
+      <div class="pg-card" style="grid-column:1/-1">
+        <h3>Resumo da Sessão <button style="padding:4px 12px;font-size:.8rem" onclick="cxResumo()">Atualizar</button></h3>
+        <div id="pcx-resumo" class="rel-scroll"><i style="color:var(--text2)">Sem dados</i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: Orcamentos -->
+  <div class="pdv-page" id="pg-orc">
+    <div class="pg-card">
+      <h3>Salvar carrinho como orçamento</h3>
+      <div class="form-row">
+        <div><label>Cliente</label><input id="po-cli" placeholder="(opcional)"></div>
+        <div><label>Vendedor</label><input id="po-vend" placeholder="(opcional)"></div>
+        <div><label>Desconto (R$)</label><input id="po-desc" type="number" value="0" min="0" step="0.01"></div>
+      </div>
+      <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="orcSalvar()">Salvar orçamento</button>
+      <span style="font-size:.8rem;color:var(--text2);margin-left:8px">Usa os itens do carrinho da aba Venda</span>
+    </div>
+    <div class="pg-card">
+      <h3>Orçamentos
+        <select id="po-status" onchange="orcListar()">
+          <option value="">Todos</option>
+          <option value="ABERTO" selected>Abertos</option>
+          <option value="FINALIZADO">Finalizados</option>
+          <option value="CANCELADO">Cancelados</option>
+        </select>
+        <button style="padding:4px 12px;font-size:.8rem" onclick="orcListar()">Atualizar</button>
+      </h3>
+      <div class="rel-scroll"><table class="rel-table" id="po-table"></table></div>
+    </div>
+  </div>
+
+  <!-- PAGE: Devolucao -->
+  <div class="pdv-page" id="pg-dev">
+    <div class="pg-card">
+      <h3>Devolução / Troca</h3>
+      <div class="form-row">
+        <div><label>Cupom</label><input id="pd-cupom" placeholder="CP00000001"></div>
+        <div><label>Modo</label>
+          <select id="pd-modo"><option value="VALE">Vale-troca</option><option value="DINHEIRO">Dinheiro</option></select></div>
+        <div><label>Motivo</label><input id="pd-motivo"></div>
+      </div>
+      <h3 style="margin-top:8px">Itens devolvidos</h3>
+      <div id="pd-itens"></div>
+      <button style="padding:6px 14px;font-size:.85rem" onclick="devAddItem()">+ Item</button>
+      <h3 style="margin-top:12px">Consumidor (só se o cupom teve NFC-e)</h3>
+      <div class="form-row">
+        <div><label>CPF/CNPJ</label><input id="pd-cdoc"></div>
+        <div><label>Nome</label><input id="pd-cnome"></div>
+        <div><label>Fone</label><input id="pd-cfone"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Logradouro</label><input id="pd-clogr"></div>
+        <div><label>Número</label><input id="pd-cnum"></div>
+        <div><label>Compl.</label><input id="pd-ccpl"></div>
+        <div><label>Bairro</label><input id="pd-cbairro"></div>
+      </div>
+      <div class="form-row">
+        <div><label>UF</label><input id="pd-cuf" maxlength="2" style="width:60px"></div>
+        <div><label>Município (nome ou IBGE)</label><input id="pd-cmun"></div>
+        <div><label>CEP</label><input id="pd-ccep"></div>
+      </div>
+      <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="devEnviar()">Registrar devolução</button>
+      <div id="pd-result" style="margin-top:10px;font-size:.85rem"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: Consultas -->
+  <div class="pdv-page" id="pg-cons">
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>Consulta de Preço</h3>
+        <div class="form-row"><div><label>Código / barras</label><input id="q-cod" onkeydown="if(event.key==='Enter')consPreco()"></div></div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="consPreco()">Consultar</button>
+        <div id="q-preco" class="rel-scroll" style="margin-top:10px"></div>
+      </div>
+      <div class="pg-card">
+        <h3>Saldo de Vale-Troca</h3>
+        <div class="form-row"><div><label>Número do vale</label><input id="q-vale"></div></div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="consVale()">Consultar</button>
+        <div id="q-vale-r" class="rel-scroll" style="margin-top:10px"></div>
+      </div>
+      <div class="pg-card">
+        <h3>Saldo de Fiado</h3>
+        <div class="form-row"><div><label>Código do cliente</label><input id="q-cli"></div></div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="consFiado()">Consultar</button>
+        <div id="q-fiado-r" class="rel-scroll" style="margin-top:10px"></div>
+      </div>
+      <div class="pg-card">
+        <h3>Segunda Via / DANFE</h3>
+        <div class="form-row"><div><label>Cupom</label><input id="q-cupom" placeholder="CP00000001"></div></div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="consCupom()">2ª via</button>
+        <button style="padding:8px 16px;background:var(--surface2);color:var(--text);border:none;border-radius:6px;cursor:pointer" onclick="consDanfe()">DANFE NFC-e</button>
+        <pre id="q-cupom-txt" style="margin-top:10px;font-size:.75rem;white-space:pre-wrap;background:var(--surface2);padding:10px;border-radius:8px;max-height:50vh;overflow-y:auto"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: Cadastros -->
+  <div class="pdv-page" id="pg-cad">
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>Caixa</h3>
+        <div class="form-row">
+          <div><label>Código</label><input id="cc-cod"></div>
+          <div><label>Nome</label><input id="cc-nome"></div>
+          <div><label>Conta contábil</label><input id="cc-conta"></div>
+          <div><label>Local</label><input id="cc-local"></div>
+          <div><label>C. custo</label><input id="cc-cc"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cadCaixa()">Salvar</button>
+      </div>
+      <div class="pg-card">
+        <h3>Código de Barras / PLU Balança</h3>
+        <div class="form-row">
+          <div><label>Código (barras/PLU)</label><input id="cb-cod"></div>
+          <div><label>Produto</label><input id="cb-prod"></div>
+          <div><label>Fator</label><input id="cb-fator" type="number" value="1" step="0.001"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cadBarra()">Salvar</button>
+      </div>
+      <div class="pg-card">
+        <h3>Promoção</h3>
+        <div class="form-row">
+          <div><label>Código</label><input id="cp-cod"></div>
+          <div><label>Produto</label><input id="cp-prod"></div>
+          <div><label>Tipo</label>
+            <select id="cp-tipo"><option value="PRECO">Preço promocional</option><option value="LEVE">Leve N pague N-1</option><option value="QTD">Desconto por quantidade</option></select></div>
+          <div><label>N (leve/qtd)</label><input id="cp-n" type="number" value="0" min="0"></div>
+          <div><label>Valor</label><input id="cp-valor" type="number" value="0" min="0" step="0.01"></div>
+          <div><label>Início</label><input id="cp-ini" type="date"></div>
+          <div><label>Fim</label><input id="cp-fim" type="date"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cadPromo()">Salvar</button>
+      </div>
+      <div class="pg-card">
+        <h3>Vendedor</h3>
+        <div class="form-row">
+          <div><label>Código</label><input id="cv-cod"></div>
+          <div><label>Nome</label><input id="cv-nome"></div>
+          <div><label>Comissão (%)</label><input id="cv-comis" type="number" value="0" min="0" step="0.1"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="cadVend()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: Relatorios -->
+  <div class="pdv-page" id="pg-rel">
+    <div class="pg-card">
+      <h3>Vendas do Dia</h3>
+      <div class="form-row">
+        <div><label>Data</label><input id="rl-data" type="date"></div>
+        <div><label>Caixa</label><input id="rl-caixa" placeholder="(todos)"></div>
+      </div>
+      <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="relVendas()">Gerar</button>
+    </div>
+    <div class="pg-card">
+      <h3>Transações TEF</h3>
+      <div class="form-row"><div><label>Data</label><input id="rl-tef-data" type="date"></div></div>
+      <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="relTef()">Gerar</button>
+    </div>
+    <div class="pg-card">
+      <h3>Gerencial / Comissão</h3>
+      <button style="padding:8px 16px" onclick="abrirRelatorios()">Abrir relatórios gerenciais (CSV)</button>
+    </div>
+    <div class="pg-card">
+      <h3>Resultado</h3>
+      <div class="rel-scroll"><table class="rel-table" id="rl-table"></table></div>
+    </div>
+  </div>
+
+  <!-- PAGE: TEF / NFC-e -->
+  <div class="pdv-page" id="pg-tef">
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>Configuração TEF</h3>
+        <div class="form-row">
+          <div><label>Provedor</label><input id="tf-prov" placeholder="CIELO, REDE, STONE..."></div>
+          <div><label>URL</label><input id="tf-url"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Merchant ID</label><input id="tf-mid"></div>
+          <div><label>Merchant Key</label><input id="tf-mkey" type="password"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Cartão padrão</label><input id="tf-cartao"></div>
+          <div><label>Bandeira padrão</label><input id="tf-band"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="tefConfig()">Salvar configuração</button>
+      </div>
+      <div class="pg-card">
+        <h3>Operações</h3>
+        <p style="font-size:.85rem;color:var(--text2)">Desfaz a última transação TEF pendente (queda de energia/comunicação).</p>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="tefDesfazer()">Desfazer TEF pendente</button>
+        <hr style="border-color:var(--bd);margin:12px 0">
+        <p style="font-size:.85rem;color:var(--text2)">Transmite as NFC-e emitidas em contingência offline.</p>
+        <button class="btn-primary" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="nfceTransmitir()">Transmitir NFC-e pendentes</button>
+        <div id="tf-result" style="margin-top:10px;font-size:.85rem"></div>
       </div>
     </div>
   </div>
@@ -392,6 +664,34 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
     <div class="btn-row">
       <button class="btn-secondary" onclick="closeModal('modal-result')">Fechar</button>
       <button class="btn-primary" id="mr-btn-print" onclick="printReceipt()" style="display:none">Imprimir Cupom</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Finalizar orcamento -->
+<div class="modal-overlay" id="modal-orcfin">
+  <div class="modal">
+    <h2>Finalizar Orçamento <span id="of-num" style="color:var(--accent)"></span></h2>
+    <div class="fields">
+      <div><label>Forma de pagamento</label>
+        <select id="of-forma">
+          <option value="DINHEIRO">Dinheiro</option>
+          <option value="PIX">PIX</option>
+          <option value="DEBITO">Débito</option>
+          <option value="CREDITO">Crédito</option>
+          <option value="FIADO">Fiado</option>
+          <option value="VALE">Vale</option>
+        </select></div>
+      <div><label>Valor (R$)</label><input id="of-valor" type="number" min="0" step="0.01"></div>
+      <div><label>Parcelas</label><input id="of-parc" type="number" min="1" value="1"></div>
+      <div><label>Documento (vale/fiado)</label><input id="of-doc"></div>
+      <div><label>CPF na nota</label><input id="of-cpf"></div>
+      <div><label>Regime</label>
+        <select id="of-regime"><option value="FISCAL">Fiscal</option><option value="COMPROVANTE">Comprovante</option></select></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="closeModal('modal-orcfin')">Cancelar</button>
+      <button class="btn-primary" onclick="orcFinalizarExec()">Finalizar</button>
     </div>
   </div>
 </div>
@@ -774,8 +1074,9 @@ function checkFiadoLimite() {
   if (!cliente) { document.getElementById('fiado-saldo-info').textContent = ''; return; }
   apiGet('/fiado/saldo?cliente=' + encodeURIComponent(cliente)).then(r => {
     if (r.ok) {
-      const disp = r.dados.disponivel || 0;
-      const html = 'Limite: R$ ' + (r.dados.limite||0).toFixed(2) + ' | Saldo: R$ ' + (r.dados.saldo||0).toFixed(2) + ' | Disponível: <b style="color:' + (disp >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + disp.toFixed(2) + '</b>';
+      const dd = pairsToObj(r.dados);
+      const disp = dd.disponivel || 0;
+      const html = 'Limite: R$ ' + (dd.limite||0).toFixed(2) + ' | Em aberto: R$ ' + (dd.aberto||0).toFixed(2) + ' | Disponível: <b style="color:' + (disp >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + disp.toFixed(2) + '</b>';
       document.getElementById('fiado-saldo-info').innerHTML = html;
     }
   }).catch(() => {});
@@ -802,8 +1103,9 @@ async function finalizarVenda() {
   const cliente = S.formaPag === 'FIADO' ? (document.getElementById('pay-cliente').value.trim() || '') : '';
   if (cliente && S.formaPag === 'FIADO') {
     const rSaldo = await apiGet('/fiado/saldo?cliente=' + encodeURIComponent(cliente));
-    if (rSaldo.ok && rSaldo.dados.disponivel < total) {
-      toast('Limite de fiado excedido! Disponível: R$ ' + rSaldo.dados.disponivel.toFixed(2), 'err');
+    const dd = pairsToObj(rSaldo.dados);
+    if (rSaldo.ok && dd.disponivel < total) {
+      toast('Limite de fiado excedido! Disponível: R$ ' + (dd.disponivel||0).toFixed(2), 'err');
       return;
     }
   }
@@ -1078,6 +1380,295 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'F7') { e.preventDefault(); cancelarCupom(); }
   if (e.key === 'Escape') { document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show')); }
 });
+
+// ============================================================
+// NAVEGACAO POR ABAS
+// ============================================================
+function showPage(id, btn) {
+  document.querySelectorAll('.pdv-page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.pdv-nav button').forEach(b => b.classList.toggle('active', b === btn));
+  if (id === 'pg-orc') orcListar();
+  if (id === 'pg-rel' && !document.getElementById('rl-data').value) {
+    document.getElementById('rl-data').value = new Date().toISOString().slice(0,10);
+    document.getElementById('rl-tef-data').value = new Date().toISOString().slice(0,10);
+  }
+}
+
+// Tabela generica: primeira linha = cabecalho (formato REL do backend)
+function renderRelTable(elId, linhas, actions) {
+  const el = document.getElementById(elId);
+  if (!linhas || !linhas.length) { el.innerHTML = '<tr><td><i>Sem dados</i></td></tr>'; return; }
+  let h = '<thead><tr>' + linhas[0].map(c => '<th>' + escapeHtml(String(c)) + '</th>').join('') + (actions ? '<th></th>' : '') + '</tr></thead><tbody>';
+  for (let i = 1; i < linhas.length; i++) {
+    h += '<tr>' + linhas[i].map(c => '<td>' + escapeHtml(String(c == null ? '' : c)) + '</td>').join('');
+    if (actions) h += '<td>' + actions(linhas[i]) + '</td>';
+    h += '</tr>';
+  }
+  el.innerHTML = h + '</tbody>';
+}
+// Lista de pares [[campo,valor],...] (formato das consultas)
+function renderPairs(elId, pairs) {
+  const el = document.getElementById(elId);
+  if (!pairs || !pairs.length) { el.innerHTML = '<i style="color:var(--text2)">Sem dados</i>'; return; }
+  el.innerHTML = '<table class="rel-table"><tbody>' +
+    pairs.map(kv => '<tr><td style="color:var(--text2)">' + escapeHtml(String(kv[0])) + '</td><td><b>' + escapeHtml(String(kv[1] == null ? '' : kv[1])) + '</b></td></tr>').join('') +
+    '</tbody></table>';
+}
+function pairsToObj(d) {
+  if (!Array.isArray(d)) return d || {};
+  if (d.length && Array.isArray(d[0])) { const o = {}; d.forEach(kv => { if (kv && kv.length >= 2) o[kv[0]] = kv[1]; }); return o; }
+  return d;
+}
+function val(id) { return document.getElementById(id).value.trim(); }
+function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+// ============================================================
+// ABA CAIXA
+// ============================================================
+async function cxAbrir() {
+  const caixa = val('pcx-caixa');
+  if (!caixa) { toast('Informe o caixa', 'err'); return; }
+  const r = await apiPost('/caixa/abrir', {caixa: caixa, operador: val('pcx-oper') || S.usuario, fundo: num('pcx-fundo')});
+  if (r.ok) {
+    S.sessao = r.dados[2];
+    document.getElementById('t-caixa').textContent = 'Sessão: ' + S.sessao;
+    toast('Caixa aberto — sessão ' + S.sessao, 'ok');
+  } else toast(r.erro || 'Erro ao abrir', 'err');
+}
+async function cxFechar() {
+  if (!S.sessao) { toast('Nenhuma sessão aberta', 'err'); return; }
+  const contado = num('pcx-contado');
+  const r = await apiPost('/caixa/fechar', {sessao: S.sessao, contado: contado});
+  if (r.ok) {
+    const d = (Array.isArray(r.dados) && Array.isArray(r.dados[2])) ? r.dados[2] : r.dados;
+    toast('Caixa fechado — diferença R$ ' + (d[2]||0).toFixed(2), 'ok');
+    S.sessao = '';
+    document.getElementById('t-caixa').textContent = 'Sessão: --';
+  } else toast(r.erro || 'Erro ao fechar', 'err');
+}
+async function cxSangria() {
+  if (!S.sessao) { toast('Nenhuma sessão aberta', 'err'); return; }
+  const v = num('pcx-valor');
+  if (v <= 0) { toast('Informe um valor', 'err'); return; }
+  const r = await apiPost('/caixa/sangria', {sessao: S.sessao, tipo: val('pcx-tipo'), valor: v, motivo: val('pcx-motivo') || 'Operação PDV'});
+  if (r.ok) toast(val('pcx-tipo') + ' registrada', 'ok');
+  else toast(r.erro || 'Erro', 'err');
+}
+async function cxCancelar() {
+  const cupom = val('pcx-cupom');
+  if (!cupom) { toast('Informe o cupom', 'err'); return; }
+  if (!confirm('Cancelar cupom ' + cupom + '?')) return;
+  const r = await apiPost('/cupom/' + encodeURIComponent(cupom) + '/cancelar', {motivo: val('pcx-cmotivo') || 'Cancelado no caixa'});
+  if (r.ok) toast('Cupom cancelado', 'ok');
+  else toast(r.erro || 'Erro ao cancelar', 'err');
+}
+async function cxResumo() {
+  if (!S.sessao) { toast('Nenhuma sessão aberta', 'err'); return; }
+  const r = await apiGet('/caixa/resumo/' + encodeURIComponent(S.sessao));
+  const el = document.getElementById('pcx-resumo');
+  if (!r.ok || !r.dados) { el.innerHTML = '<i>' + (r.erro || 'Sem dados') + '</i>'; return; }
+  const d = r.dados;
+  let h = '<table class="rel-table"><tbody>';
+  h += '<tr><td>Caixa</td><td><b>' + escapeHtml(d[0]) + '</b></td><td>Operador</td><td><b>' + escapeHtml(d[1]) + '</b></td></tr>';
+  h += '<tr><td>Abertura</td><td>' + escapeHtml(d[3]) + ' ' + escapeHtml(d[4]) + '</td><td>Status</td><td><b>' + escapeHtml(d[5]) + '</b></td></tr>';
+  h += '<tr><td>Fundo</td><td>R$ ' + (d[2]||0).toFixed(2) + '</td><td>Esperado</td><td><b>R$ ' + (d[7]||0).toFixed(2) + '</b></td></tr>';
+  h += '<tr><td>Contado</td><td>R$ ' + (d[6]||0).toFixed(2) + '</td><td>Diferença</td><td><b>R$ ' + (d[8]||0).toFixed(2) + '</b></td></tr>';
+  h += '</tbody></table>';
+  if (d.length > 9) {
+    h += '<table class="rel-table" style="margin-top:8px"><thead><tr><th>Tipo</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead><tbody>';
+    for (let i = 9; i < d.length; i++) {
+      const l = d[i] || [];
+      h += '<tr><td>' + escapeHtml(l[0]||'') + '</td><td>' + escapeHtml(l[1]||'') + '</td><td>R$ ' + (l[2]||0).toFixed(2) + '</td><td>' + escapeHtml(l[3]||'') + '</td></tr>';
+    }
+    h += '</tbody></table>';
+  }
+  el.innerHTML = h;
+}
+
+// ============================================================
+// ABA ORCAMENTOS
+// ============================================================
+async function orcSalvar() {
+  if (!S.itens.length) { toast('Carrinho vazio — adicione itens na aba Venda', 'err'); return; }
+  const r = await apiPost('/orcamento', {
+    itens: S.itens.map(i => [i.codigo, i.qtd, i.preco]),
+    cliente: val('po-cli'), vendedor: val('po-vend'), desconto: num('po-desc')
+  });
+  if (r.ok) {
+    toast('Orçamento salvo: ' + (r.dados && r.dados[2] ? r.dados[2] : r.msg), 'ok');
+    orcListar();
+  } else toast(r.erro || 'Erro ao salvar', 'err');
+}
+async function orcListar() {
+  const st = val('po-status');
+  const r = await apiGet('/orcamentos' + (st ? '?status=' + encodeURIComponent(st) : ''));
+  if (!r.ok) { toast(r.erro || 'Erro ao listar', 'err'); return; }
+  renderRelTable('po-table', r.dados, linha => {
+    const orc = linha[0], status = (linha[6] || '').toUpperCase();
+    if (status !== 'ABERTO') return '';
+    return '<button style="padding:4px 10px;font-size:.78rem;margin-right:4px" onclick="orcFinalizarAbrir(\'' + escapeHtml(orc) + '\',' + (linha[5]||0) + ')">Finalizar</button>' +
+      '<button style="padding:4px 10px;font-size:.78rem;color:var(--danger)" onclick="orcCancelar(\'' + escapeHtml(orc) + '\')">Cancelar</button>';
+  });
+}
+function orcFinalizarAbrir(orc, total) {
+  document.getElementById('of-num').textContent = orc;
+  document.getElementById('of-valor').value = total || 0;
+  document.getElementById('modal-orcfin').classList.add('show');
+}
+async function orcFinalizarExec() {
+  if (!S.sessao) { toast('Nenhuma sessão de caixa aberta', 'err'); return; }
+  const r = await apiPost('/orcamento/finalizar', {
+    sessao: S.sessao,
+    orcamento: document.getElementById('of-num').textContent,
+    pagamentos: [[val('of-forma'), num('of-valor'), parseInt(document.getElementById('of-parc').value)||1, val('of-doc')]],
+    cpf: val('of-cpf'), regime: val('of-regime')
+  });
+  if (r.ok) {
+    toast('Orçamento finalizado — cupom ' + (r.dados && r.dados[2] ? r.dados[2] : ''), 'ok');
+    closeModal('modal-orcfin');
+    orcListar();
+  } else toast(r.erro || 'Erro ao finalizar', 'err');
+}
+async function orcCancelar(orc) {
+  if (!confirm('Cancelar orçamento ' + orc + '?')) return;
+  const r = await apiPost('/orcamento/cancelar', {orcamento: orc});
+  if (r.ok) { toast('Orçamento cancelado', 'ok'); orcListar(); }
+  else toast(r.erro || 'Erro ao cancelar', 'err');
+}
+
+// ============================================================
+// ABA DEVOLUCAO
+// ============================================================
+function devAddItem() {
+  const div = document.createElement('div');
+  div.className = 'form-row dev-item';
+  div.innerHTML = '<div><label>Produto</label><input class="dev-prod"></div>' +
+    '<div><label>Quantidade</label><input class="dev-qtd" type="number" min="0.001" step="0.001" value="1"></div>' +
+    '<div style="align-self:end"><button style="color:var(--danger);padding:8px" onclick="this.parentNode.parentNode.remove()">Remover</button></div>';
+  document.getElementById('pd-itens').appendChild(div);
+}
+async function devEnviar() {
+  if (!S.sessao) { toast('Nenhuma sessão de caixa aberta', 'err'); return; }
+  const cupom = val('pd-cupom');
+  if (!cupom) { toast('Informe o cupom', 'err'); return; }
+  const itens = [];
+  document.querySelectorAll('#pd-itens .dev-item').forEach(row => {
+    const p = row.querySelector('.dev-prod').value.trim();
+    const q = parseFloat(row.querySelector('.dev-qtd').value) || 0;
+    if (p && q > 0) itens.push([p, q]);
+  });
+  if (!itens.length) { toast('Adicione pelo menos um item', 'err'); return; }
+  const body = {sessao: S.sessao, cupom: cupom, itens: itens, modo: val('pd-modo'), motivo: val('pd-motivo')};
+  if (val('pd-cdoc')) {
+    body.consumidor = {DOC: val('pd-cdoc'), NOME: val('pd-cnome'), FONE: val('pd-cfone'),
+      LOGRADOURO: val('pd-clogr'), NUMERO: val('pd-cnum'), COMPLEMENTO: val('pd-ccpl'),
+      BAIRRO: val('pd-cbairro'), UF: val('pd-cuf'), MUNICIPIO: val('pd-cmun'), CEP: val('pd-ccep')};
+  }
+  const r = await apiPost('/devolucao', body);
+  const el = document.getElementById('pd-result');
+  if (r.ok) {
+    const d = r.dados;
+    let h = '<b style="color:var(--success)">Devolução registrada.</b> ';
+    if (d && d[2]) { const x = d[2]; if (x.cDev || x[0]) h += 'Doc: ' + escapeHtml(x.cDev || x[0]); if (x.vale) h += ' — Vale gerado: <b>' + escapeHtml(x.vale) + '</b>'; }
+    el.innerHTML = h;
+    toast('Devolução registrada', 'ok');
+  } else {
+    el.innerHTML = '<b style="color:var(--danger)">' + escapeHtml(r.erro || 'Erro') + '</b>';
+  }
+}
+
+// ============================================================
+// ABA CONSULTAS
+// ============================================================
+async function consPreco() {
+  const r = await apiGet('/consulta?codigo=' + encodeURIComponent(val('q-cod')));
+  if (r.ok) renderPairs('q-preco', r.dados);
+  else document.getElementById('q-preco').innerHTML = '<i style="color:var(--danger)">' + escapeHtml(r.erro || 'Não encontrado') + '</i>';
+}
+async function consVale() {
+  const r = await apiGet('/vale/' + encodeURIComponent(val('q-vale')));
+  if (r.ok) renderPairs('q-vale-r', r.dados);
+  else document.getElementById('q-vale-r').innerHTML = '<i style="color:var(--danger)">' + escapeHtml(r.erro || 'Erro') + '</i>';
+}
+async function consFiado() {
+  const r = await apiGet('/fiado/saldo?cliente=' + encodeURIComponent(val('q-cli')));
+  if (r.ok) renderPairs('q-fiado-r', r.dados);
+  else document.getElementById('q-fiado-r').innerHTML = '<i style="color:var(--danger)">' + escapeHtml(r.erro || 'Erro') + '</i>';
+}
+async function consCupom() {
+  const r = await apiGet('/cupom/' + encodeURIComponent(val('q-cupom')));
+  const el = document.getElementById('q-cupom-txt');
+  if (r.ok && r.dados && r.dados[2]) {
+    el.textContent = r.dados[2].map(l => Array.isArray(l) ? (l[0]||'') + ' ' + (l[1]||'') : String(l)).join('\n');
+  } else el.textContent = r.erro || 'Cupom não encontrado';
+}
+function consDanfe() {
+  const cupom = val('q-cupom');
+  if (!cupom) { toast('Informe o cupom', 'err'); return; }
+  window.open(API_PREFIX.replace('/api/pdv','') + '/api/dfe/danfe?cupom=' + encodeURIComponent(cupom) + '&token=' + encodeURIComponent(S.token) + '&empresa=' + encodeURIComponent(S.empresa), '_blank');
+}
+
+// ============================================================
+// ABA CADASTROS
+// ============================================================
+async function cadCaixa() {
+  const r = await apiPost('/cadastro/caixa', {codigo: val('cc-cod'), nome: val('cc-nome'), conta: val('cc-conta'), local: val('cc-local'), cc: val('cc-cc')});
+  toast(r.ok ? 'Caixa salvo' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
+async function cadBarra() {
+  const r = await apiPost('/cadastro/barras', {codigo: val('cb-cod'), produto: val('cb-prod'), fator: num('cb-fator')});
+  toast(r.ok ? 'Código salvo' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
+async function cadPromo() {
+  const r = await apiPost('/cadastro/promocao', {codigo: val('cp-cod'), produto: val('cp-prod'), tipo: val('cp-tipo'),
+    n: num('cp-n'), valor: num('cp-valor'), inicio: val('cp-ini'), fim: val('cp-fim')});
+  toast(r.ok ? 'Promoção salva' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
+async function cadVend() {
+  const r = await apiPost('/cadastro/vendedor', {codigo: val('cv-cod'), nome: val('cv-nome'), comissao: num('cv-comis')});
+  toast(r.ok ? 'Vendedor salvo' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
+
+// ============================================================
+// ABA RELATORIOS
+// ============================================================
+async function relVendas() {
+  let url = '/relatorio/vendas?data=' + encodeURIComponent(val('rl-data'));
+  if (val('rl-caixa')) url += '&caixa=' + encodeURIComponent(val('rl-caixa'));
+  const r = await apiGet(url);
+  if (r.ok) {
+    renderRelTable('rl-table', Array.isArray(r.dados) && Array.isArray(r.dados[0]) ? r.dados[0] : r.dados);
+    if (Array.isArray(r.dados) && Array.isArray(r.dados[1]) && r.dados[1].length)
+      document.getElementById('rl-table').innerHTML += '<tbody>' + r.dados[1].map(kv => '<tr><td><b>' + escapeHtml(String(kv[0])) + '</b></td><td><b>' + escapeHtml(String(kv[1])) + '</b></td></tr>').join('') + '</tbody>';
+  }
+  else document.getElementById('rl-table').innerHTML = '<tr><td><i>' + escapeHtml(r.erro || 'Erro') + '</i></td></tr>';
+}
+async function relTef() {
+  const r = await apiGet('/relatorio/tef?data=' + encodeURIComponent(val('rl-tef-data')));
+  if (r.ok) renderRelTable('rl-table', Array.isArray(r.dados) && Array.isArray(r.dados[0]) ? r.dados[0] : r.dados);
+  else document.getElementById('rl-table').innerHTML = '<tr><td><i>' + escapeHtml(r.erro || 'Erro') + '</i></td></tr>';
+}
+
+// ============================================================
+// ABA TEF / NFC-e
+// ============================================================
+async function tefConfig() {
+  const r = await apiPost('/tef/config', {provedor: val('tf-prov'), url: val('tf-url'),
+    merchantid: val('tf-mid'), merchantkey: val('tf-mkey'), cartao: val('tf-cartao'), bandeira: val('tf-band')});
+  toast(r.ok ? 'TEF configurado' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
+async function tefDesfazer() {
+  if (!confirm('Desfazer a última transação TEF pendente?')) return;
+  const r = await apiPost('/tef/desfazer', {});
+  document.getElementById('tf-result').textContent = r.ok ? ('OK: ' + (r.msg || '')) : ('Erro: ' + (r.erro || ''));
+  toast(r.ok ? 'Resolvido' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
+async function nfceTransmitir() {
+  const r = await apiPost('/nfce/transmitir', {});
+  document.getElementById('tf-result').textContent = r.ok ? ('OK: ' + (r.msg || '')) : ('Erro: ' + (r.erro || ''));
+  toast(r.ok ? 'Transmissão concluída' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
+}
 </script>
 </body>
 </html>

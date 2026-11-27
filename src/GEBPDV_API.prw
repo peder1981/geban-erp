@@ -172,7 +172,8 @@ User Function GEBPDVCUPOMNOV(cUsuario, aBody)
         Return PDVRES(.F., "pagamentos_obrigatorios", {})
     EndIf
 
-    aR := GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, "", "", "", BOCOL(aBody:REGIME))
+    aR := GEBLOJVEN(cSessao, aItens, aPagtos, cCli, nDesc, cVend, cCPF, ;
+        BOCOL(aBody:SUPERVISOR), BOCOL(aBody:SENHA_SUPERVISOR), BOCOL(aBody:ORCAMENTO), BOCOL(aBody:REGIME))
 
 Return PDVRES(aR[1], aR[2], aR)
 
@@ -708,6 +709,320 @@ User Function GEBPDVCRYWAL(cUsuario, aBody)
     aR := GEBCRYWAL(BOCOL(aBody:MOEDA), BOCOL(aBody:ENDERECO), BOCOL(aBody:ATIVO))
 Return PDVRES(aR[1], aR[2], {})
 
+// ===== ORCAMENTOS =====
+
+/*/{Protheus.doc} GEBPDVORCNOV
+    Salva o carrinho como orcamento via API REST (POST /api/pdv/orcamento).
+    Body: {itens:[[prod,qtd,preco]], cliente, vendedor, desconto}.
+    @type Operacao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVORCNOV(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    If aBody:ITENS == Nil .Or. Len(aBody:ITENS) == 0
+        Return PDVRES(.F., "itens_obrigatorios", {})
+    EndIf
+    aR := GEBLOJORC(aBody:ITENS, BOCOL(aBody:CLIENTE), BOCOL(aBody:VENDEDOR), BOVAL(aBody:DESCONTO), BOHOJE())
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVORCLST
+    Lista orcamentos por status (GET /api/pdv/orcamentos?status=ABERTO).
+    @type Consulta PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVORCLST(cUsuario, cStatus)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJORCS(cStatus)
+Return PDVRES(aR[1], aR[2], aR[3])
+
+/*/{Protheus.doc} GEBPDVORCFIN
+    Finaliza um orcamento no caixa (POST /api/pdv/orcamento/finalizar).
+    Body: {sessao, orcamento, pagamentos:[[forma,valor,parcelas,documento]],
+           cpf, supervisor, senha_supervisor, regime}.
+    @type Operacao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVORCFIN(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    If BOCOL(aBody:SESSAO) == "" .Or. BOCOL(aBody:ORCAMENTO) == ""
+        Return PDVRES(.F., "parametros_obrigatorios: sessao, orcamento", {})
+    EndIf
+    aR := GEBLOJORCFIN(BOCOL(aBody:SESSAO), BOCOL(aBody:ORCAMENTO), aBody:PAGAMENTOS, ;
+        BOCOL(aBody:CPF), BOCOL(aBody:SUPERVISOR), BOCOL(aBody:SENHA_SUPERVISOR), BOCOL(aBody:REGIME))
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVORCCAN
+    Cancela um orcamento aberto (POST /api/pdv/orcamento/cancelar {orcamento}).
+    @type Operacao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVORCCAN(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJORCCAN(BOCOL(aBody:ORCAMENTO))
+Return PDVRES(aR[1], aR[2], aR)
+
+// ===== DEVOLUCAO =====
+
+/*/{Protheus.doc} GEBPDVDEVOLUC
+    Devolucao/troca no caixa (POST /api/pdv/devolucao).
+    Body: {sessao, cupom, itens:[[prod,qtd]], modo:VALE|DINHEIRO, motivo,
+           consumidor:{doc,nome,logradouro,numero,complemento,bairro,uf,
+           municipio (nome ou IBGE),cep,fone} (so' se o cupom teve NFC-e)}.
+    @type Operacao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVDEVOLUC(cUsuario, aBody)
+    Local aR := {}
+    Local oCons := Nil
+    Local oC := Nil
+    Local aM := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    If BOCOL(aBody:SESSAO) == "" .Or. BOCOL(aBody:CUPOM) == "" .Or. aBody:ITENS == Nil .Or. Len(aBody:ITENS) == 0
+        Return PDVRES(.F., "parametros_obrigatorios: sessao, cupom, itens", {})
+    EndIf
+    If ValType(aBody:CONSUMIDOR) == "O" .And. !(BOQ(aBody:CONSUMIDOR, "DOC") == "")
+        oC := aBody:CONSUMIDOR
+        // Municipio: aceita codigo IBGE (7 digitos) ou nome na UF.
+        If !(GEBDFEDIG(BOQ(oC, "MUNICIPIO")) == "") .Or. BOQ(oC, "MUNICIPIO") == ""
+            oCons := oC
+        Else
+            aM := GEBDFEMUNBUSCA(BOCOL(BOQ(oC, "MUNICIPIO")), Upper(BOCOL(BOQ(oC, "UF"))))
+            If Len(aM) != 1
+                Return PDVRES(.F., "municipio_invalido: informe o codigo IBGE", {})
+            EndIf
+            oC["MUNICIPIO"] := aM[1][1]
+            oCons := oC
+        EndIf
+    EndIf
+    aR := GEBLOJDEV(BOCOL(aBody:SESSAO), BOCOL(aBody:CUPOM), aBody:ITENS, BOCOL(aBody:MODO), BOCOL(aBody:MOTIVO), oCons)
+Return PDVRES(aR[1], aR[2], aR)
+
+// ===== CONSULTAS =====
+
+/*/{Protheus.doc} GEBPDVCONSULTA
+    Consulta de preco do produto (GET /api/pdv/consulta?codigo=).
+    @type Consulta PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVCONSULTA(cUsuario, cCodigo)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJCONS(BOCOL(cCodigo), "")
+Return PDVRES(aR[1], aR[2], aR[3])
+
+/*/{Protheus.doc} GEBPDVVALESALDO
+    Saldo do vale-troca (GET /api/pdv/vale/{numero}).
+    @type Consulta PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVVALESALDO(cUsuario, cVale)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJVALE(BOCOL(cVale))
+Return PDVRES(aR[1], aR[2], aR[3])
+
+/*/{Protheus.doc} GEBPDVFIASALDO
+    Saldo de fiado do cliente (GET /api/pdv/fiado/saldo?cliente=):
+    soma do TOTAL das linhas GV3 ABERTA. O limite e' o mesmo de GEBVFIA.
+    @type Consulta PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVFIASALDO(cUsuario, cCli)
+    Local aHit := {}
+    Local nAberto := 0
+    Local nLim := 1000
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    cCli := Upper(BOCOL(cCli))
+    If cCli == ""
+        Return PDVRES(.F., "cliente_obrigatorio", {})
+    EndIf
+    aHit := TCSqlQuery("SELECT COALESCE(SUM(GV3_TOTAL), 0) AS T FROM GV3 WHERE GV3_FILIAL = " + GEBDBQuote(FWxFilial("GV3")) + ;
+        " AND GV3_CLI = " + GEBDBQuote(cCli) + " AND GV3_STATUS = 'ABERTA' AND D_E_L_E_T_ = ' '")
+    If Len(aHit) > 0
+        nAberto := BOVAL(aHit[1]:T)
+    EndIf
+Return PDVRES(.T., "saldo_fiado", {{"cliente", cCli}, {"aberto", nAberto}, {"limite", nLim}, {"disponivel", nLim - nAberto}})
+
+// ===== CADASTROS DA LOJA =====
+
+/*/{Protheus.doc} GEBPDVCADCAIXA
+    Cadastra/altera caixa (POST /api/pdv/cadastro/caixa).
+    @type Cadastro PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVCADCAIXA(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJCX(BOCOL(aBody:CODIGO), BOCOL(aBody:NOME), BOCOL(aBody:CONTA), BOCOL(aBody:LOCAL), BOCOL(aBody:CC))
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVCADBAR
+    Codigo de barras / PLU de balanca (POST /api/pdv/cadastro/barras).
+    @type Cadastro PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVCADBAR(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJBAR(BOCOL(aBody:CODIGO), BOCOL(aBody:PRODUTO), BOVAL(aBody:FATOR))
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVCADPROMO
+    Cadastra promocao (POST /api/pdv/cadastro/promocao).
+    Body: {codigo, produto, tipo:PRECO|LEVE|QTD, n, valor, inicio, fim}.
+    @type Cadastro PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVCADPROMO(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJPROMO(BOCOL(aBody:CODIGO), BOCOL(aBody:PRODUTO), Upper(BOCOL(aBody:TIPO)), ;
+        BOVAL(aBody:N), BOVAL(aBody:VALOR), PDVDATA(aBody:INICIO), PDVDATA(aBody:FIM))
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVCADVEND
+    Cadastra vendedor (POST /api/pdv/cadastro/vendedor).
+    @type Cadastro PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVCADVEND(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJVEND(BOCOL(aBody:CODIGO), BOCOL(aBody:NOME), BOVAL(aBody:COMISSAO))
+Return PDVRES(aR[1], aR[2], aR)
+
+// ===== RELATORIOS =====
+
+/*/{Protheus.doc} GEBPDVRELVENDAS
+    Relatorio de vendas do dia (GET /api/pdv/relatorio/vendas?data=&caixa=).
+    @type Relatorio PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVRELVENDAS(cUsuario, cData, cCaixa)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBLOJVENDAS(PDVDATA(cData), BOCOL(cCaixa))
+Return PDVRES(aR[1], aR[2], aR[3])
+
+/*/{Protheus.doc} GEBPDVRELTEF
+    Relatorio de transacoes TEF do dia (GET /api/pdv/relatorio/tef?data=).
+    @type Relatorio PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVRELTEF(cUsuario, cData)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBTEFREL(PDVDATA(cData))
+Return PDVRES(aR[1], aR[2], aR[3])
+
+// ===== TEF / NFC-e =====
+
+/*/{Protheus.doc} GEBPDVTEFCFG
+    Configura o provedor TEF (POST /api/pdv/tef/config). Exige CONFIG/EMPRES.
+    @type Configuracao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVTEFCFG(cUsuario, aBody)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "CONFIG", "EMPRES")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBTEFCFG(BOCOL(aBody:PROVEDOR), BOCOL(aBody:URL), BOCOL(aBody:MERCHANTID), ;
+        BOCOL(aBody:MERCHANTKEY), BOCOL(aBody:CARTAO), BOCOL(aBody:BANDEIRA))
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVTEFRES
+    Desfaz transacao TEF pendente (POST /api/pdv/tef/desfazer).
+    @type Operacao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVTEFRES(cUsuario)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBTEFRESOLVE()
+Return PDVRES(aR[1], aR[2], aR)
+
+/*/{Protheus.doc} GEBPDVNFETRANSMITE
+    Transmite as NFC-e emitidas em contingencia (POST /api/pdv/nfce/transmitir).
+    @type Operacao PDV
+    @author Peder Munksgaard
+    @since 27/11/2026
+/*/
+User Function GEBPDVNFETRANSMITE(cUsuario)
+    Local aR := {}
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+    aR := GEBDFETRANSMITE()
+Return PDVRES(aR[1], aR[2], aR)
+
 /*/{Protheus.doc} PDVRES
     Resposta HTTP do PDV no envelope que public/pdv.html le:
     {"ok":bool,"msg":texto,"erro":texto|null,"dados":payload}. Volta como
@@ -729,3 +1044,7 @@ Static Function PDVRES(lOk, cMsg, xDados)
         cErro := "null"
     EndIf
 Return {"__RAW_HTTP__", "application/json; charset=utf-8", '{"ok":' + GEBRESTJSONENC(lOk == .T.) + ',"msg":' + cMsgJ + ',"erro":' + cErro + ',"dados":' + GEBRESTJSONENC(xDados) + '}', 200}
+
+// Aceita data ISO (AAAA-MM-DD, padrao <input type=date>) ou AAAAMMDD.
+Static Function PDVDATA(cData)
+Return StrTran(BOCOL(cData), "-", "")

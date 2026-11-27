@@ -9,13 +9,18 @@
     @since 21/10/2026
 /*/
 User Function GEBPDVHTML(oReq)
-    Local cPath := "/opt/geban/public/pdv.html"
+    Local cPath := AllTrim(GetEnv("GEBAN_PDV_HTML"))
     Local cContent := ""
     Local aCtx := {}
 
-    // Tentar ler o arquivo
+    If Empty(cPath)
+        cPath := "/opt/geban/public/pdv.html"
+    EndIf
     If File(cPath)
         cContent := MemoRead(cPath)
+    ElseIf File("public/pdv.html")
+        // Desenvolvimento: fonte servida a partir do diretorio do projeto.
+        cContent := MemoRead("public/pdv.html")
     Else
         // Fallback: HTML minimal
         cContent := '<html><head><title>GEBAN PDV</title></head>' + ;

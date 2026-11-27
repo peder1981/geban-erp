@@ -845,7 +845,7 @@ Todos os módulos ficam no menu lateral. Na página de cada um, as operações e
 - Razão da conta, balancete do período e DRE.
 - As contas e os eventos de lançamento padrão estão em Plano (GC1) e na GC4.
 
-**PDV — o dia do caixa** *(a frente de caixa é o PDV web em `/pdv`, porta 8090 do GEBWEB; o antigo módulo TUI "Frente de loja" foi descontinuado — as referências a "abas" abaixo valem para quem ainda usa a tela antiga)*
+**PDV — o dia do caixa** *(a frente de caixa é o PDV web em `/pdv`, porta 8090 do GEBWEB, com abas Venda, Caixa, Orçamentos, Devolução, Consultas, Cadastros, Relatórios e TEF/NFC-e; o antigo módulo TUI "Frente de loja" foi descontinuado — as "abas" citadas abaixo correspondem às abas do PDV web)*
 1. **Abrir caixa** (aba Caixa) com o fundo de troco. A situação do caixa fica sempre visível na aba Venda.
 2. **Vender** (aba Venda): adicione os produtos ao carrinho (preço e promoção já aparecem), informe desconto em valor e inclua os pagamentos (dinheiro, PIX, débito, crédito, fiado ou vale; pode misturar). Total, recebido e troco aparecem ao lado; **Finalizar venda** grava o cupom.
 3. **Cancelar cupom** (aba Caixa): só com o caixa aberto e se o cupom não teve devolução.

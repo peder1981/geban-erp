@@ -345,7 +345,7 @@ também precisam permitir.
 
 ## 2.12 PDV (frente de caixa)
 
-> **Nota:** a frente de caixa é o **PDV web** (`/pdv` no servidor GEBWEB, porta 8090 — ex.: `http://servidor:8090/pdv`), com login próprio (empresa/usuário/senha), carrinho, formas de pagamento (inclusive crypto com QR Code) e abrir/fechar caixa. O antigo módulo "Frente de loja" do TUI foi descontinuado; as seções abaixo descrevem as operações de caixa que seguem valendo — os cadastros e relatórios de loja podem ser usados via API `/api/pdv/*` ou pelos BOs `loja/*`.
+> **Nota:** a frente de caixa é o **PDV web** (`/pdv` no servidor GEBWEB, porta 8090 — ex.: `http://servidor:8090/pdv`), com login próprio (empresa/usuário/senha) e abas equivalentes às do antigo módulo: **Venda** (carrinho, formas de pagamento inclusive crypto com QR Code), **Caixa** (abrir/fechar, sangria/suprimento, cancelar cupom, resumo), **Orçamentos**, **Devolução**, **Consultas** (preço, vale, fiado, 2ª via, DANFE), **Cadastros** (caixa, barras/PLU, promoção, vendedor), **Relatórios** e **TEF / NFC-e**. O antigo módulo "Frente de loja" do TUI foi descontinuado; as seções abaixo descrevem as mesmas operações de caixa — no PDV web elas aparecem nas abas correspondentes.
 
 ### Preparar a loja (uma vez)
 
@@ -2219,7 +2219,7 @@ Curva ABC dos produtos pelo faturamento do período.
 
 ## 3.8 Frente de loja (descontinuada)
 
-> **Nota:** este módulo do TUI foi descontinuado e removido do menu — a frente de caixa agora é o **PDV web** em `/pdv` no servidor GEBWEB (porta 8090). O texto abaixo ficou como referência das operações de caixa, que continuam existindo no backend (`/api/pdv/*`, BOs `loja/*`).
+> **Nota:** este módulo do TUI foi descontinuado e removido do menu — a frente de caixa agora é o **PDV web** em `/pdv` no servidor GEBWEB (porta 8090), com abas equivalentes (Venda, Caixa, Orçamentos, Devolução, Consultas, Cadastros, Relatórios, TEF/NFC-e). O texto abaixo ficou como referência das operações de caixa.
 
 ![Frente de loja](img/manual/m08-frente-de-loja.png)
 
