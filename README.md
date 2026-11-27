@@ -199,7 +199,7 @@ Depois:
 
 ## Testes
 
-91 suítes em `tests/T_*.prw`. Cada teste cria schemas descartáveis e os remove ao final; o catálogo de identidade (`GE1`, `GE2*`) é global em `public` e os fixtures limpam depois de si.
+89 suítes em `tests/T_*.prw`. Cada teste cria schemas descartáveis e os remove ao final; o catálogo de identidade (`GE1`, `GE2*`) é global em `public` e os fixtures limpam depois de si.
 
 ```bash
 GEBAN_PG_HOST=localhost GEBAN_PG_PORT=5432 GEBAN_PG_DB=geban_test \

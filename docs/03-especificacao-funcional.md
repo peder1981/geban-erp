@@ -451,7 +451,7 @@ GFN3 pagar (`DOC/FORN/VALOR/SALDO/VENC/STATUS ABERTO/PAGA`), GFN4 movimento (`CO
 |------|-------|
 | Caixa / Financeiro | Cria conta (`GEBFNCON`), lança receber/pagar, baixa, consulta fluxo |
 | Mentor | `PAG_IMPULSIVO` trava lançamento **e** baixa de pagar (receber nunca trava) |
-| Compras (`GEBCMENT`) | Consome `GEBFNPAG(cNF, cForn, nTotal, "20261231")` na entrada |
+| Compras (`GEBCPXENT`) | Gera título a pagar pela condição do pedido (`GEBFXTIT`), menos retenções |
 | Contábil (`CTBLAN`) | Cada `GEBFNBAI` concilia via `CTBLAN(cDoc, nEfetivo)` (stub compat se GC4 ausente) |
 
 ### 6.2 Pré-condições
@@ -525,103 +525,91 @@ GFN3 pagar (`DOC/FORN/VALOR/SALDO/VENC/STATUS ABERTO/PAGA`), GFN4 movimento (`CO
 
 ---
 
-## 7. MÓDULO COMPRAS (GCP1–GCP5)
+## 7. MÓDULO COMPRAS (GCP1–GCP5 + GCQ1–GCQ7)
 
 **Fontes:** `src/GEBCOM_MIG.prw` (`GEBCMMIG`), `src/GEBCOM_FOR.prw` (`GEBCMFOR`, `GEBCMCOT`, `GEBCMMEL`),
-`src/GEBCOM_PED.prw` (`GEBCMPED`, `GEBCMIT`), `src/GEBCOM_ENT.prw` (`GEBCMENT`)
-**Tabelas:** GCP1 fornecedor (`COD/NOME/CNPJ=""`), GCP2 cotação (`FORN/PROD/PRECO`),
-GCP3 pedido header (`NUM/FORN/STATUS ABERTO/RECEBIDO`), GCP4 item (`PED/PROD/QTD/PRECO`),
-GCP5 entrada (`NF/PED/STATUS RECEBIDA`).
+`src/GEBCPX.prw` (`GEBCPXMIG`, `GEBCPXSC`, `GEBCPXGERA`, `GEBCPXPED`, `GEBCPXAPR`, `GEBCPXENT`,
+`GEBCPXDEV`, `GEBCPXABERTOS`, `GEBCPXPORFORN`, `GEBCPXSCPEND`)
+**Tabelas:** GCP1 fornecedor (`COD/NOME/CNPJ`), GCP2 cotação (`FORN/PROD/PRECO`),
+GCP3 pedido (`NUM/FORN/STATUS`), GCP4 item (`PED/PROD/QTD/PRECO`), GCP5 entrada (`NF/PED`);
+GCQ1 solicitação (`NUM/PROD/QTD/NECESS/SOLIC/STATUS/PED`), GCQ2 alçada do pedido
+(`PED/COND/LOCAL/EMISSAO/TOTAL/LIB/APROV`), GCQ3 recebido por item, GCQ4 documento de entrada,
+GCQ5 custo de entrada por item (com frete rateado), GCQ6 devolução de compra, GCQ7 IBS/CBS da entrada.
 
 ### 7.1 Atores
 
 | Ator | Papel |
 |------|-------|
-| Comprador | Cadastra fornecedor, cota, abre pedido, adiciona itens, recebe entrada |
-| Mentor | `COMPRA_IMPULSIVA` trava abertura de pedido (itens/entrada não passam pelo mentor) |
-| Estoque (`GEBVEST`) | Entrada movimenta cada item (`cProd, nQtd`) — cria com `MIN=10` se inexistente |
-| Financeiro (`GEBFNPAG`) | Entrada lança `cNF` a pagar com vencimento fixo `"20261231"` |
-| Contábil (`CTBLAN`) | Entrada concilia `CTBLAN(cNF, nTotal)` (stub compat se GC4 ausente) |
+| Comprador | Cadastra fornecedor, cota, abre solicitação ou pedido, aprova, recebe entrada, devolve |
+| Aprovador | Libera pedido `PENDENTE` via `GEBCPXAPR` (alçada `COM_ALCADA` em GE4) |
+| Mentor | `PAG_IMPULSIVO`/`COMPRA_IMPULSIVA` podem travar/liberar etapas (aviso + BO) |
+| Estoque (`GEBVEST`) | Entrada movimenta cada item — custo de entrada de GCQ5 |
+| Financeiro (`GEBFXTIT`) | Título a pagar pela condição do pedido (à vista se não houver), menos retenções |
+| Contábil (`CTBLAN`) | `COMPRA_ESTOQUE` (D estoque / C fornecedores) + retenções |
+| Derrama | Retenções da entrada (`aRet`/GRT1) viram títulos `RET-<tributo>`; GCQ7 credita IBS/CBS |
 
 ### 7.2 Pré-condições
 
-1. `GEBCMMIG()` executada (GCP1–GCP5 idempotentes).
-2. Fornecedor: `cCod`/`cNome` não vazios + GCP1 existe. Cotação: `cForn`/`cProd` não vazios,
-   `nPreco > 0` + GCP2 existe. Menor preço: `cProd` não vazio + GCP2 existe (senão `0`).
-3. Pedido: `cPed`/`cForn` não vazios + GCP3 existe. Item: `cPed`/`cProd` não vazios,
-   `nQtd > 0`, `nPreco > 0` + GCP4/GCP3 existem + pedido existe em GCP3.
-4. Entrada: `cNF`/`cPed` não vazios + GCP3/GCP4/GCP5 existem + pedido existe e não `RECEBIDO` +
-   pedido com itens (`total > 0`) + NF sem duplicata em GCP5.
+1. `GEBCPXMIG()` executada (GCQ1–GCQ7 idempotentes).
+2. Fornecedor existe em GCP1; itens `{cProd, nQtd, nPreco}` válidos e sem produto repetido.
+3. Condição de pagamento válida (`GEBFXPARC`); pedido `PENDENTE` só entra com `GEBCPXAPR`.
+4. Entrada exige pedido existente, itens a receber (explícitos ou pendentes), NF sem duplicata em GCQ4.
 
 ### 7.3 Fluxo principal (numerado)
 
-1. `GEBCMMIG()` cria GCP1–GCP5 + índices → `.T.`/`.F.`.
-2. `GEBCMFOR(cCod, cNome)`: vazio/ausente → `.F.`; existente → `FOR existe <cod>`, `.T.`;
-   senão insere GCP1 (`CNPJ=""`) → `FOR <cod>`, `.T.`.
-3. `GEBCMCOT(cForn, cProd, nPreco)`: guardas → `.F.`; senão insere GCP2 → `COT <prod> <preco>`, `.T.`
-   (permite múltiplas cotações do mesmo produto/fornecedor; sem update).
-4. `GEBCMMEL(cProd)`: vazio/ausente/sem cotação → `0`; senão menor `PRECO` ativo na filial →
-   `MEL <prod> <menor>`.
-5. `GEBCMPED(cPed, cForn)`: vazio/ausente → `BLOQUEADO`; `GEBMNT("COMPRA_IMPULSIVA")=.F.` →
-   `PED bloqueado <ped>`, `BLOQUEADO` sem tocar o banco; existente → `PED existe <ped>`, `ABERTO`;
-   senão insere GCP3 (`ABERTO`) → `PED ABERTO <ped>`, `ABERTO`.
-6. `GEBCMIT(cPed, cProd, nQtd, nPreco)`: guardas/pedido inexistente → `.F.` (+ `ITEM sem pedido <ped>`);
-   senão insere GCP4 → `ITEM <ped> <prod>`, `.T.`.
-7. `GEBCMENT(cNF, cPed)`: guardas/pedido inexistente → `.F.` (+ `ENT sem pedido`);
-   já `RECEBIDO` → `ENT ja recebida`, `.F.`; NF duplicada → `ENT duplicada`, `.F.`;
-   sem itens → `ENT sem itens`, `.F.`; `GEBFNPAG(cNF, cForn, nTotal, "20261231")=.F.` →
-   `ENT pag recusou`, `.F.` (mentor `PAG_IMPULSIVO` pode recusar aqui);
-   senão `EntraEstoque` (cada item via `GEBVEST`) + `CTBLAN(cNF, nTotal)` + GCP3 → `RECEBIDO` +
-   GCP5 (`NF, PED, RECEBIDA`) → `ENT RECEBIDA <nf> <total>`, `.T.`.
-   `nTotal = Σ(QTD×PRECO)` dos itens ativos.
+1. `GEBCMMIG()` / `GEBCPXMIG()` criam GCP1–GCP5 e GCQ1–GCQ7 + índices → `.T.`/`.F.`.
+2. `GEBCMFOR(cCod, cNome)`: idempotente; `GEBCMCOT(cForn, cProd, nPreco)` grava oferta; `GEBCMMEL(cProd)` menor preço (`0` se sem cotação).
+3. `GEBCPXSC(cNum, aItens, cSolic)`: solicitação de compra em GCQ1 (`ABERTA`).
+4. `GEBCPXGERA(cNumSC, cCond, cLocal, cData)`: gera um pedido por fornecedor usando o menor preço cotado (GCP2); item sem cotação recusa tudo; GCQ1 → `ATENDIDA`.
+5. `GEBCPXPED(cPed, cForn, aItens, cCond, cLocal, cData)`: pedido direto em GCP3/GCP4 + GCQ2. Total acima de `COM_ALCADA` ⇒ `GCQ2_LIB = PENDENTE` (bloqueado para entrada até aprovação); senão `LIBERADO`. Pedido vazio/duplicado/sem itens recusa.
+6. `GEBCPXAPR(cPed, cUsuario, lAprova)`: `PENDENTE` ⇒ `LIBERADO` ou `REJEITADO` com carimbo do aprovador.
+7. `GEBCPXENT(cNF, cPed, aItens, nFrete, cData, aRet, cChaveNF)`: documento de entrada — estoque a custo de entrada (GCQ5, frete rateado), título pelo `GEBFXTIT` menos retenções, `COMPRA_ESTOQUE`, crédito IBS/CBS em GCQ7; GCQ3 acumula recebido (pedido `PARCIAL`/`RECEBIDO`); GCQ4 guarda o documento.
+8. `GEBCPXDEV(cNF, cForn, aItens, cData, cChaveForn)`: devolução de compra (GCQ6) — estorna estoque/valor do documento.
+9. Consultas: `GEBCPXABERTOS()`, `GEBCPXPORFORN(cIni, cFim)`, `GEBCPXSCPEND()`.
 
 ### 7.4 Fluxos alternativos
 
 | ID | Cenário | Comportamento |
 |----|---------|---------------|
-| CP-A1 | Offline / fila | Compras não enfileira em GE5; `CTBLAN` stub se GC4 ausente; `GEBVEST` cria produto com `MIN=10` |
-| CP-A2 | Trava mentor | `COMPRA_IMPULSIVA=AVISA_E_TRAVA` → pedido `BLOQUEADO` sem tocar o banco (com BO: `GEBAUD` + libera); entrada herda trava indireta via `GEBFNPAG` (`PAG_IMPULSIVO`) |
-| CP-A3 | Sem estoque | Não bloqueia: entrada **soma** estoque; `ESTOQUE_MINIMO` só alerta em `GEBVEST` |
-| CP-A4 | Inadimplência | Entrada sempre gera título a pagar (`ABERTO`); inadimplência aparece no fluxo financeiro |
-| CP-A5 | Duplicatas/guardas | Fornecedor existente → `.T.` idempotente; NF duplicada, pedido `RECEBIDO`, sem itens, item sem pedido → `.F.` |
-| CP-A6 | Vencimento fixo | Entrada lança pagar com `VENC="20261231"` (literal fixo, não parametrizado) |
+| CP-A1 | Pedido acima da alçada | `GCQ2_LIB = PENDENTE`; `GEBCPXENT` recusa até `GEBCPXAPR` liberar |
+| CP-A2 | Mentor travado | Etapas guiadas pela TUI/`/bo/compras/*` passam por `GEBMNT`/BO antes de gravar |
+| CP-A3 | Entrada parcial | `aItens` vazio = todo o pendente; parcial marca pedido `PARCIAL` (GCQ3) |
+| CP-A4 | Retenções | `aRet` abate o título do fornecedor e gera guias na Derrama |
+| CP-A5 | Duplicatas | NF repetida em GCQ4, pedido duplicado, SC repetida → recusa sem tocar o banco |
 
 ### 7.5 Pós-condições (tabelas gravadas)
 
 | Função | Grava |
 |--------|-------|
-| `GEBCMMIG` | GCP1–GCP5 + índices |
-| `GEBCMFOR` | GCP1 (`COD, NOME, CNPJ=""`) — idempotente |
-| `GEBCMCOT` | GCP2 (`FORN, PROD, PRECO`) — sempre insert |
-| `GEBCMPED` | GCP3 (`NUM, FORN, ABERTO`) — idempotente |
-| `GEBCMIT` | GCP4 (`PED, PROD, QTD, PRECO`) |
-| `GEBCMENT` | GFN3 (título pagar `NF/FORN/TOTAL/ABERTO` via `GEBFNPAG`); GV1 (soma por item via `GEBVEST`); GCP3 → `RECEBIDO`; GCP5 (`NF, PED, RECEBIDA`); GC2/GC3 via `CTBLAN` |
+| `GEBCMFOR`/`GEBCMCOT` | GCP1 (`COD, NOME, CNPJ`); GCP2 (`FORN, PROD, PRECO`) |
+| `GEBCPXSC` | GCQ1 (`NUM, PROD, QTD, NECESS, SOLIC, ABERTA`) |
+| `GEBCPXGERA`/`GEBCPXPED` | GCP3 (`ABERTO`), GCP4 (itens), GCQ2 (`COND, LOCAL, TOTAL, LIB`), GCQ1 → `ATENDIDA` |
+| `GEBCPXAPR` | GCQ2 (`LIB`, `APROV`) |
+| `GEBCPXENT` | GV1+GC2/GC3 (estoque/contábil), GFN2/GFN3 via `GEBFXTIT`, GCQ3, GCQ4, GCQ5, GCQ7, GCP3 status |
+| `GEBCPXDEV` | GCQ6 + estorno de estoque/valor |
 
 ### 7.6 Regras + mensagens
 
-| Regra | Mensagem |
-|-------|----------|
-| Migração | `GEBCMMIG criando GCP1-GCP5` |
-| Fornecedor | `FOR <cod>` / `FOR existe <cod>` |
-| Cotação/menor | `COT <prod> <preco>` / `MEL <prod> <menor>` |
-| Pedido/item | `PED ABERTO <ped>` / `PED existe <ped>` / `PED bloqueado <ped>` / `ITEM <ped> <prod>` / `ITEM sem pedido <ped>` |
-| Entrada | `ENT RECEBIDA <nf> <total>` / `ENT sem pedido <ped>` / `ENT ja recebida <ped>` / `ENT duplicada <nf>` / `ENT sem itens <ped>` / `ENT pag recusou <nf>` |
+| Regra | Retorno |
+|-------|---------|
+| Pedido | `{lOk, msg, {cPed, nTotal, cLiberacao}}` — `LIBERADO`/`PENDENTE`; msg `pedido <num> <lib>` |
+| Aprovação | `{lOk, msg}` — `pedido <num> LIBERADO/REJEITADO`; `pedido_nao_esta_pendente` se já decidido |
+| Entrada | `{lOk, msg, {nTotal, cStatusPedido, aTitulos, nRetido}}` |
+| Guardas | `fornecedor_inexistente`, `sem_itens`, `item_invalido`, `produto_repetido`, `pedido_duplicado`, `falha_tabelas` |
 
 ### 7.7 Parâmetros GE4 (compras)
 
-| Evento | Valores | Default | Efeito |
-|--------|---------|---------|--------|
-| Mentor `COMPRA_IMPULSIVA` | `AVISA_E_TRAVA` / `AVISA_E_LIBERA_COM_BO` / `DESLIGADO` | libera sem BO | Trava `GEBCMPED` |
-| Mentor `PAG_IMPULSIVO` (indireto) | idem | libera sem BO | Pode recusar `GEBCMENT` via `GEBFNPAG` |
-| Mentor `ESTOQUE_MINIMO` (indireto) | idem | libera sem BO | `GEBVEST` só alerta na entrada, nunca trava |
-
----
+| Parâmetro | Valores | Default | Efeito |
+|-----------|---------|---------|--------|
+| `COM_ALCADA` | valor > 0 | `0` (sem alçada) | Total do pedido acima ⇒ `GCQ2_LIB = PENDENTE` até `GEBCPXAPR` |
+| Mentor `PAG_IMPULSIVO` | `AVISA_E_TRAVA` / `AVISA_E_LIBERA_COM_BO` / `DESLIGADO` | libera sem BO | Pode travar o título a pagar da entrada |
+| Mentor `ESTOQUE_MINIMO` | idem | libera sem BO | `GEBVEST` alerta na entrada, nunca trava |
 
 ## 8. Matriz requisitos → funções → testes
 
 Planos: `documentacao interna`.
 Convencao: testes `T_*` incluem os fontes e validam `check` + `run` + `rerun` + regressao, com `DELETE` cleanup.
-Total: **91 testes** `tests/T_*.prw` (a matriz req→função→teste abaixo é a da especificação original;
+Total: **89 testes** `tests/T_*.prw` (a matriz req→função→teste abaixo é a da especificação original;
 novos módulos — segurança RBAC, DF-e, PDV/loja, crypto, Sarney, lote, backoffice — estão cobertos
 pelos testes listados em `docs/05-referencia-tecnica.md` §9).
 
@@ -658,9 +646,9 @@ pelos testes listados em `docs/05-referencia-tecnica.md` §9).
 | FIN T5: massa 100 títulos | (todas financeiro) | `T_GEBFIN_MASSA.prw` (50×`REC` 100 + 50×`PAG` 50; `FLX` {5000,2500,2500} → baixa total → {0,0,0}; `CAIXA`=2500; GFN4 100) | GFN1–GFN4 |
 | COM T1: mig GCP1–GCP5 | `GEBCMMIG` (`GEBCOM_MIG.prw`) | `T_GEBCOM_MIG.prw` (idempotente 2× + `sqlite_master` GCP1/GCP5) | GCP1–GCP5 |
 | COM T2: fornecedor + cotação + menor preço | `GEBCMFOR`, `GEBCMCOT`, `GEBCMMEL` (`GEBCOM_FOR.prw`) | `T_GEBCOM_FOR_COT.prw` (idempotente `F-T2-01`; cota 10/7 → `MEL`=7; miss=`0`; zero/vazio negados) | GCP1, GCP2 |
-| COM T3: pedido + item + mentor | `GEBCMPED`, `GEBCMIT` (`GEBCOM_PED.prw`) | `T_GEBCOM_PED.prw` (`PED-T3-01` `ABERTO` idempotente; vazio/`COMPRA_IMPULSIVA`→`BLOQUEADO`; item sem pedido/qtd 0 negados) | GCP3, GCP4 (+GE4) |
-| COM T4: entrada → estoque + pagar + CTBLAN | `GEBCMENT` (`GEBCOM_ENT.prw`) | `T_GEBCOM_ENT.prw` (`PED-T4-01` 5×10+2×20 → `NF-T4-01`; 2ª via/NF dup/sem pedido negadas; GCP3 `RECEBIDO`+GCP5+GFN3+GV1) | GCP3→`RECEBIDO`, GCP5, GFN3, GV1 (+GC2/GC3) |
-| COM T5: massa 50 pedidos round-trip | (todas compras) | `T_GEBCOM_MASSA.prw` (50× pedido 2×10 + entrada; 50 GCP3 `RECEBIDO` + 50 GCP5 + 50 GFN3) | GCP1–GCP5, GFN3, GV1 |
+| COM T3: pedido com itens + alçada | `GEBCPXPED`, `GEBCPXAPR` (`GEBCPX.prw`) | `T_GEBCPX.prw` (pedido direto `GEBCPXPED`, alçada `PENDENTE`, `GEBCPXAPR`, entrada `GEBCPXENT`, devolução `GEBCPXDEV`) | GCP3, GCP4, GCQ2 (+GE4) |
+| COM T4: entrada → estoque + pagar + CTBLAN | `GEBCPXENT` (`GEBCPX.prw`) | `T_GEBCOM_MASSA.prw`/`T_GEBCPX.prw` (entrada por pedido, custo rateado, retenções, IBS/CBS crédito) | GCP3→`RECEBIDO/PARCIAL`, GCQ3–GCQ5, GCQ7, GFN3, GV1 (+GC2/GC3) |
+| COM T5: massa 50 pedidos round-trip | (todas compras) | `T_GEBCOM_MASSA.prw` (50× `GEBCPXPED`+`GEBCPXENT`; 50 GCP3 recebidos + GCQ4/GCQ5 + títulos) | GCP1–GCP5, GCQ1–GCQ7, GFN3, GV1 |
 | EXPANSAO T1: multi-empresa + GEH/GEI | `GEBEXPmig` (`GEBEXP_MIG.prw`) | `T_GeExp_MIG.prw` (verifica EMPRESA em 28 tabelas + GEH/GEI existentes) | GE1–GC4 + GEH + GEI |
 | EXPANSAO T2: contexto sessao | `GEBEXPCONTEXTO`, `GEBEXPIST`, `GEBEXPCONTEXT`, `GEBEXPCLEAR` (`GEBEXP_CTX.prw`) | `T_GeExp_CTX.prw` (sessao A valida, sessao B falha, clear encerra) | GE2, GEH, GEX |
 | EXPANSAO T4: relatorios nucleo | `GEBRELEMPRESAS`, `GEBRELUSUARIOS`, `GEBRELAUDITORIA`, `GEBRELMENTOR`, `GEBRELCADASTROS` (`GEBEXP_REL_NUC.prw`) | `T_GeExp_REL_NUC.prw` (5 asserts: cada funcao retorna array nao vazio com campos corretos) | GE1, GE2, GEH, GE4, GF1, GCP1, GV3, GFN1 |

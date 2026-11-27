@@ -88,8 +88,8 @@ Massa-guia: 50×100 receber + 50×50 pagar, tudo baixado → `CAIXA` **2500**, 1
 
 ### 4.6 Compras — o mercadão (pedido promete, NF cumpre)
 `GEBCMFOR` (idempotente) → `GEBCMCOT` (só registra) → `GEBCMMEL` (menor preço) →
-`GEBCMPED` (`ABERTO` pós-`COMPRA_IMPULSIVA`; travado = `BLOQUEADO` sem banco) →
-`GEBCMIT` (órfão = `.F.`) → `GEBCMENT` (soma itens → `GEBFNPAG` (se o Mentor/duplicidade
+`GEBCPXPED` (itens + alçada GCQ2: acima de `COM_ALCADA` = `PENDENTE`) →
+`GEBCPXAPR` (libera/rejeita) → `GEBCPXENT` (custo de entrada → `GEBFXTIT`/`GEBFNPAG` (se o Mentor/duplicidade
 negar, aborta sem tocar nada) → estoque + `CTBLAN` + `RECEBIDO/RECEBIDA`). Massa-guia:
 50 pedidos 2×10 → 50 `RECEBIDO` + 50 pagar de 20 + 100 un em estoque.
 **Dois pagares, dois reis:** `GD1` = fisco (juros/parcela/protesto, morre em `GEBDBAI`);
@@ -105,9 +105,9 @@ fiado estoura no número (1000), compra estoura no conselho (Mentor, sem teto).
 | Emissão → Contábil | sempre | `CTBLAN` em autorizada **e** em fila |
 | Apuração → Derrama | `GEBFAPU` | `GEBDGER` cria a guia |
 | Guia → Contábil | `GEBDBAI` | conciliação + `CTBLAN` |
-| Pedido → Financeiro | `GEBCMENT` | `GEBFNPAG` (Mentor pode abortar tudo) |
-| Pedido → Estoque | `GEBCMENT` | `GEBVEST` por item |
-| Pedido → Contábil | `GEBCMENT` | `CTBLAN` do total |
+| Pedido → Financeiro | `GEBCPXENT` | `GEBFXTIT`/`GEBFNPAG` (Mentor pode abortar tudo) |
+| Pedido → Estoque | `GEBCPXENT` | `GEBVEST` por item (custo de entrada GCQ5) |
+| Pedido → Contábil | `GEBCPXENT` | `CTBLAN` do total + retenções |
 | Receber/Pagar → Contábil | `GEBFNBAI` | movimento + `CAIXA` + `CTBLAN` |
 | Mentor → tudo | `GEBMNT(evento)` | trava/libera/B.O. antes de tocar o banco |
 | Login → Tenant | `GEBSECLOGIN` OK | vínculo → schema → `GEBEXPCONTEXTO` → token |

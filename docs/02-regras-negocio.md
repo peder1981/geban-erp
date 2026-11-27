@@ -347,8 +347,8 @@ O teste de estresse do cofre: 50 a receber de 100 + 50 a pagar de 50, tudo baixa
 O teste de estresse da compra: 50 pedidos nascem, viram NF, viram estoque e viram pagar:
 
 - `GEBCMFOR("FORN-M5","Forn Massa")` + `GEBCMCOT("FORN-M5","P-M5-A",10)` ⇒ `GEBCMMEL("P-M5-A") == 10`;
-- loop 50×: `GEBCMPED("PED-M5-N","FORN-M5") == "ABERTO"` + `GEBCMIT(cPed,"P-M5-A",2,10)` (total `2 × 10 = 20`) + `GEBCMENT("NF-M5-N",cPed)`;
-- final: **50 GCP3 `RECEBIDO` + 50 GCP5 `RECEBIDA` + 50 GFN3** — cada NF de 20 virou um pagar de 20;
+- loop 50×: `GEBCPXPED("PED-M5-N","FORN-M5",{{prod,qtd,preco}}...)` + `GEBCPXENT("NF-M5-N",cPed,...)`;
+- final: **50 pedidos recebidos + 50 documentos GCQ4 + títulos a pagar** — cada NF virou estoque + pagar + contábil;
 - estoque `P-M5-A` soma `50 × 2 = 100` unidades via `GEBVEST` — o mercadão encheu a dispensa sozinho.
 
 ---
@@ -379,8 +379,8 @@ O teste de estresse da compra: 50 pedidos nascem, viram NF, viram estoque e vira
 | `GEBNFLX` | GFN2+GFN3 | Fluxo `{rec, pag, saldo}` só `ABERTO` |
 | `GEBCMMIG` / `GEBCMFOR` | GCP1–GCP5 | Migra mercadão; cria fornecedor idempotente |
 | `GEBCMCOT` / `GEBCMMEL` | GCP2 | Cota preço; menor preço do produto |
-| `GEBCMPED` / `GEBCMIT` | GCP3 / GCP4 | Pedido com `COMPRA_IMPULSIVA`; item sem pedido nega |
-| `GEBCMENT` | GCP3/GCP4 ⇒ GV1+GFN3+GCP5+CTB | Entrada NF: estoque + pagar + contábil |
+| `GEBCPXPED` / `GEBCPXGERA` | GCP3/GCP4 + GCQ2 | Pedido com itens; total acima de `COM_ALCADA` fica `PENDENTE` |
+| `GEBCPXAPR` / `GEBCPXENT` | GCQ2 / GCQ3–GCQ7 + GV1+GFN+CTB | Aprova/rejeita; entrada: estoque a custo + pagar + retenções + crédito IBS/CBS |
 
 ---
 
@@ -419,21 +419,25 @@ O COM é o mercadão: fornecedor, cotação, pedido, entrada. Regra de ouro — 
 - **Cotação (GCP2: `FORN-PROD-PRECO`)**: `GEBCMCOT(cForn,cProd,nPreco)` grava cada oferta; fornecedor/produto vazio, `preço ≤ 0` ou GCP2 ausente ⇒ `.F.`. Cotação não trava nada — só registra quem pediu quanto.
 - **Menor preço**: `GEBCMMEL(cProd)` varre GCP2 na filial e retorna o menor `PRECO` — `0` se produto vazio, GCP2 ausente ou sem cotação. É o "quem dá menos leva o pedido", em uma função.
 
-### 14.2 Pedido — com o Mentor no ombro (`GEBCMPED`, `GEBCMIT`)
+### 14.2 Pedido — solicitação, geração e alçada (`GEBCPX*`)
 
-- **Header (GCP3: `NUM-FORN-STATUS`)**: `GEBCMPED(cPed,cForn)` cria `ABERTO` — **depois** da guia `GEBMNT("COMPRA_IMPULSIVA")`. Travado ⇒ `"BLOQUEADO"` sem tocar o banco. Idempotente (pedido existente ⇒ `"ABERTO"` sem duplicar); pedido/fornecedor vazio ou GCP3 ausente ⇒ `"BLOQUEADO"`. Pedido bloqueado não é erro: é o Mentor dizendo "dorme com essa ideia e me conta amanhã".
-- **Item (GCP4: `PED-PROD-QTD-PRECO`)**: `GEBCMIT(cPed,cProd,nQtd,nPreco)` grava; `.F.` se pedido/produto vazio, `qtd/preço ≤ 0`, GCP4 ausente ou **pedido inexistente em GCP3** — item órfão não entra no mercadão.
+A trilha oficial de compras é o backoffice `GEBCPX` (TUI **Compras → Operações** e `/bo/compras/*`); a trilha REST antiga (`GEBCMPED`/`GEBCMIT`/`GEBCMENT`) foi removida porque criava pedido sem passar pela alçada GCQ2.
 
-### 14.3 Entrada NF — o batismo triplo (`GEBCMENT`)
+- **Pedido direto**: `GEBCPXPED(cPed, cForn, aItens, cCond, cLocal, cData)` grava GCP3/GCP4 + GCQ2. `cPed` vazio gera `PC` sequencial; pedido duplicado, fornecedor inexistente, item inválido ou produto repetido recusam. Total acima de `COM_ALCADA` ⇒ `GCQ2_LIB = PENDENTE` — o pedido existe mas **não pode receber entrada** até `GEBCPXAPR(cPed, cUsuario, .T.)` liberar (ou `.F.` rejeitar).
+- **Por cotação**: `GEBCPXSC` abre solicitação (GCQ1); `GEBCPXGERA` gera um pedido por fornecedor pelo menor preço cotado (GCP2) — item sem cotação recusa tudo e a SC fica `ABERTA`.
+- **Consultas**: `GEBCPXABERTOS()`, `GEBCPXPORFORN(cIni,cFim)`, `GEBCPXSCPEND()`.
 
-`GEBCMENT(cNF,cPed)` passa as guardas abaixo e o Mentor `PAG_IMPULSIVO`, e então recebe todo o pendente pelo documento de entrada do backoffice (`GEBCPXENT`): estoque a custo de entrada (kardex), título pela condição do pedido (à vista se não tiver), `COMPRA_ESTOQUE` (D estoque / C fornecedores) e o crédito de IBS/CBS. A regra antiga era:
+### 14.3 Entrada NF — o batismo do backoffice (`GEBCPXENT`)
 
-1. **Soma** os itens GCP4 (`Σ QTD × PRECO`) — pedido sem itens ⇒ `.F.`, NF de vento não entra;
-2. **Gera o pagar** via `GEBFNPAG(cNF,cForn,nTotal,"20261231")` — se o Mentor `PAG_IMPULSIVO` ou a duplicidade recusar, a entrada aborta **sem tocar o banco** (nem estoque, nem status, nada);
-3. **Entra no estoque** (`GEBVEST(cProd,nQtd)` por item) + **`CTBLAN(cNF,nTotal)`** + marca GCP3 `RECEBIDO` + grava GCP5 (`NF-PED-STATUS RECEBIDA`).
+`GEBCPXENT(cNF, cPed, aItens, nFrete, cData, aRet, cChaveNF)` é o único caminho de entrada (exige pedido `LIBERADO`):
 
-Guardas (todas ⇒ `.F.` sem tocar o banco): NF/pedido vazio, GCP3/GCP4/GCP5 ausente, pedido inexistente ou já `RECEBIDO`, NF duplicada em GCP5.
+1. Confere pedido e alçada GCQ2; NF repetida em GCQ4 recusa;
+2. Estoque a **custo de entrada** (GCQ5, frete rateado por item) via `GEBVEST` — kardex;
+3. Título a pagar pelo `GEBFXTIT` na condição do pedido, **menos retenções** (`aRet`/GRT1 → guias `RET-*` na Derrama);
+4. `COMPRA_ESTOQUE` (D estoque / C fornecedores) + crédito IBS/CBS em GCQ7;
+5. GCQ3 acumula o recebido por item — pedido fica `PARCIAL` ou `RECEBIDO`; GCQ4 guarda o documento.
 
+`GEBCPXDEV(cNF, cForn, aItens, cData, cChaveForn)` estorna devolução de compra (GCQ6). Guardas comuns: dados vazios, tabelas ausentes, pedido inexistente — tudo recusa sem tocar o banco.
 ### 14.4 GD1 × GFN3 — a guia mora na Derrama e se paga no financeiro
 
 Desde 19/10/2026 (decisão do operador) a Derrama e o contas a pagar andam juntos:
@@ -715,7 +719,7 @@ Desenho: `documentacao interna`. Regra geral: **o que gera título ou guia apare
 | Venda do balcão (`GEBVVEN`) | Título recebido na hora no `CAIXA` | Pela nota | `VENDA_RECEITA`, `VENDA_CMV`, `FIN_REC` |
 | Fiado do balcão (`GEBVFIA`) | Título `FIA-<registro>` | — | `VENDA_RECEITA` |
 | Faturamento, loja, compras novas | Títulos pela condição | IBS/CBS (débito nas notas, crédito nas entradas) | Eventos de cada módulo |
-| Entrada antiga (`GEBCMENT`) | Pelo documento de entrada | Crédito de IBS/CBS | `COMPRA_ESTOQUE` |
+| Entrada de compra (`GEBCPXENT`) | Título pela condição − retenções | Crédito IBS/CBS (GCQ7) | `COMPRA_ESTOQUE`
 | Títulos avulsos (`GEBFNREC`/`GEBFNPAG`) | Pelo `GEBFXTIT` | — | `FIN_RECEITA` / `FIN_DESPESA` |
 | Apuração do IBS/CBS (REGULAR) | Título da guia | `GD<comp>` | `APU_IBSCBS` |
 | Simples Nacional | Títulos das guias | `DAS-`, `ICMS-`, `ISS-<comp>` | `SN_DAS`, `SN_FORA` |

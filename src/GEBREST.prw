@@ -17,8 +17,6 @@
 #include "GEBFIN_BAI.prw"
 #include "GEBFIN_MIG.prw"
 #include "GEBCOM_FOR.prw"
-#include "GEBCOM_PED.prw"
-#include "GEBCOM_ENT.prw"
 #include "GEBFIS_APU.prw"
 #include "GEBSN.prw"
 #include "GEBBO.prw"
@@ -71,7 +69,7 @@
       POST /estoque/vender|fiado|fiado/juros -> operacao estoque
       POST /contabil/lancar + GET /contabil/balancete|dre/{comp}
       POST /financeiro/contas|baixar
-      POST /compras/fornecedores|pedidos|itens|entradas
+      POST /compras/fornecedores  (pedido/entrada via /bo/compras/*)
       POST /fiscal/apurar|creditos
       POST /fiscal/simples/config|folha|apurar|atividade|produto|exportacao|feriado -> Simples Nacional (GEBSN.prw)
       GET  /fiscal/simples/extrato/{comp} | /fiscal/simples/anual/{ano} -> relatorios do Simples
@@ -284,11 +282,11 @@ Return {;
         {"GET", "/contabil/balancete/", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTBBAL(u, a)}},;
         {"GET", "/contabil/dre/", .F., "CONTABIL", "LANCTO", {|u, a, p, m| GEBRESTCTBDRE(u, a)}},;
         {"GET", "/compras/pedidos", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMLST(u)}},;
-        {"POST", "/compras/pedidos", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMPED(u, p)}},;
         {"GET", "/compras/fornecedores", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTFORLST(u)}},;
         {"POST", "/compras/fornecedores", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMFOR(u, p)}},;
-        {"POST", "/compras/itens", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMIT(u, p)}},;
-        {"POST", "/compras/entradas", .F., "COMPRAS", "PEDID", {|u, a, p, m| GEBRESTCOMENT(u, p)}},;
+        {"GET", "/pdv/", .F., "*", "", {|u, a, p, m| GEBRESTPDV(m, a, p, u)}},;
+        {"POST", "/pdv/", .F., "*", "", {|u, a, p, m| GEBRESTPDV(m, a, p, u)}},;
+        {"DELETE", "/pdv/", .F., "*", "", {|u, a, p, m| GEBRESTPDV(m, a, p, u)}},;
         {"GET", "/bo/", .F., "", "", {|u, a, p, m| GEBRESTBO(m, a, p, u)}},;
         {"POST", "/bo/", .F., "", "", {|u, a, p, m| GEBRESTBO(m, a, p, u)}}}
 
@@ -3513,188 +3511,6 @@ User Function GEBRESTCOMFOR(cUsuario, aBody)
         cBody := GEBRESTJSONRESP(.F., Nil, {"fornecedor_recusado: " + cCod})
     Else
         cBody := GEBRESTJSONRESP(.T., {cCod, cNome}, {})
-    EndIf
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-Return {cStatus, cBody}
-
-/*/{Protheus.doc} GEBRESTCOMPED
-    Endpoint POST /compras/pedidos. Abre pedido via GEBCMPED.
-    @type Endpoint operacao
-    @author Peder Munksgaard
-    @since 25/09/2026
-    @param cUsuario Usuario autenticado
-    @param aBody Body {pedido, fornecedor}
-    @return Array 201 ABERTO / 403 BLOQUEADO / 400
-/*/
-User Function GEBRESTCOMPED(cUsuario, aBody)
-    Local aArea   := GetArea()
-    Local cStatus := "201"
-    Local cBody   := ""
-    Local cPed    := ""
-    Local cForn   := ""
-    Local cSt     := ""
-    Local aEx     := {}
-    If cUsuario == Nil
-        cUsuario := ""
-    EndIf
-    If aBody == Nil
-        aBody := {}
-    EndIf
-    If Len(aBody) >= 1
-        cPed := AllTrim(cValToChar(aBody[1]))
-    EndIf
-    If Len(aBody) >= 2
-        cForn := AllTrim(cValToChar(aBody[2]))
-    EndIf
-    If cPed == "" .Or. cForn == ""
-        cStatus := "400"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"pedido_invalido: informe pedido e fornecedor"})
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return {cStatus, cBody}
-    EndIf
-    aEx := TCSqlQuery("SELECT 1 FROM GCP1 WHERE GCP1_COD = " + GEBDBQuote(cForn) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
-    If Len(aEx) == 0
-        cStatus := "404"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"fornecedor_nao_cadastrado: " + cForn})
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return {cStatus, cBody}
-    EndIf
-    cSt := GEBCMPED(cPed, cForn)
-    If cSt == "ABERTO"
-        cBody := GEBRESTJSONRESP(.T., {cPed, cForn, "status", cSt}, {})
-    Else
-        If cSt == "BLOQUEADO"
-            cStatus := "403"
-        Else
-            cStatus := "400"
-        EndIf
-        cBody := GEBRESTJSONRESP(.F., Nil, {"pedido_recusado: " + cSt})
-    EndIf
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-Return {cStatus, cBody}
-
-/*/{Protheus.doc} GEBRESTCOMIT
-    Endpoint POST /compras/itens. Adiciona item via GEBCMIT.
-    @type Endpoint operacao
-    @author Peder Munksgaard
-    @since 25/09/2026
-    @param cUsuario Usuario autenticado
-    @param aBody Body {pedido, produto, quantidade, preco}
-    @return Array 201 / 400
-/*/
-User Function GEBRESTCOMIT(cUsuario, aBody)
-    Local aArea   := GetArea()
-    Local cStatus := "201"
-    Local cBody   := ""
-    Local cPed    := ""
-    Local cProd   := ""
-    Local nQtd    := 0
-    Local nPreco  := 0
-    Local aPed    := {}
-    If cUsuario == Nil
-        cUsuario := ""
-    EndIf
-    If aBody == Nil
-        aBody := {}
-    EndIf
-    If Len(aBody) >= 1
-        cPed := AllTrim(cValToChar(aBody[1]))
-    EndIf
-    If Len(aBody) >= 2
-        cProd := AllTrim(cValToChar(aBody[2]))
-    EndIf
-    If Len(aBody) >= 3
-        nQtd := Val(cValToChar(aBody[3]))
-    EndIf
-    If Len(aBody) >= 4
-        nPreco := Val(cValToChar(aBody[4]))
-    EndIf
-    If cPed == "" .Or. cProd == "" .Or. nQtd <= 0 .Or. nPreco <= 0
-        cStatus := "400"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"item_invalido: informe pedido, produto, quantidade e preco"})
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return {cStatus, cBody}
-    EndIf
-    aPed := TCSqlQuery("SELECT GCP3_NUM FROM GCP3 WHERE GCP3_NUM = " + GEBDBQuote(cPed) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
-    If Len(aPed) == 0
-        cStatus := "404"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"pedido_nao_encontrado: " + cPed})
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return {cStatus, cBody}
-    EndIf
-    If !GEBCMIT(cPed, cProd, nQtd, nPreco)
-        cStatus := "400"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"item_recusado: " + cPed})
-    Else
-        cBody := GEBRESTJSONRESP(.T., {cPed, cProd, nQtd, nPreco}, {})
-    EndIf
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-Return {cStatus, cBody}
-
-/*/{Protheus.doc} GEBRESTCOMENT
-    Endpoint POST /compras/entradas. Da entrada via GEBCMENT.
-    @type Endpoint operacao
-    @author Peder Munksgaard
-    @since 25/09/2026
-    @param cUsuario Usuario autenticado
-    @param aBody Body {nf, pedido}
-    @return Array 201 / 400
-/*/
-User Function GEBRESTCOMENT(cUsuario, aBody)
-    Local aArea   := GetArea()
-    Local cStatus := "201"
-    Local cBody   := ""
-    Local cNF     := ""
-    Local cPed    := ""
-    Local aPed    := {}
-    If cUsuario == Nil
-        cUsuario := ""
-    EndIf
-    If aBody == Nil
-        aBody := {}
-    EndIf
-    If Len(aBody) >= 1
-        cNF := AllTrim(cValToChar(aBody[1]))
-    EndIf
-    If Len(aBody) >= 2
-        cPed := AllTrim(cValToChar(aBody[2]))
-    EndIf
-    If cNF == "" .Or. cPed == ""
-        cStatus := "400"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"entrada_invalida: informe nf e pedido"})
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return {cStatus, cBody}
-    EndIf
-    aPed := TCSqlQuery("SELECT GCP3_NUM FROM GCP3 WHERE GCP3_NUM = " + GEBDBQuote(cPed) + " AND D_E_L_E_T_ = ' ' LIMIT 1")
-    If Len(aPed) == 0
-        cStatus := "404"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"pedido_nao_encontrado: " + cPed})
-        If Len(aArea) > 0
-            RestArea(aArea)
-        EndIf
-        Return {cStatus, cBody}
-    EndIf
-    If !GEBCMENT(cNF, cPed)
-        cStatus := "400"
-        cBody := GEBRESTJSONRESP(.F., Nil, {"entrada_recusada: " + cPed})
-    Else
-        cBody := GEBRESTJSONRESP(.T., {cNF, cPed}, {})
     EndIf
     If Len(aArea) > 0
         RestArea(aArea)

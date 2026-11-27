@@ -12,7 +12,6 @@
 #include "../src/GEBEXP_CTX.prw"
 #include "../src/GEBEXP_MIG.prw"
 #include "../src/GEBAUD.prw"
-#include "../src/GEBMON.prw"
 #include "../src/GENUC_MNT.prw"
 #include "../src/GENUC_CAD.prw"
 #include "../src/GEBFIS_MIG.prw"
@@ -36,8 +35,6 @@
 #include "../src/GEBCTB_BAL.prw"
 #include "../src/GEBCOM_MIG.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBFIL_MIG.prw"
 #include "../src/GEBREST.prw"
 #include "../src/GEBEXP_REL_BIZ.prw"
@@ -87,6 +84,8 @@ User Function T_GEBTUI_FLUXOS()
     Local cGuia := ""
     Local aRes  := {}
     Local aChk  := {}
+    Local oReq  := Nil
+    Local oItem := Nil
 
     If !GEBDBConecta()
         ConOut("T_GEBTUI_FLUXOS FAIL")
@@ -201,15 +200,24 @@ User Function T_GEBTUI_FLUXOS()
     aRes := GEBFLXRUN("CTBBAL", {|| GEBRESTCTBBAL(cUsu, cComp)})
     lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2" .And. At("3.01.001", aRes[2]) > 0 .And. At("4.01.001", aRes[2]) > 0, "CTB balancete da competencia traz as contas movimentadas (" + aRes[1] + " " + Left(aRes[2], 200) + ")")
 
-    // ===== COMPRAS: fornecedor -> pedido -> item -> entrada NF (sec. 14)
+    // ===== COMPRAS: fornecedor -> pedido (trilha GEBCPX via /bo/compras/*,
+    // com alcada GCQ2) -> entrada NF (sec. 14)
     aRes := GEBFLXRUN("COMFOR", {|| GEBRESTCOMFOR(cUsu, {"FORN-01", "Fornecedor 01"})})
     lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2", "COM fornecedor (" + aRes[1] + ")")
-    aRes := GEBFLXRUN("COMPED", {|| GEBRESTCOMPED(cUsu, {"PED-01", "FORN-01"})})
-    lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2", "COM pedido (" + aRes[1] + ")")
-    aRes := GEBFLXRUN("COMIT", {|| GEBRESTCOMIT(cUsu, {"PED-01", "BANANA-PRATA", 2, 10})})
-    lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2", "COM item 2 x 10 (" + aRes[1] + ")")
-    aRes := GEBFLXRUN("COMENT", {|| GEBRESTCOMENT(cUsu, {"NF-C01", "PED-01"})})
-    lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2", "COM entrada da NF (" + aRes[1] + ")")
+    oReq := JsonObject():New()
+    oReq["NUMERO"] := "PED-01"
+    oReq["FORNECEDOR"] := "FORN-01"
+    oItem := JsonObject():New()
+    oItem["PRODUTO"] := "BANANA-PRATA"
+    oItem["QUANTIDADE"] := 2
+    oItem["PRECO"] := 10
+    oReq["ITENS"] := {oItem}
+    aRes := GEBFLXRUN("COMPED", {|| GEBREST("POST", "/bo/compras/pedido", {oReq}, cUsu, "test")})
+    lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2", "COM pedido (" + aRes[1] + " " + Left(aRes[2], 160) + ")")
+    oReq["NOTA"] := "NF-C01"
+    oReq["PEDIDO"] := "PED-01"
+    aRes := GEBFLXRUN("COMENT", {|| GEBREST("POST", "/bo/compras/entrada", {oReq}, cUsu, "test")})
+    lOk := GEBFLXOK(lOk, Left(aRes[1], 1) == "2", "COM entrada da NF (" + aRes[1] + " " + Left(aRes[2], 160) + ")")
     aChk := TCSqlQuery("SELECT GFN3_VALOR AS V FROM GFN3 WHERE GFN3_DOC = 'NF-C01' AND D_E_L_E_T_ = ' '")
     lOk := GEBFLXOK(lOk, Len(aChk) == 1 .And. Val(aChk[1]:V) == 20, "COM entrada gera pagar de 20 (" + GEBFLXROW(aChk) + ")")
     aChk := TCSqlQuery("SELECT GV1_SALDO AS S FROM GV1 WHERE GV1_PROD = 'BANANA-PRATA' AND D_E_L_E_T_ = ' '")

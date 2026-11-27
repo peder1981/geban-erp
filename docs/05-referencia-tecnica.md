@@ -1,9 +1,9 @@
 # 05 — Referência Técnica Completa do ERP GEBAN
 
 > **Autor:** Peder Munksgaard · **Data:** 26/09/2026 · **Idioma:** PT-BR
-> **Fontes primárias:** `src/*.prw` (84 arquivos, 650 `User Function` — todas catalogadas na seção 8,
+> **Fontes primárias:** `src/*.prw` (81 arquivos, 633 `User Function` — todas catalogadas na seção 8,
 > gerada por `scripts/doc-funcoes.py`), `docs/02-regras-negocio.md`, planos e ledgers em `documentacao interna`.
-> **Estado verificado:** suíte completa **91/91 PASS** contra Postgres real (`geban_test`) sob o runtime
+> **Estado verificado:** suíte completa **89/89 PASS** contra Postgres real (`geban_test`) sob o runtime
 > **AdvPP advplc** — ver seção 9. Interface em componentes PO-UI (`src/GEBTUI.prw`), todas as operações
 > em formulários de tela única.
 > PDFs gerados com o template `jmpm` (`md2pdf.py --template jmpm --cover`).
@@ -58,7 +58,7 @@ Function` (externa) vs `Static Function` (interna); sem `IIF()`, sem `Function` 
 SonarQube: CA4000/CA1002/CA1000/CA1004 e segurança CA2050–CA2052. Toda API externa deve
 ser validada antes do uso; toda geração fecha com gap analysis.
 
-## 4. Inventário de tabelas (124 tabelas)
+## 4. Inventário de tabelas (123 tabelas)
 
 Gerado por `scripts/doc-tabelas.py` a partir das definições nos fontes (`CREATE TABLE`,
 `BOTAB`, `SNTab` e `ALTER TABLE ... ADD COLUMN`). Toda tabela tem ainda `R_E_C_N_O_`
@@ -189,7 +189,6 @@ ficam no schema `public`; as demais, no schema de cada empresa.
 | `SCH_JOB` | Nucleo | — | `SCH_FILIAL`, `SCH_ROTINA`, `SCH_HORA`, `SCH_DIA`, `SCH_ATIVO`, `SCH_ULTEXEC`, `SCH_STATUS`, `SCH_MSG` |
 | `SCH_LOG` | Nucleo | — | `SCH_LFILIAL`, `SCH_LROTINA`, `SCH_LDATA`, `SCH_LHORA`, `SCH_LSTATUS`, `SCH_LMSG` |
 | `SEC_ADMIN_SESSION` | Segurança | Monitor / sessões admin | `SEC_AST_TOKEN`, `SEC_AST_USUARIO`, `SEC_AST_EMPRESA`, `SEC_AST_FILIAL`, `SEC_AST_IP`, `SEC_AST_LOGINEM`, `SEC_AST_ULTIMAACAO`, `SEC_AST_ROTINA`, `SEC_AST_MEMORIA` |
-| `SEC_MON` | Segurança | Monitor / sessões admin |  |
 | `SEC_PERM` | Segurança | RBAC (`PERFIL`, `MENU`, `ITEM`, `PERMITE`) | `SEC_PERM_FILIAL`, `SEC_PERM_PERFIL`, `SEC_PERM_MENU`, `SEC_PERM_ITEM`, `SEC_PERM_EMPRESA`, `SEC_PERM_PERMITE` |
 
 ## 5. Infra de dados e segurança (funções-base)
@@ -278,9 +277,6 @@ gravação real, token/chave com aspas = 400 sem SQL. Rotas (método + path → 
 | POST | `/api/financeiro/contas` | `U_GEBWAPI_FINCON` |
 | POST | `/api/financeiro/baixar` | `U_GEBWAPI_FINBAI` |
 | POST | `/api/compras/fornecedores` | `U_GEBWAPI_COMFOR` |
-| POST | `/api/compras/pedidos` | `U_GEBWAPI_COMPED` |
-| POST | `/api/compras/itens` | `U_GEBWAPI_COMIT` |
-| POST | `/api/compras/entradas` | `U_GEBWAPI_COMENT` |
 | POST | `/api/fiscal/apurar` | `U_GEBWAPI_FISAPU` |
 | POST | `/api/fiscal/creditos` | `U_GEBWAPI_FISCRE` |
 | POST | `/api/fiscal/simples/config` | `U_GEBWAPI_SNCFG` |
@@ -339,6 +335,8 @@ gravação real, token/chave com aspas = 400 sem SQL. Rotas (método + path → 
 | GET | `/pdv/ws` | `U_GEBPDVWS` |
 
 `POST /api/bo/{modulo}/{acao}` (`U_GEBWAPI_BOPOST`) é o dispatcher do backoffice (telas `GEBBO*`): ~117 ações em um único path. `GET /pdv` serve `public/pdv.html` (`U_GEBPDVHTML`) e `GET /pdv/ws` o websocket do PDV (`U_GEBPDVWS`).
+
+Os wrappers `U_GEBWAPI_PDV*` de `/api/pdv/*` não executam a regra de negócio direto: cada um delega a `GEBREST()` com path `/pdv/...`, que casa o prefixo `/pdv/` de `GEBRESTROTAS()` e cai no dispatcher `GEBRESTPDV()` — ou seja, **todas as rotas do PDV passam por autenticação, RBAC e rate limit do GEBREST** (bucket por usuário, `web:<usuario>`). Escrita de compras não existe mais em `/api/compras/*` (pedido/entrada vão por `/api/bo/compras/*` → trilha `GEBCPX` com alçada GCQ2).
 ## 7. TUI serve — mapa de menus (`GEBTUI`, porta 8081)
 
 Login: usuário/senha → empresa (menu) → filial (menu); super entra direto na matriz
@@ -379,7 +377,7 @@ chama a mesma função de negócio da API REST, com a permissão conferida antes
   (`GEBTUITROCASENHA`: política e confirmação; outro usuário só via `GEBSECPODE`;
   ninguém muda o próprio perfil; derruba as sessões do alvo).
 
-## 8. Referência completa de funções por arquivo (650 funções)
+## 8. Referência completa de funções por arquivo (633 funções)
 
 Gerada por `scripts/doc-funcoes.py` a partir dos fontes: assinatura exata da
 declaração e propósito da primeira linha do `Protheus.doc` (ou do comentário
@@ -387,15 +385,12 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 
 ### GEB_NUCLEO
 
-**`src/GEBAUD.prw`** — 5 funções
+**`src/GEBAUD.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GBAUDINIC` | `GBAUDINIC()` | — |
 | `GBAUDLOG` | `GBAUDLOG(cTabela, cAcao, cRegistro, cUsuario, cEmpresa, cFilial)` | — |
-| `GBAUDLISTAR` | `GBAUDLISTAR(cEmpresa, cInicio, cFim, nMax)` | — |
-| `GBAUDRESUMO` | `GBAUDRESUMO(cEmpresa)` | — |
-| `GBAUDExport` | `GBAUDExport(cEmpresa, cFormato)` | — |
 
 **`src/GEBDB_CORE.prw`** — 6 funções
 
@@ -427,17 +422,6 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEFFILMIG` | `GEFFILMIG()` | — |
 | `GEFFILVALIDA` | `GEFFILVALIDA(cEmp, cFil)` | Valida codigo de filial EEUUFF contra a empresa (puro, sem I/O). |
 | `GEFFILUNI` | `GEFFILUNI(cFil)` | Extrai a unidade de negocios (UU, posicoes 3-4) do codigo EEUUFF. |
-
-**`src/GEBMON.prw`** — 6 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBMONINIC` | `GEBMONINIC()` | Inicializa a tabela SEC_MON (monitoramento) se nao existir. |
-| `GEBMONATUALIZA` | `GEBMONATUALIZA(cToken, cRotina)` | Atualiza ultima acao e rotina do token na SEC_MON. |
-| `GEBMONLISTAR` | `GEBMONLISTAR()` | Lista todos os usuarios monitorados. |
-| `GEBMONDESLIGAR` | `GEBMONDESLIGAR(cToken)` | Remove da SEC_MON e encerra sessao via GEBSECTOKENDEL. |
-| `GEBMONMETRICAS` | `GEBMONMETRICAS()` | Calcula metricas em tempo real. |
-| `GEBMONROTINA` | `GEBMONROTINA(cToken)` | Retorna o nome da rotina em execucao para o token informado. |
 
 **`src/GEBSCH.prw`** — 10 funções
 
@@ -833,12 +817,6 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 
 ### GEB_COM
 
-**`src/GEBCOM_ENT.prw`** — 1 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBCMENT` | `GEBCMENT(cNF, cPed)` | — |
-
 **`src/GEBCOM_FOR.prw`** — 3 funções
 
 | Função | Assinatura | Propósito |
@@ -852,13 +830,6 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GEBCMMIG` | `GEBCMMIG()` | — |
-
-**`src/GEBCOM_PED.prw`** — 2 funções
-
-| Função | Assinatura | Propósito |
-|---|---|---|
-| `GEBCMPED` | `GEBCMPED(cPed, cForn)` | — |
-| `GEBCMIT` | `GEBCMIT(cPed, cProd, nQtd, nPreco)` | — |
 
 ### GEB_BACKOFFICE
 
@@ -1075,7 +1046,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBLOJGER` | `GEBLOJGER(cIni, cFim, cAgrupa)` | Relatorio gerencial da loja no periodo, agrupado por DIA (padrao), CAIXA, OPERADOR ou VENDEDOR. |
 | `GEBLOJCOMIS` | `GEBLOJCOMIS(cIni, cFim)` | Relatorio: comissao por vendedor no periodo. |
 
-**`src/GEBPDV_API.prw`** — 38 funções
+**`src/GEBPDV_API.prw`** — 39 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
@@ -1089,9 +1060,9 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBPDVPRODUTBUSC` | `GEBPDVPRODUTBUSC(cUsuario, cCodigo)` | Busca produto por codigo ou codigo de barras via API REST. |
 | `GEBPDVRELGER` | `GEBPDVRELGER(cUsuario, aBody)` | Relatorio gerencial da loja via API REST. |
 | `GEBPDVRELCOM` | `GEBPDVRELCOM(cUsuario, aBody)` | Relatorio de comissao por vendedor via API REST. |
-| `GEBPDVPERIFLIST` | `GEBPDVPERIFLIST(cUsuario, cTipo)` | Lista perifÃ©ricos configurados via API REST. |
-| `GEBPDVPERIFREG` | `GEBPDVPERIFREG(cUsuario, aBody)` | Registra perifÃ©rico via API REST. |
-| `GEBPDVPERIFDEL` | `GEBPDVPERIFDEL(cUsuario, nId)` | Remove perifÃ©rico via API REST. |
+| `GEBPDVPERIFLIST` | `GEBPDVPERIFLIST(cUsuario, cTipo)` | Lista periféricos configurados via API REST. |
+| `GEBPDVPERIFREG` | `GEBPDVPERIFREG(cUsuario, aBody)` | Registra periférico via API REST. |
+| `GEBPDVPERIFDEL` | `GEBPDVPERIFDEL(cUsuario, nId)` | Remove periférico via API REST. |
 | `GEBPDVSANGRIA` | `GEBPDVSANGRIA(cUsuario, aBody)` | Sangria ou suprimento de caixa via API REST. |
 | `GEBPDVRELGERCSV` | `GEBPDVRELGERCSV(cUsuario, aBody)` | Relatorio gerencial exportado como CSV. |
 | `GEBPDVRELCOMCSV` | `GEBPDVRELCOMCSV(cUsuario, aBody)` | Relatorio de comissao exportado como CSV. |
@@ -1117,13 +1088,14 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBPDVTEFCFG` | `GEBPDVTEFCFG(cUsuario, aBody)` | Configura o provedor TEF (POST /api/pdv/tef/config). |
 | `GEBPDVTEFRES` | `GEBPDVTEFRES(cUsuario)` | Desfaz transacao TEF pendente (POST /api/pdv/tef/desfazer). |
 | `GEBPDVNFETRANSMITE` | `GEBPDVNFETRANSMITE(cUsuario)` | Transmite as NFC-e emitidas em contingencia (POST /api/pdv/nfce/transmitir). |
+| `GEBRESTPDV` | `GEBRESTPDV(cMetodo, cResto, aParams, cUsuario)` | Dispatcher unico das rotas /pdv/*: o wrapper HTTP (GEBWAPI_PDV*) autentica via GEBPDV_AUTH e delega ao GEBREST (rate limit + RBAC); aqui o metodo+caminho casa com a tabela... |
 
 **`src/GEBPDV_HTML.prw`** — 2 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
-| `GEBPDVHTML` | `GEBPDVHTML(oReq)` | Serve a interface PDV (pÃ¡gina HTML autocontida). |
-| `GEBPDVWS` | `GEBPDVWS(oReq)` | Health check do serviÃ§o WebSocket de perifÃ©ricos. |
+| `GEBPDVHTML` | `GEBPDVHTML(oReq)` | Serve a interface PDV (página HTML autocontida). |
+| `GEBPDVWS` | `GEBPDVWS(oReq)` | Health check do serviço WebSocket de periféricos. |
 
 **`src/GEBPERIF_MIG.prw`** — 1 funções
 
@@ -1272,7 +1244,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 
 ### GEB_REST_WEB
 
-**`src/GEBREST.prw`** — 55 funções
+**`src/GEBREST.prw`** — 52 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
@@ -1321,9 +1293,6 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBRESTFINCON` | `GEBRESTFINCON(cUsuario, aBody)` | Endpoint POST /financeiro/contas. |
 | `GEBRESTFINBAI` | `GEBRESTFINBAI(cUsuario, aBody)` | Endpoint POST /financeiro/baixar. |
 | `GEBRESTCOMFOR` | `GEBRESTCOMFOR(cUsuario, aBody)` | Endpoint POST /compras/fornecedores. |
-| `GEBRESTCOMPED` | `GEBRESTCOMPED(cUsuario, aBody)` | Endpoint POST /compras/pedidos. |
-| `GEBRESTCOMIT` | `GEBRESTCOMIT(cUsuario, aBody)` | Endpoint POST /compras/itens. |
-| `GEBRESTCOMENT` | `GEBRESTCOMENT(cUsuario, aBody)` | Endpoint POST /compras/entradas. |
 | `GEBRESTFISAPU` | `GEBRESTFISAPU(cUsuario, aBody)` | Endpoint POST /fiscal/apurar. |
 | `GEBRESTSNCFG` | `GEBRESTSNCFG(cUsuario, aBody)` | Endpoints POST /fiscal/simples/config {anexo, inicio AAAAMM}, /fiscal/simples/folha {competencia, folha, receita_externa, atividade}, /fiscal/simples/apurar {competencia},... |
 | `GEBRESTSNFOL` | `GEBRESTSNFOL(cUsuario, aBody)` | — |
@@ -1377,7 +1346,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBWAPI_PDVTEFRES` | `GEBWAPI_PDVTEFRES(oReq)` | — |
 | `GEBWAPI_PDVNFETR` | `GEBWAPI_PDVNFETR(oReq)` | — |
 
-**`src/GEBWEB_API.prw`** — 64 funções
+**`src/GEBWEB_API.prw`** — 61 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
@@ -1424,9 +1393,6 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBWAPI_FINCON` | `GEBWAPI_FINCON(oReq)` | POST /api/financeiro/contas -- cria conta (auth). |
 | `GEBWAPI_FINBAI` | `GEBWAPI_FINBAI(oReq)` | POST /api/financeiro/baixar -- baixa titulo (auth). |
 | `GEBWAPI_COMFOR` | `GEBWAPI_COMFOR(oReq)` | POST /api/compras/fornecedores -- cadastra (auth). |
-| `GEBWAPI_COMPED` | `GEBWAPI_COMPED(oReq)` | POST /api/compras/pedidos -- abre pedido (auth). |
-| `GEBWAPI_COMIT` | `GEBWAPI_COMIT(oReq)` | POST /api/compras/itens -- adiciona item (auth). |
-| `GEBWAPI_COMENT` | `GEBWAPI_COMENT(oReq)` | POST /api/compras/entradas -- da entrada (auth). |
 | `GEBWAPI_FISAPU` | `GEBWAPI_FISAPU(oReq)` | POST /api/fiscal/apurar -- apura competencia (auth). |
 | `GEBWAPI_SNCFG` | `GEBWAPI_SNCFG(oReq)` | POST /api/fiscal/simples/config (anexo, inicio), /folha (competencia, folha, receita_externa) e /apurar (competencia) -- Simples Nacional (auth). |
 | `GEBWAPI_SNFOL` | `GEBWAPI_SNFOL(oReq)` | — |
@@ -1480,7 +1446,7 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 |---|---|---|
 | `TEST_INIT` | `TEST_INIT()` | — |
 
-## 9. Testes (91 suítes `tests/T_*.prw`)
+## 9. Testes (89 suítes `tests/T_*.prw`)
 
 Runner local: **`tests/run-all.sh`** — roda cada `tests/T_*.prw` via `advplc run` contra o
 Postgres de teste (`GEBAN_PG_*` apontando para `geban_test`, nunca produção), imprime
@@ -1492,7 +1458,7 @@ Postgres de teste (`GEBAN_PG_*` apontando para `geban_test`, nunca produção), 
 
 Cada suíte cria schemas descartáveis (`test_*`, `emp_*` de teste) e os remove ao final;
 o catálogo de identidade (`GE1`, `GE2*`, `GE2_TOK`) é global em `public` — fixtures gravam
-lá com prefixo `T_`/`REST-` e limpam depois. Rodada de referência: **91/91 PASS**
+lá com prefixo `T_`/`REST-` e limpam depois. Rodada de referência: **89/89 PASS**
 (`geban_test`, advplc local).
 
 ## 10. Deploy e operação

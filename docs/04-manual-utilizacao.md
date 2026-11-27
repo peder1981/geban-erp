@@ -440,35 +440,36 @@ Funções: `GEBCMCOT(fornecedor, produto, preço)` grava; `GEBCMMEL(produto)` mo
 3. Para comparar: **Compras → Operações → Menor preço cotado** → informe o produto. Ex.: `GEBCMMEL("BAN01")` devolve `4.20`.
 4. Preço zerado, fornecedor/produto vazio negam. Sem cotação, o menor volta 0.
 
-### 14.3 Fazer o pedido
+### 14.3 Fazer o pedido (com itens de uma vez)
 
-Funções: `GEBCMPED(pedido, fornecedor)` abre; `GEBCMIT(pedido, produto, quantidade, preço)` põe item.
+Função: `GEBCPXPED(pedido, fornecedor, itens, condição, local, data)`. Itens = lista `{produto, quantidade, preço}`.
 
-1. **Compras → Operações → Abrir pedido** → número (ex.: `PED-001`) + fornecedor → Confirmar. (Ou **Pedido de compra com itens**, que abre o pedido já com a grade de itens.) Retorno: `ABERTO` (ok) ou `BLOQUEADO` (Mentor travou ou dado vazio — veja capítulo 15).
-2. **Compras → Operações → Adicionar item** → pedido + produto + quantidade + preço. Ex.: `GEBCMIT("PED-001", "BAN01", 10, 4.50)`.
-3. Regras do item: pedido precisa existir; quantidade e preço maiores que zero; senão retorna `.F.`.
-4. Pedido repetido não duplica: devolve `ABERTO` de novo.
+1. **Compras → Operações → Pedido de compra com itens** (ou **Pedido direto**) → preencha fornecedor, condição de pagamento, local e a grade de itens → Confirmar.
+   - Pedido em branco ganha número automático (`PC` + sequencial).
+   - Retorno: `{.T., "pedido <num> LIBERADO|PENDENTE", {...}}`.
+2. **Alçada**: se o total passar do limite `COM_ALCADA` (parâmetro do técnico), o pedido nasce `PENDENTE` — ele existe, mas **não pode receber entrada** até alguém aprovar:
+   - **Compras → Operações → Aprovar/rejeitar pedido** → número do pedido + usuário + decisão. Liberado vira `LIBERADO`; rejeitado vira `REJEITADO`.
+3. Regras: fornecedor precisa existir (cadastre antes, 14.1); quantidade e preço maiores que zero; produto repetido no mesmo pedido recusa; pedido repetido recusa.
+4. **Pelo cotado**: **Solicitação de compra** (`GEBCPXSC`) lista o que a loja precisa; **Gerar pedidos da solicitação** (`GEBCPXGERA`) cria um pedido por fornecedor usando automaticamente o menor preço cotado (14.2). Item sem cotação recusa tudo.
 
 ### 14.4 Receber a NF / dar entrada
 
-Função: `GEBCMENT(nota, pedido)`. Ex.: `GEBCMENT("NF-001", "PED-001")`.
+Função: `GEBCPXENT(nota, pedido, itens, frete, data, retenções, chaveNF)`. Ex.: `GEBCPXENT("NF-001", "PED-001", {}, 0, "20261127", {}, "")` — itens vazio = recebe tudo que está pendente.
 
-1. **Compras → Operações → Dar entrada** (ou **Documento de entrada**, com itens) → nota do fornecedor (ex.: `NF-001`) + pedido → Confirmar.
+1. **Compras → Operações → Documento de entrada** → nota do fornecedor + pedido + itens (ou tudo pendente) + frete → Confirmar.
 2. O sistema faz sozinho, nesta ordem:
-   a. Confere pedido: precisa existir e estar `ABERTO` (se já está `RECEBIDO`, nega).
+   a. Confere o pedido: precisa existir e estar `LIBERADO` (se está `PENDENTE`, aprove antes no 14.3; se já `RECEBIDO`, nega).
    b. Confere a nota: não pode repetir (NF duplicada nega).
-   c. Soma os itens (`quantidade x preço` de cada linha). Pedido sem item nega.
-   d. Lança o total a pagar com a mesma nota: `GEBFNPAG(nota, fornecedor, total, "20261231")`. Se o financeiro recusar (ex.: Mentor travou), a entrada inteira nega e nada mexe.
-   e. Dá entrada de cada item no estoque (`GEBVEST(produto, quantidade)`).
-   f. Registra no contas (`CTBLAN`), marca o pedido como `RECEBIDO` e grava a entrada (GCP5) como `RECEBIDA`.
-3. Retorno: `.T.` (entrou) ou `.F.` (qualquer trava acima — confira qual mensagem apareceu).
-
-> O vencimento do pagar criado pela entrada é fixo `20261231`. Depois ajuste o vencimento de verdade no Financeiro com o técnico, se precisar.
+   c. Dá entrada de cada item no estoque **ao custo de entrada** (preço + frete rateado) — o custo médio do produto se acerta sozinho.
+   d. Lança o total a pagar pela **condição do pedido** (à vista se não tiver), já descontando as **retenções** informadas (ISS/IRRF/etc. — o retido vira guia na Derrama).
+   e. Registra no contas (`COMPRA_ESTOQUE`), credita IBS/CBS da compra e marca o pedido `PARCIAL` ou `RECEBIDO`.
+3. Retorno: `{.T., msg, {total, status do pedido, títulos, retido}}` ou `.F.` com o motivo.
+4. **Devolução ao fornecedor**: **Compras → Operações → Devolução de compra** (`GEBCPXDEV`) estorna itens de uma NF recebida.
 
 **Comandos do técnico (cola rápida de compras):**
 
 ```bash
-advplc check src/GEBCOM_MIG.prw src/GEBCOM_FOR.prw src/GEBCOM_PED.prw src/GEBCOM_ENT.prw --include src
+advplc check src/GEBCOM_MIG.prw src/GEBCOM_FOR.prw src/GEBCPX.prw --include src
 advplc serve src/GEBTUI.prw --port 8081
 ```
 
@@ -491,7 +492,7 @@ O Mentor tem 3 humores (gravados em GE4):
 | Estoque baixo | `ESTOQUE_MINIMO` | Só avisa, não trava |
 | Lançar direto | `LANC_DIRETO` | Direto negado (`.F.`) |
 | Lançar/baixar conta a pagar | `PAG_IMPULSIVO` | `GEBFNPAG`/`GEBFNBAI` devolvem `.F.` sem gravar |
-| Abrir pedido de compra | `COMPRA_IMPULSIVA` | `GEBCMPED` devolve `BLOQUEADO` sem gravar |
+| Liberar etapas de compra | `COMPRA_IMPULSIVA` | pedido/entrada via TUI ou `/bo/compras/*` ficam bloqueados até o Mentor liberar |
 
 **O que fazer:** leia o aviso. Se for `TRAVA` e você acha que está errado, chame o responsável (ADMIN) ou o técnico para mudar o modo em GE4. Não tente "dar um jeitinho": o BO fica gravado.
 
@@ -514,20 +515,20 @@ Igual ao sem internet: use `SO_FILA` ou deixe no `ONLINE_FILA` (ele tenta e, fal
 
 ### 15.5 Mentor barrou minha compra ou meu pagamento — passo a passo
 
-Vale para `GEBCMPED` → `BLOQUEADO` (evento `COMPRA_IMPULSIVA`) e `GEBFNPAG` / `GEBFNBAI` de pagar → `.F.` (evento `PAG_IMPULSIVO`).
+Vale para as operações de compra guiadas (`COMPRA_IMPULSIVA`) e `GEBFNPAG` / `GEBFNBAI` de pagar → `.F.` (evento `PAG_IMPULSIVO`).
 
 1. **Anote o que você tentou:** número do pedido ou documento do pagar + valor + fornecedor.
 2. **Confira o básico primeiro** (antes de culpar o Mentor):
    - Pedido: número e fornecedor preenchidos? O pedido já existe como `ABERTO`?
    - Pagar: documento vazio? Valor zerado? Documento repetido?
-   - Se for item (`GEBCMIT` → `.F.`): o pedido existe? Quantidade e preço maiores que zero?
+   - Se for pedido/entrada de compra: o pedido existe? Está `LIBERADO` (não `PENDENTE`)? Itens com quantidade e preço maiores que zero?
 3. **Se os dados estão certos, é o Mentor:** peça ao ADMIN para olhar o modo em GE4 para `COMPRA_IMPULSIVA` (compra) ou `PAG_IMPULSIVO` (pagamento).
 4. **Decida com o ADMIN:** ou corrige a causa (ex.: compra por impulso mesmo — cancele o pedido) ou o ADMIN muda para `AVISA_E_LIBERA_COM_BO` (libera registrando o BO em GE3) e você repete a operação.
-5. **Entrada travada junto:** se a entrada (`GEBCMENT`) negou com "pag recusou", é o `PAG_IMPULSIVO` travando o pagar automático da NF. Libere o pagamento primeiro, depois repita a entrada com a mesma nota e pedido. Não crie outra nota: a original não foi gravada, pode repetir igual.
+5. **Entrada travada junto:** se a entrada (`GEBCPXENT`) negou por pagamento, é o `PAG_IMPULSIVO` travando o título da NF. Libere o pagamento primeiro, depois repita a entrada com a mesma nota e pedido. Não crie outra nota: a original não foi gravada, pode repetir igual.
 
 ### 15.6 "Sem estoque" na entrada — entenda de uma vez
 
-- **Na entrada de compra não existe "sem estoque".** A entrada sempre **soma** no estoque (`GEBVEST(produto, quantidade)`). Produto novo cria a linha sozinho. Então `GEBCMENT` nunca nega por falta de estoque.
+- **Na entrada de compra não existe "sem estoque".** A entrada sempre **soma** no estoque ao custo de entrada (`GEBVEST`). Produto novo cria a linha sozinho. Então `GEBCPXENT` nunca nega por falta de estoque.
 - **Se a entrada negou, a causa é outra:** pedido inexistente ou já `RECEBIDO`, NF duplicada, pedido sem itens, ou o pagar automático recusado (capítulo 15.5). Leia a mensagem e volte ao capítulo 14.4.
 - **O `SEM_ESTOQUE` é da venda** (`GEBVVEN`): significa que não tem saldo para vender. Aí sim você repõe comprando (capítulo 14) ou ajusta com `GEBVEST` de entrada.
 
@@ -577,7 +578,7 @@ Se aconteceu mesmo (ex.: lançou `PAG-001` e `PAG-002` para a mesma conta real):
 
 **Como funciona o caixa (receber/pagar)?** Conta `CAIXA` (GFN1) + receber (GFN2) + pagar (GFN3) + baixa (GFN4). Lança com `GEBFNREC`/`GEBFNPAG`, baixa com `GEBFNBAI`, confere com `GEBNFLX`. Detalhes no capítulo 13.
 
-**Como compro mercadoria?** Fornecedor (`GEBCMFOR`) → cotação (`GEBCMCOT`) → menor preço (`GEBCMMEL`) → pedido (`GEBCMPED` + `GEBCMIT`) → entrada da NF (`GEBCMENT`), que já cria o pagar e soma o estoque. Detalhes no capítulo 14.
+**Como compro mercadoria?** Fornecedor (`GEBCMFOR`) → cotação (`GEBCMCOT`) → menor preço (`GEBCMMEL`) → pedido com itens (`GEBCPXPED`, vira `PENDENTE` se passar da alçada → `GEBCPXAPR` libera) → entrada da NF (`GEBCPXENT`), que já cria o pagar e soma o estoque. Detalhes no capítulo 14.
 
 **Meu pedido deu BLOQUEADO. E agora?** Ou faltou número/fornecedor, ou o Mentor `COMPRA_IMPULSIVA` travou. Veja o passo a passo no capítulo 15.5.
 
@@ -605,7 +606,7 @@ Faça nesta ordem, todo mês:
 
 **Compras**
 - [ ] 3. Todos os pedidos chegaram? (Pedidos ainda `ABERTO` em GCP3: cobrar fornecedor ou cancelar com o contador.)
-- [ ] 4. Todas as NFs de entrada foram recebidas? (`GEBCMENT` de cada pedido; NF sem entrada = estoque e pagar faltando.)
+- [ ] 4. Todas as NFs de entrada foram recebidas? (`GEBCPXENT` de cada pedido; NF sem entrada = estoque e pagar faltando.)
 - [ ] 5. Cotações do mês estão gravadas? (Serve de prova do menor preço depois.)
 
 **Caixa (financeiro)**
@@ -780,7 +781,7 @@ Faça esta verificação **por empresa** (repete para cada uma das suas empresas
 
 **Compras**
 - [ ] 3. Todos os pedidos chegaram? (Pedidos ainda `ABERTO` em GCP3: cobrar fornecedor ou cancelar com o contador.)
-- [ ] 4. Todas as NFs de entrada foram recebidas? (`GEBCMENT` de cada pedido; NF sem entrada = estoque e pagar faltando.)
+- [ ] 4. Todas as NFs de entrada foram recebidas? (`GEBCPXENT` de cada pedido; NF sem entrada = estoque e pagar faltando.)
 - [ ] 5. Cotações do mês estão gravadas? (Serve de prova do menor preço depois.)
 
 **Caixa (financeiro)**

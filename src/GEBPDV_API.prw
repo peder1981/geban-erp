@@ -1066,3 +1066,128 @@ Return {"__RAW_HTTP__", "application/json; charset=utf-8", '{"ok":' + GEBRESTJSO
 // Aceita data ISO (AAAA-MM-DD, padrao <input type=date>) ou AAAAMMDD.
 Static Function PDVDATA(cData)
 Return StrTran(BOCOL(cData), "-", "")
+
+/*/{Protheus.doc} GEBRESTPDV
+    Dispatcher unico das rotas /pdv/*: o wrapper HTTP (GEBWAPI_PDV*)
+    autentica via GEBPDV_AUTH e delega ao GEBREST (rate limit + RBAC);
+    aqui o metodo+caminho casa com a tabela GEBPDVTAB e o handler
+    GEBPDV* correspondente executa. aParams traz oReq (corpo) ou os
+    campos escalares ja' extraidos pelo wrapper.
+    @type Endpoint dispatcher
+    @author Peder Munksgaard
+    @since 27/11/2026
+    @param cMetodo, character, metodo HTTP
+    @param cResto, character, caminho apos "/pdv/" (ex.: "caixa/lista")
+    @param aParams, array, {oReq} ou campos escalares
+    @param cUsuario, character, usuario autenticado
+    @return array {cStatus, cBody}
+/*/
+User Function GEBRESTPDV(cMetodo, cResto, aParams, cUsuario)
+    Local aTab := {}
+    Local nI := 0
+    Local aRes := {}
+
+    If aParams == Nil
+        aParams := {}
+    EndIf
+    aTab := GEBPDVTAB()
+    For nI := 1 To Len(aTab)
+        If aTab[nI][1] == Upper(AllTrim(cMetodo)) .And. GEBPDVMatch(aTab[nI][2], Lower(AllTrim(cResto)))
+            aRes := Eval(aTab[nI][3], cUsuario, aParams)
+            Return GEBPDVADAPT(aRes)
+        EndIf
+    Next nI
+Return {"404", '{"ok":false,"msg":"rota_inexistente","erro":"rota_inexistente","dados":null}'}
+
+// {metodo, padrao de caminho ("{x}" = um segmento), bloco {|u,a| handler}}.
+// "a" e' o aParams recebido do GEBREST.
+Static Function GEBPDVTAB()
+Local aTab := {}
+
+    aTab := {
+        {"GET",    "caixa/lista",           {|u, a| GEBPDVCAIXALST(u)}},;
+        {"GET",    "caixa/sessoes",         {|u, a| GEBPDVCAIXASS(u)}},;
+        {"POST",   "caixa/abrir",           {|u, a| GEBPDVCAIXAABR(u, a[1])}},;
+        {"POST",   "caixa/fechar",          {|u, a| GEBPDVCAIXAFECH(u, a[1])}},;
+        {"GET",    "caixa/resumo/{x}",      {|u, a| GEBPDVCAIXARESUMO(u, a[1])}},;
+        {"POST",   "caixa/sangria",         {|u, a| GEBPDVSANGRIA(u, a[1])}},;
+        {"POST",   "cupom/novo",            {|u, a| GEBPDVCUPOMNOV(u, a[1])}},;
+        {"GET",    "cupom/{x}",             {|u, a| GEBPDVCUPOMGET(u, a[1])}},;
+        {"POST",   "cupom/{x}/cancelar",    {|u, a| GEBPDVCUPCANC(u, a[1])}},;
+        {"GET",    "produto/busca",         {|u, a| GEBPDVPRODUTBUSC(u, a[1])}},;
+        {"GET",    "relatorio/gerencial",      {|u, a| GEBPDVRELGER(u, a[1])}},;
+        {"GET",    "relatorio/gerencial/csv",  {|u, a| GEBPDVRELGERCSV(u, a[1])}},;
+        {"GET",    "relatorio/comissao",       {|u, a| GEBPDVRELCOM(u, a[1])}},;
+        {"GET",    "relatorio/comissao/csv",   {|u, a| GEBPDVRELCOMCSV(u, a[1])}},;
+        {"GET",    "perifericos",           {|u, a| GEBPDVPERIFLIST(u, a[1])}},;
+        {"POST",   "perifericos",           {|u, a| GEBPDVPERIFREG(u, a[1])}},;
+        {"DELETE", "perifericos/{x}",       {|u, a| GEBPDVPERIFDEL(u, a[1])}},;
+        {"GET",    "crypto/cotacao",        {|u, a| GEBPDVCRYCOT(u)}},;
+        {"GET",    "crypto/wallets",        {|u, a| GEBPDVCRYWALLST(u)}},;
+        {"GET",    "crypto/previa",         {|u, a| GEBPDVCRYPREV(u, a[1], a[2])}},;
+        {"POST",   "crypto/wallet",         {|u, a| GEBPDVCRYWAL(u, a[1])}},;
+        {"POST",   "orcamento",             {|u, a| GEBPDVORCNOV(u, a[1])}},;
+        {"GET",    "orcamentos",            {|u, a| GEBPDVORCLST(u, a[1])}},;
+        {"POST",   "orcamento/finalizar",   {|u, a| GEBPDVORCFIN(u, a[1])}},;
+        {"POST",   "orcamento/cancelar",    {|u, a| GEBPDVORCCAN(u, a[1])}},;
+        {"POST",   "devolucao",             {|u, a| GEBPDVDEVOLUC(u, a[1])}},;
+        {"GET",    "consulta",              {|u, a| GEBPDVCONSULTA(u, a[1])}},;
+        {"GET",    "vale/{x}",              {|u, a| GEBPDVVALESALDO(u, a[1])}},;
+        {"GET",    "fiado/saldo",           {|u, a| GEBPDVFIASALDO(u, a[1])}},;
+        {"POST",   "cadastro/caixa",        {|u, a| GEBPDVCADCAIXA(u, a[1])}},;
+        {"POST",   "cadastro/barras",       {|u, a| GEBPDVCADBAR(u, a[1])}},;
+        {"POST",   "cadastro/promocao",     {|u, a| GEBPDVCADPROMO(u, a[1])}},;
+        {"POST",   "cadastro/vendedor",     {|u, a| GEBPDVCADVEND(u, a[1])}},;
+        {"GET",    "relatorio/vendas",      {|u, a| GEBPDVRELVENDAS(u, a[1], a[2])}},;
+        {"GET",    "relatorio/tef",         {|u, a| GEBPDVRELTEF(u, a[1])}},;
+        {"POST",   "tef/config",            {|u, a| GEBPDVTEFCFG(u, a[1])}},;
+        {"POST",   "tef/desfazer",          {|u, a| GEBPDVTEFRES(u)}},;
+        {"POST",   "nfce/transmitir",       {|u, a| GEBPDVNFETRANSMITE(u)}}
+    }
+Return aTab
+
+// Casa cResto (minusculo) com o padrao: segmentos iguais, "{...}" = curinga.
+Static Function GEBPDVMatch(cPattern, cResto)
+    Local aP := PDVSplit(cPattern)
+    Local aR := PDVSplit(cResto)
+    Local nI := 0
+
+    If Len(aP) != Len(aR)
+        Return .F.
+    EndIf
+    For nI := 1 To Len(aP)
+        If Left(aP[nI], 1) == "{"
+            If aR[nI] == ""
+                Return .F.
+            EndIf
+        Else
+            If aP[nI] != aR[nI]
+                Return .F.
+            EndIf
+        EndIf
+    Next nI
+Return .T.
+
+Static Function PDVSplit(cTxt)
+    Local aOut := {}
+    Local cSeg := ""
+    Local nI := 0
+
+    For nI := 1 To Len(cTxt)
+        If SubStr(cTxt, nI, 1) == "/"
+            AAdd(aOut, cSeg)
+            cSeg := ""
+        Else
+            cSeg += SubStr(cTxt, nI, 1)
+        EndIf
+    Next nI
+    AAdd(aOut, cSeg)
+Return aOut
+
+// PDVRES devolve {"__RAW_HTTP__", mime, json, status}; o GEBREST espera
+// {cStatus, cBody}. Erros internos viram 500 no envelope PDV.
+Static Function GEBPDVADAPT(xRes)
+    If ValType(xRes) == "A" .And. Len(xRes) >= 4 .And. xRes[1] == "__RAW_HTTP__"
+        Return {cValToChar(xRes[4]), cValToChar(xRes[3])}
+    EndIf
+Return {"500", '{"ok":false,"msg":"erro_interno","erro":"erro_interno","dados":null}'}

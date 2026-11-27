@@ -16,8 +16,6 @@
 #include "../src/GEBUNI_MIG.prw"
 #include "../src/GEBDB_CORE.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBV_EST.prw"
 #include "../src/GEBFIN_CON.prw"
 #include "../src/GEBFIS_CAD.prw"
@@ -67,6 +65,7 @@ User Function T_GEBCOM_MASSA()
     Local lOk := .T.
     Local nI := 0
     Local aHit := {}
+    Local aR := {}
 
     If !GEBDBConecta()
         ConOut("T_GEBCOM_MASSA: FALHA GEBDBConecta")
@@ -97,6 +96,10 @@ User Function T_GEBCOM_MASSA()
     TCSqlExec("DELETE FROM GCP3 WHERE GCP3_NUM LIKE 'PED-M5-%'")
     TCSqlExec("DELETE FROM GCP4 WHERE GCP4_PED LIKE 'PED-M5-%'")
     TCSqlExec("DELETE FROM GCP5 WHERE GCP5_NF LIKE 'NF-M5-%'")
+    TCSqlExec("DELETE FROM GCQ2 WHERE GCQ2_PED LIKE 'PED-M5-%'")
+    TCSqlExec("DELETE FROM GCQ3 WHERE GCQ3_PED LIKE 'PED-M5-%'")
+    TCSqlExec("DELETE FROM GCQ4 WHERE GCQ4_NF LIKE 'NF-M5-%'")
+    TCSqlExec("DELETE FROM GCQ5 WHERE GCQ5_NF LIKE 'NF-M5-%'")
     TCSqlExec("DELETE FROM GFN3 WHERE GFN3_DOC LIKE 'NF-M5-%'")
 
     // Seed
@@ -105,18 +108,14 @@ User Function T_GEBCOM_MASSA()
         GEBCMCOT("FORN-M5", "P-M5-" + Str(nI,2,0), 50.00)
     Next nI
 
-    // 50 pedidos
+    // 50 pedidos com itens (trilha GEBCPX: GCP3/GCP4 + GCQ2 alcada).
     For nI := 1 To 50
-        If !GEBCMPED("PED-M5-" + Str(nI,3,0), "FORN-M5")
+        aR := GEBCPXPED("PED-M5-" + Str(nI,3,0), "FORN-M5", {{"P-M5-01", 10, 10.00}, {"P-M5-02", 10, 10.00}}, "0", "01", BOHOJE())
+        If !aR[1]
             lOk := .F.; Exit
         EndIf
-        If !GEBCMIT("PED-M5-" + Str(nI,3,0), "P-M5-01", 10, 10.00)
-            lOk := .F.; Exit
-        EndIf
-        If !GEBCMIT("PED-M5-" + Str(nI,3,0), "P-M5-02", 10, 10.00)
-            lOk := .F.; Exit
-        EndIf
-        If !GEBCMENT("NF-M5-" + Str(nI,3,0), "PED-M5-" + Str(nI,3,0))
+        aR := GEBCPXENT("NF-M5-" + Str(nI,3,0), "PED-M5-" + Str(nI,3,0), {}, 0, BOHOJE(), {})
+        If !aR[1]
             lOk := .F.; Exit
         EndIf
     Next nI
@@ -133,6 +132,10 @@ User Function T_GEBCOM_MASSA()
     TCSqlExec("DELETE FROM GCP3 WHERE GCP3_NUM LIKE 'PED-M5-%'")
     TCSqlExec("DELETE FROM GCP4 WHERE GCP4_PED LIKE 'PED-M5-%'")
     TCSqlExec("DELETE FROM GCP5 WHERE GCP5_NF LIKE 'NF-M5-%'")
+    TCSqlExec("DELETE FROM GCQ2 WHERE GCQ2_PED LIKE 'PED-M5-%'")
+    TCSqlExec("DELETE FROM GCQ3 WHERE GCQ3_PED LIKE 'PED-M5-%'")
+    TCSqlExec("DELETE FROM GCQ4 WHERE GCQ4_NF LIKE 'NF-M5-%'")
+    TCSqlExec("DELETE FROM GCQ5 WHERE GCQ5_NF LIKE 'NF-M5-%'")
     TCSqlExec("DELETE FROM GFN3 WHERE GFN3_DOC LIKE 'NF-M5-%'")
 
     TCSqlExec("SET search_path TO public")

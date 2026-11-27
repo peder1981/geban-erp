@@ -25,8 +25,6 @@
 #include "../src/GEBV_FIA.prw"
 #include "../src/GEBCOM_MIG.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBBOLIB.prw"
 #include "../src/GEBCTX.prw"
 #include "../src/GEBEST.prw"
@@ -195,9 +193,9 @@ User Function T_GEBINTEG()
     lOk := Chk(lOk, "balcao kardex", Len(TCSqlQuery("SELECT GES2_DOC FROM GES2 WHERE GES2_DOC = 'VV1' AND GES2_TIPO = 'S'")) == 1 .And. Perna("VENDA_CMV:VV1", "D", "4.01.001") > 0)
     lOk := Chk(lOk, "balcao recebido", Len(TCSqlQuery("SELECT GFN2_DOC FROM GFN2 WHERE GFN2_DOC = 'VV1' AND GFN2_STATUS = 'RECEBIDA'")) == 1)
     GEBCMFOR("F5", "Fornecedor 5")
-    GEBCMPED("PL1", "F5")
-    GEBCMIT("PL1", "P1", 2, 5)
-    lOk := Chk(lOk, "entrada antiga", GEBCMENT("NFL1", "PL1") .And. Len(TCSqlQuery("SELECT GCQ4_NF FROM GCQ4 WHERE GCQ4_NF = 'NFL1'")) == 1 .And. ;
+    aR := GEBCPXPED("PL1", "F5", {{"P1", 2, 5}}, "0", "", "20261231")
+    lOk := Chk(lOk, "pedido antigo", aR[1])
+    lOk := Chk(lOk, "entrada antiga", GEBCPXENT("NFL1", "PL1", {}, 0, "20261231")[1] .And. Len(TCSqlQuery("SELECT GCQ4_NF FROM GCQ4 WHERE GCQ4_NF = 'NFL1'")) == 1 .And. ;
         Soma("SELECT GFN3_VALOR AS V FROM GFN3 WHERE GFN3_DOC = 'NFL1' AND D_E_L_E_T_ = ' '") == 10 .And. ;
         Len(TCSqlQuery("SELECT GES2_DOC FROM GES2 WHERE GES2_DOC = 'NFL1' AND GES2_TIPO = 'E'")) == 1)
 

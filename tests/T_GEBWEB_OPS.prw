@@ -13,7 +13,6 @@
 #include "../src/GEBEXP_CTX.prw"
 #include "../src/GEBEXP_MIG.prw"
 #include "../src/GEBAUD.prw"
-#include "../src/GEBMON.prw"
 #include "../src/GEBEXP_REL_BIZ.prw"
 #include "../src/GEBEXP_REL_NUC.prw"
 #include "../src/GEBDER_MIG.prw"
@@ -37,8 +36,6 @@
 #include "../src/GEBFIN_BAI.prw"
 #include "../src/GEBFIN_CON.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBFIS_APU.prw"
 #include "../src/GEBSN.prw"
 #include "../src/GEBV_EST.prw"
@@ -203,41 +200,8 @@ User Function T_GEBWEB_OPS()
     Else
         ConOut("  OK fornecedor 201")
     EndIf
-    oMock["PEDIDO"] := "WPED01"
-    oMock["FORNECEDOR"] := "WFOR01"
-    aRet := GEBWAPI_COMPED(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 201)
-        lOk := .F.
-        ConOut("FAIL: COMPED")
-    Else
-        ConOut("  OK pedido 201")
-    EndIf
-    oMock["PEDIDO"] := ""
-    aRet := GEBWAPI_COMPED(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 400)
-        lOk := .F.
-        ConOut("FAIL: COMPED vazio nao deu 400")
-    EndIf
-    oMock["PEDIDO"] := "WPED01"
-    oMock["PRODUTO"] := "WOP01"
-    oMock["QUANTIDADE"] := "5"
-    oMock["PRECO"] := "20"
-    aRet := GEBWAPI_COMIT(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 201)
-        lOk := .F.
-        ConOut("FAIL: COMIT")
-    Else
-        ConOut("  OK item 201")
-    EndIf
-    oMock["NF"] := "WNF01"
-    oMock["PEDIDO"] := "WPED01"
-    aRet := GEBWAPI_COMENT(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 201)
-        lOk := .F.
-        ConOut("FAIL: COMENT")
-    Else
-        ConOut("  OK entrada 201")
-    EndIf
+    // Pedido/entrada de compra nao passam mais por /api/compras/* (trilha
+    // antiga sem alcada GCQ2): usam /api/bo/compras/pedido|entrada (GEBCPX).
 
     // Fiscal: produto, apuracao, credito.
     oMock["CODIGO"] := "WOP01"
@@ -247,6 +211,33 @@ User Function T_GEBWEB_OPS()
     If !(Len(aRet) >= 4 .And. aRet[4] == 201)
         lOk := .F.
         ConOut("FAIL: PRDLSC ops")
+    EndIf
+    // Backoffice compras: pedido com itens + entrada (alcada GCQ2).
+    oMock["MODULO"] := "compras"
+    oMock["ACAO"] := "pedido"
+    oMock["NUMERO"] := "WPED01"
+    oMock["FORNECEDOR"] := "WFOR01"
+    oMock["CONDICAO"] := "0"
+    oMock["ARMAZEM"] := "01"
+    oItem := JsonObject():New()
+    oItem["PRODUTO"] := "WOP01"
+    oItem["QUANTIDADE"] := 5
+    oItem["PRECO"] := 20
+    oMock["ITENS"] := {oItem}
+    aRet := GEBWAPI_BOPOST(oMock)
+    If !(Len(aRet) >= 4 .And. aRet[4] == 200)
+        lOk := .F.
+        ConOut("FAIL: BO compras/pedido")
+    EndIf
+    oMock["ACAO"] := "entrada"
+    oMock["NOTA"] := "WNF01"
+    oMock["PEDIDO"] := "WPED01"
+    aRet := GEBWAPI_BOPOST(oMock)
+    If !(Len(aRet) >= 4 .And. aRet[4] == 200)
+        lOk := .F.
+        ConOut("FAIL: BO compras/entrada")
+    Else
+        ConOut("  OK backoffice compras pedido/entrada 200")
     EndIf
     oMock["COMPETENCIA"] := "202609"
     aRet := GEBWAPI_FISAPU(oMock)

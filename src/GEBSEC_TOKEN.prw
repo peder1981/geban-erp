@@ -10,9 +10,8 @@
     Notas AdvPP: ConOut p/ log; TCSqlQuery/TCSqlExec so literais;
     GetArea/RestArea guardados; If Nil em vez de Default; sem SELECT *.
     Nota TOK_EXPIRES: coluna TEXT no formato "YYYYMMDD HH:MM:SS" (igual
-    TOK_CREATED), permite granularidade de minuto. GEBMONMETRICAS()
-    (GEBMON.prw) compara so contra DToS(Date()) -- portanto o corte de
-    "online" tem granularidade de dia mesmo com TOK_EXPIRES precisa; um
+    TOK_CREATED), permite granularidade de minuto. O monitor
+    (GEBRESTMONUSU) compara contra now() com esse formato; um
     token expirado mais cedo no mesmo dia ainda conta como online ate a
     virada do dia. Fora do escopo desta funcao corrigir.
     @type Funcao de gestao de sessao

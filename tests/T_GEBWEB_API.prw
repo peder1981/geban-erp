@@ -21,7 +21,6 @@
 #include "../src/GEBFIN_FLX.prw"
 #include "../src/GEBFIS_CAD.prw"
 #include "../src/GEBFIS_EMI.prw"
-#include "../src/GEBMON.prw"
 #include "../src/GEBAUD.prw"
 #include "../src/GENUC_MNT.prw"
 #include "../src/GEBREST.prw"
@@ -87,6 +86,7 @@ User Function T_GEBWEB_API()
     Local oNil   := Nil
     Local oMock  := Nil
     Local oBad   := Nil
+    Local oItem  := Nil
     Local oL     := Nil
     Local lTemFil := .F.
     Local nI     := 0
@@ -561,28 +561,30 @@ User Function T_GEBWEB_API()
         lOk := .F.
         ConOut("FAIL: VINCSC filial fantasma nao deu 400")
     EndIf
-    oMock["PEDIDO"] := "ZZPEDX"
+    // Compras: pedido/entrada de compra so' existem na trilha GEBCPX
+    // (/api/bo/compras/*); a trilha antiga /api/compras/{pedidos,itens,entradas}
+    // foi removida por pular a alcada GCQ2.
+    oMock["MODULO"] := "compras"
+    oMock["ACAO"] := "pedido"
+    oMock["NUMERO"] := "ZZPEDX"
     oMock["FORNECEDOR"] := "ZZINEXISTE"
-    aRet := GEBWAPI_COMPED(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 404)
+    oItem := JsonObject():New()
+    oItem["PRODUTO"] := "WAPI01"
+    oItem["QUANTIDADE"] := 1
+    oItem["PRECO"] := 10
+    oMock["ITENS"] := {oItem}
+    aRet := GEBWAPI_BOPOST(oMock)
+    If !(Len(aRet) >= 4 .And. aRet[4] == 400)
         lOk := .F.
-        ConOut("FAIL: COMPED sem fornecedor nao deu 404")
+        ConOut("FAIL: BO compras/pedido sem fornecedor nao deu 400")
     EndIf
+    oMock["ACAO"] := "entrada"
+    oMock["NOTA"] := "WNFX"
     oMock["PEDIDO"] := "ZZINEXISTE"
-    oMock["PRODUTO"] := "WAPI01"
-    oMock["QUANTIDADE"] := "1"
-    oMock["PRECO"] := "10"
-    aRet := GEBWAPI_COMIT(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 404)
+    aRet := GEBWAPI_BOPOST(oMock)
+    If !(Len(aRet) >= 4 .And. aRet[4] == 400)
         lOk := .F.
-        ConOut("FAIL: COMIT sem pedido nao deu 404")
-    EndIf
-    oMock["NF"] := "WNFX"
-    oMock["PEDIDO"] := "ZZINEXISTE"
-    aRet := GEBWAPI_COMENT(oMock)
-    If !(Len(aRet) >= 4 .And. aRet[4] == 404)
-        lOk := .F.
-        ConOut("FAIL: COMENT sem pedido nao deu 404")
+        ConOut("FAIL: BO compras/entrada sem pedido nao deu 400")
     EndIf
     oMock["CHAVE"] := "WAPIX"
     oMock["PRODUTO"] := "ZZINEXISTE"

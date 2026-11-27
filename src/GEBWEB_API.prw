@@ -207,7 +207,7 @@ Static Function GEBWAPIW_GET(cTok, cEmp, cMetodo, cPath, aParams)
     If aParams == Nil
         aParams := {}
     EndIf
-    aRes := GEBREST(cMetodo, cPath, aParams, cUsu, "web")
+    aRes := GEBREST(cMetodo, cPath, aParams, cUsu, "web:" + cUsu)
     aRet := GEBWAPIRESP(aRes)
     If Len(aArea) > 0
         RestArea(aArea)
@@ -243,7 +243,7 @@ Static Function GEBWAPIW_POST(cTok, cEmp, cPath, aBody)
     If aBody == Nil
         aBody := {}
     EndIf
-    aRes := GEBREST("POST", cPath, aBody, cUsu, "web")
+    aRes := GEBREST("POST", cPath, aBody, cUsu, "web:" + cUsu)
     aRet := GEBWAPIRESP(aRes)
     If Len(aArea) > 0
         RestArea(aArea)
@@ -279,7 +279,7 @@ Static Function GEBWAPIW_PUTDEL(cTok, cEmp, cMetodo, cPath, aBody)
     If aBody == Nil
         aBody := {}
     EndIf
-    aRes := GEBREST(cMetodo, cPath, aBody, cUsu, "web")
+    aRes := GEBREST(cMetodo, cPath, aBody, cUsu, "web:" + cUsu)
     aRet := GEBWAPIRESP(aRes)
     If Len(aArea) > 0
         RestArea(aArea)
@@ -892,39 +892,6 @@ User Function GEBWAPI_COMFOR(oReq)
     aBody := {GEBWAPIFIELD(oReq, "CODIGO"), GEBWAPIFIELD(oReq, "NOME")}
 Return GEBWAPIW_POST(GEBWAPIFIELD(oReq, "TOKEN"), GEBWAPIFIELD(oReq, "EMPRESA"), "/compras/fornecedores", aBody)
 
-/*/{Protheus.doc} GEBWAPI_COMPED
-    POST /api/compras/pedidos -- abre pedido (auth). Body: pedido, fornecedor.
-    @type Rota HTTP
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBWAPI_COMPED(oReq)
-    Local aBody := {}
-    aBody := {GEBWAPIFIELD(oReq, "PEDIDO"), GEBWAPIFIELD(oReq, "FORNECEDOR")}
-Return GEBWAPIW_POST(GEBWAPIFIELD(oReq, "TOKEN"), GEBWAPIFIELD(oReq, "EMPRESA"), "/compras/pedidos", aBody)
-
-/*/{Protheus.doc} GEBWAPI_COMIT
-    POST /api/compras/itens -- adiciona item (auth). Body: pedido, produto, quantidade, preco.
-    @type Rota HTTP
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBWAPI_COMIT(oReq)
-    Local aBody := {}
-    aBody := {GEBWAPIFIELD(oReq, "PEDIDO"), GEBWAPIFIELD(oReq, "PRODUTO"), GEBWAPIFIELD(oReq, "QUANTIDADE"), GEBWAPIFIELD(oReq, "PRECO")}
-Return GEBWAPIW_POST(GEBWAPIFIELD(oReq, "TOKEN"), GEBWAPIFIELD(oReq, "EMPRESA"), "/compras/itens", aBody)
-
-/*/{Protheus.doc} GEBWAPI_COMENT
-    POST /api/compras/entradas -- da entrada (auth). Body: nf, pedido.
-    @type Rota HTTP
-    @author Peder Munksgaard
-    @since 25/09/2026
-/*/
-User Function GEBWAPI_COMENT(oReq)
-    Local aBody := {}
-    aBody := {GEBWAPIFIELD(oReq, "NF"), GEBWAPIFIELD(oReq, "PEDIDO")}
-Return GEBWAPIW_POST(GEBWAPIFIELD(oReq, "TOKEN"), GEBWAPIFIELD(oReq, "EMPRESA"), "/compras/entradas", aBody)
-
 /*/{Protheus.doc} GEBWAPI_FISAPU
     POST /api/fiscal/apurar -- apura competencia (auth). Body: competencia.
     @type Rota HTTP
@@ -990,7 +957,7 @@ Static Function GEBWAPIBO(cMetodo, oReq)
     If !(aAuth[1])
         Return GEBWAPIDENY()
     EndIf
-Return GEBWAPIRESP(GEBREST(cMetodo, "/bo/" + Lower(BOCOL(oReq["MODULO"])) + "/" + Lower(BOCOL(oReq["ACAO"])), {oReq}, aAuth[2], "web"))
+Return GEBWAPIRESP(GEBREST(cMetodo, "/bo/" + Lower(BOCOL(oReq["MODULO"])) + "/" + Lower(BOCOL(oReq["ACAO"])), {oReq}, aAuth[2], "web:" + aAuth[2]))
 
 // GET /api/fiscal/simples/extrato/{comp} e /anual/{ano} -- relatorios do Simples (auth).
 User Function GEBWAPI_SNEXT(oReq)

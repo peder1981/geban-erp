@@ -101,8 +101,8 @@ A conexão (`GEBDBConecta()`, `src/GEBDB_TENANT.prw`) lê `GEBAN_PG_HOST`, `GEBA
                             │ GEB_FIN          │ │ GEB_COM          │
                             │ GEBFIN_MIG GFN1-4│ │ GEBCOM_MIG GCP1-5│
                             │ GEBFIN_CON GFN2/3│ │ GEBCOM_FOR GCP1/2│
-                            │ GEBFIN_BAI GFN2-4│ │ GEBCOM_PED GCP3/4│
-                            │ GEBFIN_FLX GFN2/3│ │ GEBCOM_ENT GCP3-5│
+                            │ GEBFIN_BAI GFN2-4│ │ GEBCPX GCP3/4+GCQ │
+                            │ GEBFIN_FLX GFN2/3│ │ GEBCPXENT GCP/GCQ │
                             └──────────────────┘ └──────────────────┘
                              │                    │
                              └────────┬───────────┘
@@ -137,11 +137,11 @@ A conexão (`GEBDBConecta()`, `src/GEBDB_TENANT.prw`) lê `GEBAN_PG_HOST`, `GEBA
     GEBDBAI → CTBLAN · GEBVVEN → GEBMNT + GV1/GV2 + GEBFEMI (se fiscal) ou CTBLAN
     GEBCDIR → GEBCFG + GEBUSR + GEBMNT + CTBGRV · CTBLAN/CTBGRV → GC2/GC3/GC4
     GEBFNPAG → GEBMNT("PAG_IMPULSIVO") · GEBFNBAI → GEBMNT("PAG_IMPULSIVO", só PAG) + GFN4/GFN1 + CTBLAN
-    GEBCMPED → GEBMNT("COMPRA_IMPULSIVA") · GEBCMENT → SomaItens(GCP4) + GEBFNPAG + GEBVEST + CTBLAN
+    GEBCPXPED/GEBCPXGERA → GCP3/GCP4 + GCQ2 (alçada COM_ALCADA) · GEBCPXAPR → GCQ2 · GEBCPXENT → GCQ5 + GEBVEST + GEBFXTIT + CTBLAN
 ```
 Ordem de dependência de migração: `GENMIG` (GE1–GE5) → `GEBFMIG` (GF1–GF6) →
 `GEBDMIG` (GD1–GD3) → `GEBVMIG` (GV1–GV3) → `GEBCMIG` (GC1–GC4 + seeds) →
-`GEBFNMIG` (GFN1–GFN4) → `GEBCMMIG` (GCP1–GCP5).
+`GEBFNMIG` (GFN1–GFN4) → `GEBCMMIG` (GCP1–GCP5) → `GEBCPXMIG` (GCQ1–GCQ7).
 
 ---
 
@@ -212,9 +212,9 @@ Todas as tabelas: `R_E_C_N_O_ INTEGER PRIMARY KEY AUTOINCREMENT` + `D_E_L_E_T_ T
 |------|--------|--------|-----|
 | GCP1 | `GCP1_COD`, `GCP1_NOME`, `GCP1_CNPJ` (vazio — `GEBCMFOR()` grava `""`) | `GCP1_FILIAL_COD` | Fornecedor. Idempotente por código (`GEBCMFOR()` retorna `.T.` sem duplicar) |
 | GCP2 | `GCP2_FORN`, `GCP2_PROD`, `GCP2_PRECO REAL` | `GCP2_FILIAL_PROD` | Cotação. Múltiplas linhas por produto; menor preço via `GEBCMMEL()` (`0` se vazio/ausente) |
-| GCP3 | `GCP3_NUM`, `GCP3_FORN`, `GCP3_STATUS` (`ABERTO`/`RECEBIDO`) | `GCP3_FILIAL_NUM` | Pedido header. Criação via `GEBCMPED()` após Mentor `COMPRA_IMPULSIVA`; idempotente (existente retorna `ABERTO`) |
-| GCP4 | `GCP4_PED`, `GCP4_PROD`, `GCP4_QTD/PRECO REAL` | `GCP4_FILIAL_PED` | Item do pedido. Escrita via `GEBCMIT()` (exige pedido existente em GCP3) |
-| GCP5 | `GCP5_NF`, `GCP5_PED`, `GCP5_STATUS` (`RECEBIDA`) | `GCP5_FILIAL_NF` | Entrada. 1 linha por NF via `GEBCMENT()`; NF duplicada recusada |
+| GCP3 | `GCP3_NUM`, `GCP3_FORN`, `GCP3_STATUS` | `GCP3_FILIAL_NUM` | Pedido header. Criação via `GEBCPXPED()`/`GEBCPXGERA()` (`GEBCPX.prw`); status acompanha a entrada (`PARCIAL`/`RECEBIDO`) |
+| GCP4 | `GCP4_PED`, `GCP4_PROD`, `GCP4_QTD/PRECO REAL` | `GCP4_FILIAL_PED` | Item do pedido. Escrita na criação do pedido (itens `{prod,qtd,preco}`) |
+| GCP5 | `GCP5_NF`, `GCP5_PED`, `GCP5_STATUS` (`RECEBIDA`) | `GCP5_FILIAL_NF` | Entrada. Documento de NF via `GEBCPXENT()`; NF duplicada recusada |
 
 Acesso em todos os módulos: `RetSqlName()` + `%notDel`/`%xfilial`/`%exp`, `TCSetField()` pós-query
 (conforme spec §2); no runtime AdvPP leitura/escrita via workarea + `TCSqlExec`/`TCSqlQuery`
@@ -357,7 +357,7 @@ pelo `o script de publicacao` antes de publicar.
   em GFN2/GFN3 (`nSaldo = receber−pagar`); tabelas ausentes valem zero; quitados
   (`RECEBIDA`/`PAGA`) fora da soma.
 
-### 4.8 Compras — `src/GEBCOM_MIG.prw`, `src/GEBCOM_FOR.prw`, `src/GEBCOM_PED.prw`, `src/GEBCOM_ENT.prw`
+### 4.8 Compras — `src/GEBCOM_MIG.prw`, `src/GEBCOM_FOR.prw`, `src/GEBCPX.prw`
 
 - `GEBCMMIG()` → `.T.`/`.F.` — GCP1–GCP5 idempotente.
 - `GEBCMFOR(cCod, cNome)` → `.T.`/`.F.` — fornecedor GCP1 (`CNPJ=""`);
@@ -365,17 +365,22 @@ pelo `o script de publicacao` antes de publicar.
 - `GEBCMCOT(cForn, cProd, nPreco)` → `.T.`/`.F.` — cotação GCP2;
   `.F.` se forn/prod vazio, preço ≤ 0 ou GCP2 ausente.
 - `GEBCMMEL(cProd)` → menor `PRECO` em GCP2 na filial (`0` se vazio/ausente/sem cotação).
-- `GEBCMPED(cPed, cForn)` → `"ABERTO"` / `"BLOQUEADO"` — header GCP3 (`ABERTO`)
-  após Mentor `GEBMNT("COMPRA_IMPULSIVA")` (travado ⇒ `BLOQUEADO` sem tocar o banco);
-  idempotente (existente retorna `ABERTO`); vazio ou GCP3 ausente ⇒ `BLOQUEADO`.
-- `GEBCMIT(cPed, cProd, nQtd, nPreco)` → `.T.`/`.F.` — item GCP4; `.F.` se
-  ped/prod vazio, qtd/preço ≤ 0, GCP4 ausente ou pedido inexistente em GCP3.
-- `GEBCMENT(cNF, cPed)` → `.T.`/`.F.` — recebe pedido `ABERTO`: soma itens GCP4
-  (`QTD×PRECO`), movimenta cada produto via `GEBVEST(cProd, nQtd)`, lança o total
-  via `GEBFNPAG(cNF, cForn, nTotal, "20261231")` (vencimento de entrada fixo),
-  concilia via `CTBLAN(cNF, nTotal)`, marca GCP3 `RECEBIDO` e grava GCP5
-  (`RECEBIDA`). `.F.` sem tocar o banco se NF/pedido vazio, tabelas ausentes,
-  pedido inexistente ou já `RECEBIDO`, sem itens, NF duplicada ou `GEBFNPAG` recusar.
+- `GEBCPXPED(cPed, cForn, aItens, cCond, cLocal, cData)` → `{lOk, msg, {cPed, nTotal, cLiberacao}}`
+  — pedido direto: GCP3/GCP4 + GCQ2 (condição, local, emissão, total, liberação).
+  `cPed` vazio gera `PC`+sequencial; total > `COM_ALCADA` ⇒ `GCQ2_LIB=PENDENTE`
+  (entrada bloqueada até aprovação); senão `LIBERADO`.
+- `GEBCPXSC(cNum, aItens, cSolic)` → solicitação de compra em GCQ1 (`ABERTA`).
+- `GEBCPXGERA(cNumSC, cCond, cLocal, cData)` → um pedido por fornecedor pelo menor
+  preço cotado (GCP2); item sem cotação recusa tudo; GCQ1 → `ATENDIDA`.
+- `GEBCPXAPR(cPed, cUsuario, lAprova)` → `PENDENTE` ⇒ `LIBERADO`/`REJEITADO` + aprovador.
+- `GEBCPXENT(cNF, cPed, aItens, nFrete, cData, aRet, cChaveNF)` → `{lOk, msg, {nTotal,
+  cStatusPedido, aTitulos, nRetido}}` — entrada: estoque a custo de entrada (GCQ5,
+  frete rateado) + `GEBVEST`, título via `GEBFXTIT` menos retenções (Derrama),
+  `COMPRA_ESTOQUE`, crédito IBS/CBS (GCQ7), GCQ3 recebido por item, GCQ4 documento;
+  pedido fica `PARCIAL`/`RECEBIDO`.
+- `GEBCPXDEV(cNF, cForn, aItens, cData, cChaveForn)` → devolução de compra (GCQ6).
+- `GEBCPXABERTOS()` / `GEBCPXPORFORN(cIni, cFim)` / `GEBCPXSCPEND()` → consultas.
+- `GEBCPXMIG()` → `.T.`/`.F.` — GCQ1–GCQ7 idempotente.
 
 ### 4.6 Contábil — `src/GEBCTB_MIG.prw`, `src/GENUC_MNT.prw` (`CTBLAN`/`CTBGRV`), `src/GEBCTB_DIR.prw`, `src/GEBCTB_BAL.prw`
 
@@ -404,9 +409,10 @@ pelo `o script de publicacao` antes de publicar.
    `ABERTO`, PAG sob Mentor `PAG_IMPULSIVO`) → `GEBFNBAI()` (GFN2/GFN3 + GFN4/GFN1
    + `CTBLAN()`) → `GEBNFLX()` (`{receber, pagar, saldo}` só `ABERTO`).
 7. **Entrada de compra:** `GEBCMFOR()` (GCP1) → `GEBCMCOT()`/`GEBCMMEL()` (GCP2) →
-   `GEBCMPED()` (GCP3 `ABERTO`, sob Mentor `COMPRA_IMPULSIVA`) + `GEBCMIT()` (GCP4) →
-   `GEBCMENT()` (`src/GEBCOM_ENT.prw`): soma GCP4 → `GEBVEST()` por produto (GV1) +
-   `GEBFNPAG()` (GFN3, venc fixo `20261231`) + `CTBLAN()` → GCP3 `RECEBIDO` + GCP5 `RECEBIDA`.
+   `GEBCPXPED()`/`GEBCPXGERA()` (GCP3/GCP4 + GCQ2; `PENDENTE` acima de `COM_ALCADA`)
+   → `GEBCPXAPR()` libera → `GEBCPXENT()` (`src/GEBCPX.prw`): estoque a custo de
+   entrada (GCQ5/GV1) + `GEBFXTIT`/`GEBFNPAG` (condição do pedido − retenções) +
+   `CTBLAN` (`COMPRA_ESTOQUE`) + GCQ7 (crédito IBS/CBS) → pedido `PARCIAL`/`RECEBIDO`.
 
 ---
 
@@ -428,7 +434,7 @@ alias literal · workarea p/ leitura · `DbAppend()+RecLock(.T.)+MsUnlock()` p/ 
 | 2 | `GetNextAlias()` **não existe** | Alias literal (`"GE4"`, `"GF2"`, …) | ex. `src/GENUC_MIG.prw` `GEBCFG()` |
 | 3 | `Default` **sobrescreve incondicionalmente** | `If x == Nil` em vez de `Default` | Todos os `User Function` com params |
 | 4 | `GetArea()` retorna `""` sem workarea aberta; `RestArea("")` **aborta** | Guarda `If Len(aArea) > 0` em **todas** as saídas | ex. `src/GEBSEC_LOGIN.prw` |
-| 5 | `BeginSql` standalone é **no-op** no pré-processador (`preprocessor.go:345`, vira atribuição de string) | Leitura via workarea (`DbSelectArea`/`DbGoTop`/scan/`DbSkip`); SQL só via `TCSqlExec`/`TCSqlQuery` literais | ex. `src/GENUC_MIG.prw:75-90`, `src/GEBFIS_APU.prw` `SomaGF4()`, `src/GEBCOM_ENT.prw` `SomaItens()` |
+| 5 | `BeginSql` standalone é **no-op** no pré-processador (`preprocessor.go:345`, vira atribuição de string) | Leitura via workarea (`DbSelectArea`/`DbGoTop`/scan/`DbSkip`); SQL só via `TCSqlExec`/`TCSqlQuery` literais | ex. `src/GENUC_MIG.prw:75-90`, `src/GEBFIS_APU.prw` `SomaGF4()`, `src/GEBCPX.prw` `CPXPendentes()` |
 | 6 | `Select()` e `Used()` são **stubs** (sempre `0`/`.F.`); `DbSelectArea` em tabela ausente **aborta** | Guarda de existência via `TCSqlQuery` antes de abrir — originalmente `SELECT name FROM sqlite_master …` (evidência da era SQLite); após a migração para Postgres (Fase 1c), o guard vive centralizado em `GEBDBTableExists()`/`GEBDBTableExistsHere()` (`src/GEBDB_CORE.prw`, sobre `pg_tables`/`information_schema`) | ex. `src/GENUC_MIG.prw:67-73`, `src/GEBFIS_EMI.prw:110-125`, `src/GEBDB_CORE.prw` |
 | 7 | Escrita via workarea: `DbAppend()` puro **não persiste**; `RecLock()` sozinho **aborta** ("no current record") em tabela vazia | `DbAppend()` + `RecLock(alias, .T.)` + atribuições + `MsUnlock()` — único caminho que persiste (probes Task 3: gravou em vazia e em duplo insert N=2) | ex. `src/GENUC_CAD.prw:60-70`, `src/GENUC_MNT.prw:103-112` |
 | 8 | Colunas `EMPRESA` adicionadas via `ALTER TABLE` **não aparecem no workarea** do AdvPP (`GEX->EMPRESA` retorna Nil) | Uso de `TCSqlQuery` para consultas que filtram por EMPRESA em `GEBEXP_CTX.prw`; workarea usado SOMENTE para tabelas criadas no mesmo módulo (`GEX`, `GEH`) | `src/GEBEXP_CTX.prw:55-73` (validação via `TCSqlQuery`); workarea só em `GEBEXPIST`/`GEBEXPCONTEXT` (GEX criada localmente) |
@@ -460,14 +466,14 @@ do Postgres chega ao `TCSqlQuery` como `""` (4.8.5); `GetEnv` de variável ausen
 | Check | `advplc check src/*.prw tests/*.prw` | **84 files: 84 ok, 0 failed** (8 workers) |
 | Suite | `advplc run tests/T_*.prw --db-path …` (46 arquivos, comando da era SQLite) | **46 PASS, 0 FAIL** (contagem por grep `PASS` por teste) |
 | Serve | `advplc serve src/GEBTUI.prw --port 8081` | `AdvPP web: http://0.0.0.0:8081 (fonte: GEBTUI.prw)` |
-| Massa | `T_GEBAN_MASSA` (100 auditorias), `T_GEBFIS_MASSA` (100 notas), `T_GEBV_MASSA` (100 vendas), `T_GEBDER_MASSA` (50 guias), `T_GEBCTB_MASSA` (200 lançamentos, `BAL`+`DRE`), `T_GEBFIN_MASSA` (100 títulos: 50 receber de 100 + 50 pagar de 50, `FLX {5000,2500,2500}` → baixa total → `{0,0,0}`, `CAIXA` 2500, 100 mov), `T_GEBCOM_MASSA` (50 pedidos: item 2×10=20 + entrada, 50 GCP3 `RECEBIDO` + 50 GCP5 + 50 GFN3), `T_GeExp_MASSA` (3 empresas 01/02/99 isoladas; cada uma: 20 NFs emitidas, 5 guias derrama, 10 pedidos entrada, 10 CTB; `GEBRELGERAL` por empresa confere contagens; 5 trackers validados) | Todos `PASS` na suite acima |
+| Massa | `T_GEBAN_MASSA` (100 auditorias), `T_GEBFIS_MASSA` (100 notas), `T_GEBV_MASSA` (100 vendas), `T_GEBDER_MASSA` (50 guias), `T_GEBCTB_MASSA` (200 lançamentos, `BAL`+`DRE`), `T_GEBFIN_MASSA` (100 títulos: 50 receber de 100 + 50 pagar de 50, `FLX {5000,2500,2500}` → baixa total → `{0,0,0}`, `CAIXA` 2500, 100 mov), `T_GEBCOM_MASSA` (50× `GEBCPXPED`+`GEBCPXENT`: 50 pedidos recebidos + GCQ4/GCQ5 + títulos), `T_GeExp_MASSA` (3 empresas 01/02/99 isoladas; cada uma: 20 NFs emitidas, 5 guias derrama, 10 pedidos entrada, 10 CTB; `GEBRELGERAL` por empresa confere contagens; 5 trackers validados) | Todos `PASS` na suite acima |
 
 Testes por módulo (`tests/`): núcleo `T_GENUC_{MIG,CAD,MNT}` + `T_GEBAN_MASSA`;
 fiscal `T_GEBFIS_{MIG,CAD,EMI,APU,MASSA}`; derrama `T_GEBDER_{MIG,GUI,COB,BAI,MASSA}`;
 estoque `T_GEBV_{MIG,EST,VEN,FIA,MASSA}`; contábil `T_GEBCTB_{MIG,CTB,DIR,BAL,MASSA}`;
 financeiro `T_GEBFIN_{MIG,CON_LAN,BAI,FLX,MASSA}`; compras
-`T_GEBCOM_{MIG,FOR_COT,PED,ENT,MASSA}`; multi-empresa `T_GeExp_{MIG,CTX,REL_BIZ,REL_NUC,MASSA}`;
-interface `T_GEBTUI_{OPS,FLUXOS,PERM}`, `T_GEBTUIPDV`, `T_GEBTUIBO`.
+`T_GEBCOM_{MIG,FOR_COT,MASSA}` + `T_GEBCPX`; multi-empresa `T_GeExp_{MIG,CTX,REL_BIZ,REL_NUC,MASSA}`;
+interface `T_GEBTUI_{OPS,FLUXOS,PERM}`, `T_GEBTUIBO`, `T_GEBPDV_API` e `T_GEBLOJ*` (PDV web).
 Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks anteriores.
 
 ---
@@ -518,8 +524,7 @@ Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks an
 | `src/GEBFIN_FLX.prw` | `GEBNFLX` | `tests/T_GEBFIN_FLX.prw` |
 | `src/GEBCOM_MIG.prw` | `GEBCMMIG` (GCP1–GCP5) | `tests/T_GEBCOM_MIG.prw` |
 | `src/GEBCOM_FOR.prw` | `GEBCMFOR`, `GEBCMCOT`, `GEBCMMEL` | `tests/T_GEBCOM_FOR_COT.prw` |
-| `src/GEBCOM_PED.prw` | `GEBCMPED`, `GEBCMIT` | `tests/T_GEBCOM_PED.prw` |
-| `src/GEBCOM_ENT.prw` | `GEBCMENT` | `tests/T_GEBCOM_ENT.prw` |
+| `src/GEBCPX.prw` | `GEBCPXMIG`, `GEBCPXSC`, `GEBCPXGERA`, `GEBCPXPED`, `GEBCPXAPR`, `GEBCPXENT`, `GEBCPXDEV`, `GEBCPXABERTOS`, `GEBCPXPORFORN`, `GEBCPXSCPEND` | `tests/T_GEBCPX.prw`, `tests/T_GEBCOM_MASSA.prw` |
 | `src/GEBEXP_MIG.prw` | `GEBEXPCriaAuditoria` (cria GEH/GEI no schema do tenant corrente) | `tests/T_GeExp_MIG.prw` |
 | `src/GEBEXP_CTX.prw` | `GEBEXPCONTEXTO`, `GEBEXPIST`, `GEBEXPCONTEXT`, `GEBEXPCLEAR` | `tests/T_GeExp_CTX.prw` |
 | `src/GEBEXP_REL_BIZ.prw` | `GEBRELFISCAL`, `GEBRELDERRAMA`, `GEBRELFIN`, `GEBRELSTOQUE`, `GEBRELCOMPRAS`, `GEBRELCONTABIL`, `GEBRELGERAL` | `tests/T_GeExp_REL_BIZ.prw` |

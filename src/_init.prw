@@ -3,7 +3,6 @@
 #include "../src/GEBSEC_MIG.prw"
 #include "../src/GEBEXP_MIG.prw"
 #include "../src/GEBAUD.prw"
-#include "../src/GEBMON.prw"
 
 User Function TEST_INIT()
     Local lOk := .T.
@@ -19,6 +18,5 @@ User Function TEST_INIT()
     EndIf
     If lOk
         GBAUDINIC()
-        GEBMONINIC()
     EndIf
 Return lOk

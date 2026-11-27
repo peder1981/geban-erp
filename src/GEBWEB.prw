@@ -95,9 +95,6 @@ User Function GEBWEB(nPorta)
     oSrv:AddRoute("POST", "/api/financeiro/contas", "U_GEBWAPI_FINCON")
     oSrv:AddRoute("POST", "/api/financeiro/baixar", "U_GEBWAPI_FINBAI")
     oSrv:AddRoute("POST", "/api/compras/fornecedores", "U_GEBWAPI_COMFOR")
-    oSrv:AddRoute("POST", "/api/compras/pedidos", "U_GEBWAPI_COMPED")
-    oSrv:AddRoute("POST", "/api/compras/itens", "U_GEBWAPI_COMIT")
-    oSrv:AddRoute("POST", "/api/compras/entradas", "U_GEBWAPI_COMENT")
     oSrv:AddRoute("POST", "/api/fiscal/apurar", "U_GEBWAPI_FISAPU")
     oSrv:AddRoute("POST", "/api/fiscal/creditos", "U_GEBWAPI_FISCRE")
     oSrv:AddRoute("POST", "/api/fiscal/simples/config", "U_GEBWAPI_SNCFG")
@@ -347,7 +344,7 @@ User Function GEBWAPI_PDVCAIXALST(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCAIXALST(cUsu)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/caixa/lista", {}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCAIXASS(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -355,7 +352,7 @@ User Function GEBWAPI_PDVCAIXASS(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCAIXASS(cUsu)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/caixa/sessoes", {}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCAIXAABR(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -363,7 +360,7 @@ User Function GEBWAPI_PDVCAIXAABR(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCAIXAABR(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/caixa/abrir", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCAIXAFECH(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -371,7 +368,7 @@ User Function GEBWAPI_PDVCAIXAFECH(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCAIXAFECH(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/caixa/fechar", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCAIXARESUMO(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -379,7 +376,7 @@ User Function GEBWAPI_PDVCAIXARESUMO(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCAIXARESUMO(cUsu, GEBWAPIFIELD(oReq, "SESSAO"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/caixa/resumo/{x}", {GEBWAPIFIELD(oReq, "SESSAO")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVSANGRIA(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -387,7 +384,7 @@ User Function GEBWAPI_PDVSANGRIA(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVSANGRIA(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/caixa/sangria", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCUPOMNOV(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -395,7 +392,7 @@ User Function GEBWAPI_PDVCUPOMNOV(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCUPOMNOV(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/cupom/novo", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCUPOMGET(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -403,7 +400,7 @@ User Function GEBWAPI_PDVCUPOMGET(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCUPOMGET(cUsu, GEBWAPIFIELD(oReq, "ID"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/cupom/{x}", {GEBWAPIFIELD(oReq, "ID")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCUPCANC(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -411,7 +408,7 @@ User Function GEBWAPI_PDVCUPCANC(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCUPCANC(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/cupom/{x}/cancelar", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVPRODUTBUSC(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -419,7 +416,7 @@ User Function GEBWAPI_PDVPRODUTBUSC(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVPRODUTBUSC(cUsu, GEBWAPIFIELD(oReq, "CODIGO"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/produto/busca", {GEBWAPIFIELD(oReq, "CODIGO")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVRELGER(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -427,7 +424,7 @@ User Function GEBWAPI_PDVRELGER(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVRELGER(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/relatorio/gerencial", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVRELGERCSV(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -435,7 +432,7 @@ User Function GEBWAPI_PDVRELGERCSV(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVRELGERCSV(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/relatorio/gerencial/csv", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVRELCOM(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -443,7 +440,7 @@ User Function GEBWAPI_PDVRELCOM(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVRELCOM(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/relatorio/comissao", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVRELCOMCSV(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -451,7 +448,7 @@ User Function GEBWAPI_PDVRELCOMCSV(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVRELCOMCSV(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/relatorio/comissao/csv", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVPERIFLIST(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -459,7 +456,7 @@ User Function GEBWAPI_PDVPERIFLIST(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVPERIFLIST(cUsu, GEBWAPIFIELD(oReq, "TIPO"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/perifericos", {GEBWAPIFIELD(oReq, "TIPO")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVPERIFREG(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -467,7 +464,7 @@ User Function GEBWAPI_PDVPERIFREG(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVPERIFREG(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/perifericos", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVPERIFDEL(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -475,7 +472,7 @@ User Function GEBWAPI_PDVPERIFDEL(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVPERIFDEL(cUsu, Val(GEBWAPIFIELD(oReq, "ID")))
+Return GEBWAPIRESP(GEBREST("DELETE", "/pdv/perifericos/{x}", {Val(GEBWAPIFIELD(oReq, "ID"))}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCRYCOT(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -483,7 +480,7 @@ User Function GEBWAPI_PDVCRYCOT(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCRYCOT(cUsu)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/crypto/cotacao", {}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCRYWALLST(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -491,7 +488,7 @@ User Function GEBWAPI_PDVCRYWALLST(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCRYWALLST(cUsu)
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/crypto/wallets", {}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCRYPREV(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -499,7 +496,7 @@ User Function GEBWAPI_PDVCRYPREV(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCRYPREV(cUsu, GEBWAPIFIELD(oReq, "MOEDA"), BOVAL(GEBWAPIFIELD(oReq, "VALOR")))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/crypto/previa", {GEBWAPIFIELD(oReq, "MOEDA"), BOVAL(GEBWAPIFIELD(oReq, "VALOR"))}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCRYWAL(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -507,7 +504,7 @@ User Function GEBWAPI_PDVCRYWAL(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCRYWAL(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/crypto/wallet", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVORCNOV(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -515,7 +512,7 @@ User Function GEBWAPI_PDVORCNOV(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVORCNOV(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/orcamento", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVORCLST(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -523,7 +520,7 @@ User Function GEBWAPI_PDVORCLST(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVORCLST(cUsu, GEBWAPIFIELD(oReq, "STATUS"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/orcamentos", {GEBWAPIFIELD(oReq, "STATUS")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVORCFIN(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -531,7 +528,7 @@ User Function GEBWAPI_PDVORCFIN(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVORCFIN(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/orcamento/finalizar", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVORCCAN(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -539,7 +536,7 @@ User Function GEBWAPI_PDVORCCAN(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVORCCAN(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/orcamento/cancelar", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVDEV(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -547,7 +544,7 @@ User Function GEBWAPI_PDVDEV(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVDEVOLUC(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/devolucao", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCONS(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -555,7 +552,7 @@ User Function GEBWAPI_PDVCONS(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCONSULTA(cUsu, GEBWAPIFIELD(oReq, "CODIGO"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/consulta", {GEBWAPIFIELD(oReq, "CODIGO")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVVALE(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -563,7 +560,7 @@ User Function GEBWAPI_PDVVALE(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVVALESALDO(cUsu, GEBWAPIFIELD(oReq, "NUMERO"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/vale/{x}", {GEBWAPIFIELD(oReq, "NUMERO")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVFIAS(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -571,7 +568,7 @@ User Function GEBWAPI_PDVFIAS(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVFIASALDO(cUsu, GEBWAPIFIELD(oReq, "CLIENTE"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/fiado/saldo", {GEBWAPIFIELD(oReq, "CLIENTE")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCADCX(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -579,7 +576,7 @@ User Function GEBWAPI_PDVCADCX(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCADCAIXA(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/cadastro/caixa", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCADBAR(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -587,7 +584,7 @@ User Function GEBWAPI_PDVCADBAR(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCADBAR(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/cadastro/barras", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCADPROMO(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -595,7 +592,7 @@ User Function GEBWAPI_PDVCADPROMO(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCADPROMO(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/cadastro/promocao", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVCADVEND(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -603,7 +600,7 @@ User Function GEBWAPI_PDVCADVEND(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVCADVEND(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/cadastro/vendedor", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVRELVEN(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -611,7 +608,7 @@ User Function GEBWAPI_PDVRELVEN(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVRELVENDAS(cUsu, GEBWAPIFIELD(oReq, "DATA"), GEBWAPIFIELD(oReq, "CAIXA"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/relatorio/vendas", {GEBWAPIFIELD(oReq, "DATA"), GEBWAPIFIELD(oReq, "CAIXA")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVRELTEF(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -619,7 +616,7 @@ User Function GEBWAPI_PDVRELTEF(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVRELTEF(cUsu, GEBWAPIFIELD(oReq, "DATA"))
+Return GEBWAPIRESP(GEBREST("GET", "/pdv/relatorio/tef", {GEBWAPIFIELD(oReq, "DATA")}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVTEFCFG(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -627,7 +624,7 @@ User Function GEBWAPI_PDVTEFCFG(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVTEFCFG(cUsu, oReq)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/tef/config", {oReq}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVTEFRES(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -635,7 +632,7 @@ User Function GEBWAPI_PDVTEFRES(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVTEFRES(cUsu)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/tef/desfazer", {}, cUsu, "web:" + cUsu))
 
 User Function GEBWAPI_PDVNFETR(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character
@@ -643,4 +640,4 @@ User Function GEBWAPI_PDVNFETR(oReq)
     If cUsu == ""
         Return GEBWAPIDENY()
     EndIf
-Return GEBPDVNFETRANSMITE(cUsu)
+Return GEBWAPIRESP(GEBREST("POST", "/pdv/nfce/transmitir", {}, cUsu, "web:" + cUsu))

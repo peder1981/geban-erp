@@ -7,27 +7,27 @@
 #include "../src/GEBSEC_MIG.prw"
 #include "../src/GEBEXP_CTX.prw"
 #include "../src/GEBAUD.prw"
-#include "../src/GEBMON.prw"
 #include "../src/GEBSEC_TOKEN.prw"
 
 /*/{Protheus.doc} T_GEBMON
-    Teste do modulo de monitoramento.
+    Prova a expiracao de tokens de sessao (GEBSECTOKEN) e o criterio de
+    "online" usado pelo monitor REST (GEBRESTMONUSU): token com TOK_EXPIRES
+    no passado nao conta; no futuro, conta.
     @type Teste automatizado
     @author Peder Munksgaard
     @since 23/09/2026
 /*/
 User Function T_GEBMON()
     Local lOk := .T.
-    Local aMet := {}
-    Local aList := {}
     Local cRot := ""
     Local cTokGer := ""
     Local aTokRow := {}
     Local cExpGer := ""
     Local cHojeStr := ""
     Local cAmanhaStr := ""
-    Local nOnlineGet := -1
     Local nOnline0 := 0
+    Local nOnlineGet := -1
+    Local aQ := {}
 
     If !GEBDBConecta()
         ConOut("T_GEBMON: GEBDBConecta fail")
@@ -47,12 +47,13 @@ User Function T_GEBMON()
     EndIf
     GEXBINIT()
     GBAUDINIC()
-    GEBMONINIC()
 
     // Baseline: GE2_TOK e' catalogo global (public) e acumula tokens de
-    // outros testes; a metrica conta todos os validos, entao o assert usa
-    // o delta em vez de um total absoluto.
-    nOnline0 := GEBMONMETRICAS()[1]
+    // outros testes; o assert usa delta em vez de total absoluto.
+    aQ := TCSqlQuery("SELECT COUNT(*) AS N FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > ' ' AND TOK_EXPIRES > to_char(now(), 'YYYYMMDD HH24:MI:SS')")
+    If Len(aQ) > 0
+        nOnline0 := Val(aQ[1]:N)
+    EndIf
 
     // GEBSECTOKEN() deve expirar em ~8h (mesmo dia ou dia seguinte), nao
     // em ~480 dias -- cobre a correcao de Date()+N em GEBSEC_TOKEN.prw.
@@ -88,20 +89,14 @@ User Function T_GEBMON()
     TCSqlExec("INSERT INTO public.GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'tok_expirado_tmon', 'usrexp_tmon', '01', '01', '127.0.0.1', '20200101 00:00:00', '20200102 00:00:00')")
     TCSqlExec("INSERT INTO public.GE2_TOK (D_E_L_E_T_, TOK_TOKEN, TOK_USUARIO, TOK_EMPRESA, TOK_FILIAL, TOK_IP, TOK_CREATED, TOK_EXPIRES) VALUES (' ', 'tok_valido_tmon', 'usrval_tmon', '01', '01', '127.0.0.1', '20301231 00:00:00', '20301231 23:59:59')")
 
-    aMet := GEBMONMETRICAS()
-    aList := GEBMONLISTAR()
-    cRot := GEBMONROTINA("token_teste")
-
-    // aMet[1] = nUsuariosOnline: so "tok_valido" e o gerado por GEBSECTOKEN()
-    // devem contar; "tok_expirado" nao. Prova que a metrica usa a
-    // expiracao real (~8h), corrigida em src/GEBSEC_TOKEN.prw -- o bug
-    // original produzia TOK_EXPIRES vazio ("", Date()+N nao devolve Date
-    // neste runtime), nao uma data futura.
-    If Len(aMet) >= 1
-        nOnlineGet := aMet[1]
+    // Mesmo criterio do monitor REST: TOK_EXPIRES > agora (formato texto
+    // "YYYYMMDD HH:MM:SS" compara lexicograficamente).
+    aQ := TCSqlQuery("SELECT COUNT(*) AS N FROM public.GE2_TOK WHERE D_E_L_E_T_ = ' ' AND TOK_EXPIRES > ' ' AND TOK_EXPIRES > to_char(now(), 'YYYYMMDD HH24:MI:SS')")
+    If Len(aQ) > 0
+        nOnlineGet := Val(aQ[1]:N)
     EndIf
     If nOnlineGet != nOnline0 + 2
-        ConOut("T_GEBMON: nUsuariosOnline esperado " + cValToChar(nOnline0 + 2) + " (baseline+2), obtido " + cValToChar(nOnlineGet))
+        ConOut("T_GEBMON: online esperado " + cValToChar(nOnline0 + 2) + " (baseline+2), obtido " + cValToChar(nOnlineGet))
         lOk := .F.
     EndIf
 

@@ -25,8 +25,6 @@
 #include "../src/GEBV_FIA.prw"
 #include "../src/GEBCOM_MIG.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBBOLIB.prw"
 #include "../src/GEBCTX.prw"
 #include "../src/GEBEST.prw"

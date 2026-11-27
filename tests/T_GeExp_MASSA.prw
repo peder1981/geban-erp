@@ -22,8 +22,6 @@
 #include "../src/GEBV_EST.prw"
 #include "../src/GEBCOM_MIG.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBCTB_MIG.prw"
 #include "../src/GEBCTB_DIR.prw"
 #include "../src/GEBEXP_MIG.prw"

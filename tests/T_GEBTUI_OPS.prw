@@ -13,7 +13,6 @@
 #include "../src/GEBEXP_CTX.prw"
 #include "../src/GEBEXP_MIG.prw"
 #include "../src/GEBAUD.prw"
-#include "../src/GEBMON.prw"
 #include "../src/GEBEXP_REL_BIZ.prw"
 #include "../src/GEBEXP_REL_NUC.prw"
 #include "../src/GEBDER_MIG.prw"
@@ -37,8 +36,6 @@
 #include "../src/GEBFIN_BAI.prw"
 #include "../src/GEBFIN_CON.prw"
 #include "../src/GEBCOM_FOR.prw"
-#include "../src/GEBCOM_PED.prw"
-#include "../src/GEBCOM_ENT.prw"
 #include "../src/GEBFIS_APU.prw"
 #include "../src/GEBSN.prw"
 #include "../src/GEBV_EST.prw"
@@ -120,7 +117,7 @@ User Function T_GEBTUI_OPS()
     Next nM
     ConOut("  formularios executados: " + cValToChar(Len(aForms)))
     // Todas as operacoes sao formularios. Queda inesperada = operacao perdida.
-    lOk := Chk(lOk, "formularios", Len(aForms) >= 130)
+    lOk := Chk(lOk, "formularios", Len(aForms) >= 125)
 
     // JSON dos formularios do DF-e: UF maiuscula, IBGE direto, CONT_UF nao vai
     aR := TUIDfeJson({|o| {.T., o:ToJson()}}, {"UF", "MUNICIPIO", "CONT_UF", "CONT_MUNICIPIO"}, {"sp", "3550308", "rj", "3304557"})

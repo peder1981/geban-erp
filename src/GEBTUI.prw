@@ -12,7 +12,6 @@
 #include "GEBEXP_CTX.prw"
 #include "GEBEXP_MIG.prw"
 #include "GEBAUD.prw"
-#include "GEBMON.prw"
 #include "GENUC_MNT.prw"
 #include "GENUC_CAD.prw"
 #include "GEBFIS_MIG.prw"
@@ -36,8 +35,6 @@
 #include "GEBCTB_BAL.prw"
 #include "GEBCOM_MIG.prw"
 #include "GEBCOM_FOR.prw"
-#include "GEBCOM_PED.prw"
-#include "GEBCOM_ENT.prw"
 #include "GEBFIL_MIG.prw"
 #include "GEBREST.prw"
 #include "GEBTUIBO.prw"
@@ -302,7 +299,6 @@ Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
         Return
     EndIf
     GBAUDINIC()
-    GEBMONINIC()
     If !GEBEXPCONTEXTO(cEmp, cFil, cUsu)
         oApp:Notify("Sessao recusada.", "error")
         Return
@@ -720,10 +716,7 @@ Return { ;
     {"Compras", 0, 0, "Cotacao de fornecedor", {{"Fornecedor", "C", "", "GCP1_COD"}, {"Produto", "C", ""}, {"Preco", "N", 0}}, ;
         {|u, a| TUICotacao(a)}, "BO", "", aPed}, ;
     {"Compras", 0, 0, "Menor preco cotado", {{"Produto", "C", ""}}, {|u, a| TUIMenorPreco(a[1])}, "BO", "", aPed}, ;
-    {"Compras", 0, 0, "Novo fornecedor", {{"Codigo", "C", ""}, {"Nome", "C", ""}}, {|u, a| GEBRESTCOMFOR(u, a)}, "201", "Fornecedor criado."}, ;
-    {"Compras", 0, 0, "Abrir pedido", {{"Pedido", "C", ""}, {"Fornecedor", "C", "", "GCP1_COD"}}, {|u, a| GEBRESTCOMPED(u, a)}, "201", "Pedido aberto."}, ;
-    {"Compras", 0, 0, "Adicionar item", {{"Pedido", "C", "", "GCP3_NUM"}, {"Produto", "C", ""}, {"Quantidade", "N", 1}, {"Preco", "N", 0}}, {|u, a| GEBRESTCOMIT(u, a)}, "201", "Item adicionado."}, ;
-    {"Compras", 0, 0, "Dar entrada", {{"Nota fiscal", "C", ""}, {"Pedido", "C", "", "GCP3_NUM"}}, {|u, a| GEBRESTCOMENT(u, a)}, "201", "Entrada registrada."} ;
+    {"Compras", 0, 0, "Novo fornecedor", {{"Codigo", "C", ""}, {"Nome", "C", ""}}, {|u, a| GEBRESTCOMFOR(u, a)}, "201", "Fornecedor criado."}
     }
 
 // Inventario: o lote/endereco vale para a diferenca entre contado e saldo.

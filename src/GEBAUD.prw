@@ -4,9 +4,7 @@
 /*/{Protheus.doc} GEBAUD
     Auditoria processual GEBAN (Task 3 GEB_NUCLEO - expansao).
     Mapeamento 1:1 com as interfaces do plano (chamadas sem prefixo U_):
-    U_GBAUDINIC -> GBAUDINIC | U_GBAUDLOG -> GBAUDLOG |
-    U_GBAUDLISTAR -> GBAUDLISTAR | U_GBAUDRESUMO -> GBAUDRESUMO |
-    U_GBAUDExport -> GBAUDExport.
+    U_GBAUDINIC -> GBAUDINIC | U_GBAUDLOG -> GBAUDLOG.
     GBAUDINIC() cria a tabela GEI_AUDIT se nao existir:
     R_E_C_N_O_ PK, DELETER, TABELA, ACAO (INS/ALT/DEL), REGISTRO,
     ANTES (memo), DEPOIS (memo), USUARIO, EMPRESA, FILIAL, HORA,
@@ -15,13 +13,6 @@
     grava entrada em GEI_AUDIT com hora atual e duracao zero
     (medicao precisa exige BeginTimestamp que nao existe no AdvPP;
     duracao fica 0 em todas as entradas).
-    GBAUDLISTAR(cEmpresa, cInicio, cFim, nMax) retorna array
-    {tabela, acao, registro, hora, duracao, usuario} filtrado por
-    empresa/data e limitado por nMax (0 = sem limite).
-    GBAUDRESUMO(cEmpresa) retorna object com totalAcoes, porTabela
-    (array {tabela, count}), ultimasAcoes (array com ate 10 ultimas).
-    GBAUDExport(cEmpresa, cFormato) exporta audit como CSV ou JSON
-    string, filtrado por empresa.
     Notas AdvPP (balisador):
     log via ConOut (FWLogMsg inexistente no runtime); If Nil em vez
     de Default; GetArea/RestArea guardados; TCSqlQuery/TCSqlExec
@@ -36,16 +27,10 @@
     @param cUsuario Usuario que realizou a acao (GBAUDLOG)
     @param cEmpresa Empresa do registro (GBAUDLOG)
     @param cFilial Filial do registro (GBAUDLOG)
-    @param cEmpresa Codigo da empresa para filtro (GBAUDLISTAR/RESUMO/EXPORT)
-    @param cInicio Data inicio YYMMDD ou YYYYMMDD (GBAUDLISTAR)
-    @param cFim Data fim YYMMDD ou YYYYMMDD (GBAUDLISTAR)
-    @param nMax Maximo de registros a retornar (GBAUDLISTAR, 0=ilimitado)
-    @param cFormato Formato de exportacao: CSV ou JSON (GBAUDExport)
+    @param cEmpresa Codigo da empresa (GBAUDLOG)
+    @param cFilial Filial do registro (GBAUDLOG)
     @return .T. se tabelas inicializadas (GBAUDINIC)
     @return void (GBAUDLOG)
-    @return array {tabela,acao,registro,hora,duracao,usuario} (GBAUDLISTAR)
-    @return object {totalAcoes,porTabela,ultimasAcoes} (GBAUDRESUMO)
-    @return string formatada (GBAUDExport)
 /*/
 User Function GBAUDINIC()
     Local aArea := GetArea()
@@ -152,253 +137,3 @@ User Function GBAUDLOG(cTabela, cAcao, cRegistro, cUsuario, cEmpresa, cFilial)
     EndIf
 Return
 
-User Function GBAUDLISTAR(cEmpresa, cInicio, cFim, nMax)
-    Local aArea := GetArea()
-    Local aRet := {}
-    Local cSql := ""
-    Local aHit := {}
-    Local nIdx := 0
-    Local oRow := Nil
-
-    If cEmpresa == Nil
-        cEmpresa := ""
-    EndIf
-    If cInicio == Nil
-        cInicio := ""
-    EndIf
-    If cFim == Nil
-        cFim := ""
-    EndIf
-    If nMax == Nil
-        nMax := 0
-    EndIf
-
-    cSql := "SELECT GEI_AUDIT_TABELA, GEI_AUDIT_ACAO, GEI_AUDIT_REGISTRO, " + ;
-            "GEI_AUDIT_HORA, GEI_AUDIT_DURACAOMS, GEI_AUDIT_USUARIO " + ;
-            "FROM GEI_AUDIT WHERE D_E_L_E_T_ = ' '"
-    If cEmpresa != ""
-        cSql += " AND GEI_AUDIT_EMPRESA = " + GEBDBQuote(cEmpresa) + ""
-    EndIf
-    If cInicio != ""
-        cSql += " AND GEI_AUDIT_HORA >= " + GEBDBQuote(cInicio) + ""
-    EndIf
-    If cFim != ""
-        cSql += " AND GEI_AUDIT_HORA <= " + GEBDBQuote(cFim + " 23:59:59")
-    EndIf
-    cSql += " ORDER BY GEI_AUDIT_HORA DESC"
-    If nMax > 0
-        cSql += " LIMIT " + Str(nMax)
-    EndIf
-
-    aHit := TCSqlQuery(cSql)
-    For nIdx := 1 To Len(aHit)
-        oRow := aHit[nIdx]
-        AAdd(aRet, { ;
-            IifObj(oRow:GEI_AUDIT_TABELA, ""), ;
-            IifObj(oRow:GEI_AUDIT_ACAO, ""), ;
-            IifObj(oRow:GEI_AUDIT_REGISTRO, ""), ;
-            IifObj(oRow:GEI_AUDIT_HORA, ""), ;
-            IifObj(oRow:GEI_AUDIT_DURACAOMS, 0), ;
-            IifObj(oRow:GEI_AUDIT_USUARIO, "") ;
-        })
-    Next nIdx
-
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-Return aRet
-
-User Function GBAUDRESUMO(cEmpresa)
-    Local aArea := GetArea()
-    Local aRet  := {}
-    Local cSql  := ""
-    Local aHit  := {}
-    Local nIdx  := 0
-    Local oRow  := Nil
-    Local cTbl  := ""
-    Local nTot  := 0
-    Local aPor  := {}
-    Local aUlt  := {}
-
-    If cEmpresa == Nil
-        cEmpresa := ""
-    EndIf
-
-    // Total de acoes.
-    cSql := "SELECT R_E_C_N_O_ FROM GEI_AUDIT WHERE D_E_L_E_T_ = ' '"
-    If cEmpresa != ""
-        cSql += " AND GEI_AUDIT_EMPRESA = " + GEBDBQuote(cEmpresa) + ""
-    EndIf
-    aHit := TCSqlQuery(cSql)
-    nTot := Len(aHit)
-    AAdd(aRet, nTot)                      // [1] totalAcoes
-
-    // Por tabela.
-    cSql := "SELECT GEI_AUDIT_TABELA, COUNT(*) AS CNT " + ;
-            "FROM GEI_AUDIT WHERE D_E_L_E_T_ = ' '"
-    If cEmpresa != ""
-        cSql += " AND GEI_AUDIT_EMPRESA = " + GEBDBQuote(cEmpresa) + ""
-    EndIf
-    cSql += " GROUP BY GEI_AUDIT_TABELA ORDER BY CNT DESC"
-    aHit := TCSqlQuery(cSql)
-    For nIdx := 1 To Len(aHit)
-        oRow := aHit[nIdx]
-        cTbl := IifObj(oRow:GEI_AUDIT_TABELA, "")
-        AAdd(aPor, {cTbl, IifObj(oRow:CNT, 0)})
-    Next nIdx
-    AAdd(aRet, aPor)                     // [2] porTabela
-
-    // Ultimas 10 acoes.
-    cSql := "SELECT GEI_AUDIT_TABELA, GEI_AUDIT_ACAO, GEI_AUDIT_REGISTRO, " + ;
-            "GEI_AUDIT_HORA, GEI_AUDIT_USUARIO " + ;
-            "FROM GEI_AUDIT WHERE D_E_L_E_T_ = ' '"
-    If cEmpresa != ""
-        cSql += " AND GEI_AUDIT_EMPRESA = " + GEBDBQuote(cEmpresa) + ""
-    EndIf
-    cSql += " ORDER BY GEI_AUDIT_HORA DESC LIMIT 10"
-    aHit := TCSqlQuery(cSql)
-    For nIdx := 1 To Len(aHit)
-        oRow := aHit[nIdx]
-        AAdd(aUlt, { ;
-            IifObj(oRow:GEI_AUDIT_TABELA, ""), ;
-            IifObj(oRow:GEI_AUDIT_ACAO, ""), ;
-            IifObj(oRow:GEI_AUDIT_REGISTRO, ""), ;
-            IifObj(oRow:GEI_AUDIT_HORA, ""), ;
-            IifObj(oRow:GEI_AUDIT_USUARIO, "") ;
-        })
-    Next nIdx
-    AAdd(aRet, aUlt)                     // [3] ultimasAcoes
-
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-Return aRet
-
-User Function GBAUDExport(cEmpresa, cFormato)
-    Local aArea := GetArea()
-    Local cSql  := ""
-    Local aHit  := {}
-    Local nIdx  := 0
-    Local oRow  := Nil
-    Local cOut  := ""
-    Local cFmt  := ""
-    Local cQ    := ""
-
-    If cEmpresa == Nil
-        cEmpresa := ""
-    EndIf
-    If cFormato == Nil
-        cFormato := "CSV"
-    EndIf
-    cFmt := Upper(AllTrim(cFormato))
-    cQ := Chr(34)
-
-    cSql := "SELECT GEI_AUDIT_TABELA, GEI_AUDIT_ACAO, GEI_AUDIT_REGISTRO, " + ;
-            "GEI_AUDIT_HORA, GEI_AUDIT_DURACAOMS, GEI_AUDIT_USUARIO, " + ;
-            "GEI_AUDIT_EMPRESA " + ;
-            "FROM GEI_AUDIT WHERE D_E_L_E_T_ = ' '"
-    If cEmpresa != ""
-        cSql += " AND GEI_AUDIT_EMPRESA = " + GEBDBQuote(cEmpresa) + ""
-    EndIf
-    cSql += " ORDER BY GEI_AUDIT_HORA DESC"
-
-    aHit := TCSqlQuery(cSql)
-
-    If cFmt == "CSV"
-        cOut := "tabela,acao,registro,hora,duracao_ms,usuario,empresa" + Chr(13) + Chr(10)
-        For nIdx := 1 To Len(aHit)
-            oRow := aHit[nIdx]
-            cOut += EscCSV(IifObj(oRow:GEI_AUDIT_TABELA, "")) + "," + ;
-                    EscCSV(IifObj(oRow:GEI_AUDIT_ACAO, "")) + "," + ;
-                    EscCSV(IifObj(oRow:GEI_AUDIT_REGISTRO, "")) + "," + ;
-                    EscCSV(IifObj(oRow:GEI_AUDIT_HORA, "")) + "," + ;
-                    IifObj(oRow:GEI_AUDIT_DURACAOMS, 0) + "," + ;
-                    EscCSV(IifObj(oRow:GEI_AUDIT_USUARIO, "")) + "," + ;
-                    EscCSV(IifObj(oRow:GEI_AUDIT_EMPRESA, "")) + Chr(13) + Chr(10)
-        Next nIdx
-    Else
-        // JSON
-        cOut := "{" + cQ + "total" + cQ + ":" + cValToChar(Len(aHit)) + "," + cQ + "audits" + cQ + ":["
-        For nIdx := 1 To Len(aHit)
-            oRow := aHit[nIdx]
-            If nIdx > 1
-                cOut += ","
-            EndIf
-            cOut += "{" + cQ + "tabela" + cQ + ":" + cQ + EscJSON(IifObj(oRow:GEI_AUDIT_TABELA, "")) + cQ + "," + ;
-                    cQ + "acao" + cQ + ":" + cQ + EscJSON(IifObj(oRow:GEI_AUDIT_ACAO, "")) + cQ + "," + ;
-                    cQ + "registro" + cQ + ":" + cQ + EscJSON(IifObj(oRow:GEI_AUDIT_REGISTRO, "")) + cQ + "," + ;
-                    cQ + "hora" + cQ + ":" + cQ + EscJSON(IifObj(oRow:GEI_AUDIT_HORA, "")) + cQ + "," + ;
-                    cQ + "duracao_ms" + cQ + ":" + IifObj(oRow:GEI_AUDIT_DURACAOMS, 0) + "," + ;
-                    cQ + "usuario" + cQ + ":" + cQ + EscJSON(IifObj(oRow:GEI_AUDIT_USUARIO, "")) + cQ + "," + ;
-                    cQ + "empresa" + cQ + ":" + cQ + EscJSON(IifObj(oRow:GEI_AUDIT_EMPRESA, "")) + cQ + "}"
-        Next nIdx
-        cOut += "]}"
-    EndIf
-
-    ConOut("GBAUDExport " + cFmt + " gerado com " + Str(Len(aHit)) + " registros")
-
-    If Len(aArea) > 0
-        RestArea(aArea)
-    EndIf
-Return cOut
-
-// Retorna valor se nao for Nil, senao retorna valorPadrao.
-Static Function IifObj(xVal, xPadrao)
-    If xVal == Nil
-        Return xPadrao
-    EndIf
-Return xVal
-
-// Substitui ocorrencias de cOld por cNew em cStr.
-Static Function StrRep(cStr, cOld, cNew)
-    Local cRet   := ""
-    Local nPos   := 1
-    Local nLenO  := Len(cOld)
-    Local nLenS  := Len(cStr)
-    Local nNext  := 0
-
-    If cOld == "" .Or. cStr == ""
-        Return cStr
-    EndIf
-
-    cRet := ""
-    While nPos <= nLenS
-        nNext := At(cOld, cStr, nPos)
-        If nNext == 0
-            cRet := cRet + SubStr(cStr, nPos)
-            Exit
-        EndIf
-        cRet := cRet + SubStr(cStr, nPos, nNext - nPos)
-        cRet := cRet + cNew
-        nPos := nNext + nLenO
-    EndDo
-Return cRet
-
-// Escape de aspas duplas para CSV.
-Static Function EscCSV(cVal)
-    Local cRet := ""
-    If cVal == Nil
-        cRet := ""
-    Else
-        cRet := AllTrim(cVal)
-    EndIf
-    If At(",", cRet) > 0 .Or. At(Chr(34), cRet) > 0 .Or. At(Chr(13), cRet) > 0
-        cRet := Chr(34) + StrRep(cRet, Chr(34), Chr(34) + Chr(34)) + Chr(34)
-    EndIf
-Return cRet
-
-// Escape de caracteres especiais para JSON.
-Static Function EscJSON(cVal)
-    Local cRet := ""
-    Local cBS  := ""
-    If cVal == Nil
-        cRet := ""
-    Else
-        cRet := AllTrim(cVal)
-    EndIf
-    cBS := Chr(92)
-    cRet := StrRep(cRet, cBS, cBS + cBS)
-    cRet := StrRep(cRet, Chr(34), cBS + Chr(34))
-    cRet := StrRep(cRet, Chr(10), cBS + "n")
-    cRet := StrRep(cRet, Chr(13), cBS + "r")
-Return cRet

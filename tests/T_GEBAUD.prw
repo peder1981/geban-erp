@@ -68,7 +68,7 @@ User Function T_GEBAUD()
 
     // Verify logs exist
     If lOk
-        aLog := GBAUDLISTAR("01", "", "", 10)
+        aLog := TCSqlQuery("SELECT GEI_AUDIT_TABELA FROM GEI_AUDIT WHERE D_E_L_E_T_ = ' ' AND GEI_AUDIT_EMPRESA = '01'")
         If Len(aLog) < 2
             ConOut("T_GEBAUD: expected 2 logs, got " + LTrim(Str(Len(aLog))))
             lOk := .F.
