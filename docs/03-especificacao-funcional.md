@@ -692,8 +692,9 @@ navegador é uma sessão (VM própria).
   colunas de credencial (`TUISigilo`)); clicar numa linha preenche os campos ligados dos formulários.
   Abaixo, os formulários em abas pelo prefixo do título: Operações, Relatórios, Banco,
   NF-e de fornecedores, Simples Nacional e Documentos eletrônicos.
-- **Frente de loja** (`TUIPdvPg`): venda numa tela (carrinho, preço/promoção, pagamentos múltiplos,
-  troco), caixa, orçamentos, consultas, cadastros, relatórios, TEF/NFC-e e devolução.
+- **PDV web** (`public/pdv.html`, rota `/pdv` do GEBWEB): frente de caixa com login próprio,
+  carrinho, pagamentos múltiplos (inclusive crypto), troco e abrir/fechar caixa.
+  Substituiu o módulo TUI "Frente de loja" (`GEBTUIPDV`, removido).
 - **Rastreabilidade** (`TUIRastreio`): origem + número → árvore com os registros de cada etapa (`GEBTRAK*`).
 - **Resultado**: relatórios (`GBR1` ou a tabela do relatório) com botão Voltar (`GEBTUIBRW`).
 

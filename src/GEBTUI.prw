@@ -44,7 +44,6 @@
 #include "GEBEXP_REL_BIZ.prw"
 #include "GEBEXP_REL_NUC.prw"
 #include "GEBEXP_TRAK.prw"
-#include "GEBTUIPDV.prw"
 
 // bTUIBrw: com o app ativo, GEBTUIBRW mostra a tabela na pagina Resultado.
 Static bTUIBrw := Nil
@@ -86,7 +85,7 @@ Static Function TUILogin(oApp, oPg)
     Local oUsu := PoInput():New(oW, "Usuario")
     Local oSen := PoPassword():New(oW, "Senha")
     Local oBtn := PoButton():New(oW, "Entrar")
-    Local aMod := {"Fiscal e NF-e", "Financeiro", "Estoque", "Contabil", "Compras", "Faturamento", "Frente de loja", "Simples Nacional"} as Array
+    Local aMod := {"Fiscal e NF-e", "Financeiro", "Estoque", "Contabil", "Compras", "Faturamento", "Simples Nacional"} as Array
     Local nI   := 0 as Numeric
 
     // Duas colunas: apresentacao a esquerda, acesso a direita (grade de 12).
@@ -319,7 +318,7 @@ Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
     For nI := 1 To Len(aMods)
         If TUIPode(cUsu, aMods[nI][3])
             If Len(aMods[nI]) >= 5
-                oPg := Eval(aMods[nI][5], oApp)   // pagina propria (Frente de loja)
+                oPg := Eval(aMods[nI][5], oApp)   // pagina propria (modulo com tela custom)
             Else
                 oPg := TUIModPg(oApp, aMods[nI], aForms, cUsu)
             EndIf
@@ -383,7 +382,6 @@ Return { ;
     {"Compras", "an an-shopping-cart", "COMPRAS", {{"GCP1", "Fornecedores"}, {"GCP3", "Pedidos"}}}, ;
     {"Faturamento", "an an-file-text", "FATURAMENTO", {{"GFT1", "Clientes"}, {"GFT2", "Precos"}, {"GFT3", "Pedidos de venda"}, {"GSK1", "Regras Sarney"}, ;
         {"GSK3", "Historico Sarney"}, {"GCK1", "Wallets crypto"}, {"GCK2", "Pagamentos crypto"}}}, ;
-    {"Frente de loja", "an an-storefront", "LOJA", {}, {|oApp| TUIPdvPg(oApp, cEmp, cFil, cUsu)}}, ;
     {"Nucleo", "an an-gear", "ADMIN", {{"GE1", "Empresas"}, {"GEU1", "Unidades"}, {"GEF1", "Filiais"}, {"GE2", "Usuarios"}}} ;
     }
 
@@ -1330,7 +1328,7 @@ Static Function TUIItemMostra(aIt)
         aRow := {cValToChar(nI)}
         For nJ := 1 To Len(aIt[1][nI])
             If ValType(aIt[1][nI][nJ]) == "N"
-                aAdd(aRow, TUIPdvQtd(aIt[1][nI][nJ]))
+                aAdd(aRow, TUIQtd(aIt[1][nI][nJ]))
             Else
                 aAdd(aRow, BOSTR(aIt[1][nI][nJ]))
             EndIf
@@ -1339,6 +1337,18 @@ Static Function TUIItemMostra(aIt)
     Next nI
     aIt[2]:SetItems(aLin)
 Return
+
+// Quantidade no formato brasileiro sem zeros inuteis: 1, 2,5, 0,375 ("1.000" se lia "mil").
+Static Function TUIQtd(nQtd)
+    Local cQ := AllTrim(Str(nQtd, 18, 3)) as Character
+
+    Do While "." $ cQ .And. Right(cQ, 1) == "0"
+        cQ := Left(cQ, Len(cQ) - 1)
+    EndDo
+    If Right(cQ, 1) == "."
+        cQ := Left(cQ, Len(cQ) - 1)
+    EndIf
+Return StrTran(cQ, ".", ",")
 
 // Botao auxiliar do formulario: o bloco devolve {lOk, cMsg, {{nCampo, xValor}...}}.
 Static Function TUICalcula(oApp, bCalc, aCps)

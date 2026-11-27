@@ -72,7 +72,6 @@
 #include "../src/GEBTUIBO.prw"
 #include "../src/GEBTUI.prw"
 #include "../src/GEBEXP_TRAK.prw"
-#include "../src/GEBTUIPDV.prw"
 #include "../src/GEBDER_FIN.prw"
 #include "../src/GEBRET.prw"
 
@@ -108,12 +107,8 @@ User Function T_GEBTUI_OPS()
     GEBBCOMIG()
     GEBTUIBRWAPP({|cAlias, cTit| ConOut("    grade " + cAlias + ": " + cTit), .T.})
     aMods := TUIModulos("zz", "", "super")
-    lOk := Chk(lOk, "modulos", Len(aMods) >= 9)
+    lOk := Chk(lOk, "modulos", Len(aMods) >= 8)
     aForms := TUIFormularios("zz", "")
-    // formularios do PDV que nao dependem da sessao de caixa
-    aEval(TUIPdvCadastros(), {|x| aAdd(aForms, x)})
-    aEval(TUIPdvRelatorios(), {|x| aAdd(aForms, x)})
-    aEval(TUIPdvTef(), {|x| aAdd(aForms, x)})
     For nM := 1 To Len(aForms)
         aVal := {}
         For nO := 1 To Len(aForms[nM][5])
@@ -125,7 +120,7 @@ User Function T_GEBTUI_OPS()
     Next nM
     ConOut("  formularios executados: " + cValToChar(Len(aForms)))
     // Todas as operacoes sao formularios. Queda inesperada = operacao perdida.
-    lOk := Chk(lOk, "formularios", Len(aForms) >= 140)
+    lOk := Chk(lOk, "formularios", Len(aForms) >= 130)
 
     // JSON dos formularios do DF-e: UF maiuscula, IBGE direto, CONT_UF nao vai
     aR := TUIDfeJson({|o| {.T., o:ToJson()}}, {"UF", "MUNICIPIO", "CONT_UF", "CONT_MUNICIPIO"}, {"sp", "3550308", "rj", "3304557"})

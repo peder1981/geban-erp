@@ -1421,7 +1421,7 @@ Todas as funções de negócio devolvem `{lOk, cMsg, xDados}`. Os relatórios de
 
 **Venda da loja (`loja/venda`):** além de `sessao`, `itens`, `pagamentos`, `cliente` e `desconto`, aceita `vendedor`, `cpf`, `supervisor`, `senha_supervisor` (desconto acima de `LOJ_DESC_MAX`) e `regime` (`FISCAL` padrão ou `COMPROVANTE`; `loja/orcamento-finalizar` aceita `regime` também). Em `itens`, `produto` pode ser o código de barras ou a etiqueta da balança. Em `pagamentos`, a forma `VALE` leva o número do vale em `documento`; a forma `CRYPTO` leva `"MOEDA|ENDERECO"` em `documento` (ex.: `BTC|bc1q...`), exige `CRY_CONTA` configurada e wallet ativa da moeda — a cotação BRL→crypto é buscada no CoinGecko uma única vez por pagamento e o QR code é montado no caixa (`/api/pdv/crypto/previa`). Com `regime=COMPROVANTE` a venda não emite NFC-e **nem grava GF3/GF4** (o comprovante interno não entra na apuração de DAS nem de IBS/CBS; o faturamento `GEBFATFAT` segue a mesma regra e zera `GFT5_IBS`/`GFT5_CBS`). Com `LOJ_REG_ATIVO=S`, o teto de desconto passa a depender do regime: `COMPROVANTE` pago em dinheiro usa `LOJ_REG_DESCC`, qualquer outro caso usa `LOJ_REG_DESCF`.
 
-**Propagação da forma CRYPTO pelos módulos:** PDV web (`pdv.html` + `GEBPDV_API`) e PDV TUI (`GEBTUIPDV`, campo `MOEDA|ENDERECO`) → `GEBLOJVEN` valida conta `CRY_CONTA`, wallet e cotação; na liquidação credita `CRY_CONTA` (`GEBFXMOVCONTA`), grava auditoria `GCK2` (moeda, endereço, BRL, quantidade, cotação) e lançamento contábil `LOJ_CRYPTO` (evento padrão débito `1.01.002` / crédito `3.01.001`, conta financeira real no débito); NFC-e leva `tPag=99` com `xPag="Crypto <MOEDA>"`; cancelamento (`GEBLOJCAN`) estorna a conta e o evento; `GEBLOJRESUMO` consolida `forma CRYPTO` por sessão. O PDV web ganhou `GET /api/pdv/caixa/sessoes` (`GEBPDVCAIXASS`) para retomar sessão de caixa já aberta — `pdv.html` passa a chamar as rotas sob `/api/pdv/*` (antes prefixo `/api` não batia com nenhuma rota).
+**Propagação da forma CRYPTO pelos módulos:** PDV web (`pdv.html` + `GEBPDV_API`) → `GEBLOJVEN` valida conta `CRY_CONTA`, wallet e cotação; na liquidação credita `CRY_CONTA` (`GEBFXMOVCONTA`), grava auditoria `GCK2` (moeda, endereço, BRL, quantidade, cotação) e lançamento contábil `LOJ_CRYPTO` (evento padrão débito `1.01.002` / crédito `3.01.001`, conta financeira real no débito); NFC-e leva `tPag=99` com `xPag="Crypto <MOEDA>"`; cancelamento (`GEBLOJCAN`) estorna a conta e o evento; `GEBLOJRESUMO` consolida `forma CRYPTO` por sessão. O PDV web ganhou `GET /api/pdv/caixa/sessoes` (`GEBPDVCAIXASS`) para retomar sessão de caixa já aberta — `pdv.html` passa a chamar as rotas sob `/api/pdv/*` (antes prefixo `/api` não batia com nenhuma rota).
 
 **Entrada de compra (`compras/entrada`):** além de `nota`, `pedido`, `itens`, `frete` e `data`, aceita `retencoes` (códigos da GRT1 separados por vírgula, ex.: `ISS5,IR15`).
 
@@ -1613,7 +1613,7 @@ Situações em GDF5: `AUTORIZADA`, `CONTINGENCIA`, `REJEITADA`, `REJEITADA_CONTI
 
 **Telas:**
 - Fiscal > Documentos eletrônicos (`GEBTUIDFE`, 12 opções).
-- Frente de loja > "NFC-e: transmitir as emitidas em contingência" e "NFC-e: DANFE do cupom". A segunda mostra o texto e um link de impressão com token novo.
+- A tela TUI de "NFC-e: transmitir contingência" / "DANFE do cupom" saiu com a descontinuação da Frente de loja; as operações seguem no backend (rotas `/api/dfe/*` e BOs).
 
 **Testes:**
 

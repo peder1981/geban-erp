@@ -40,7 +40,7 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 | | |
 |---|---|
 | ![Login](docs/img/01-login.jpg) **Login** — instalação nova já traz a conta `super`; o primeiro acesso pede troca de senha | ![Troca obrigatória](docs/img/11-troca-senha.jpg) **Troca de senha obrigatória**, com as regras da política ao lado |
-| ![Início](docs/img/03-inicio.jpg) **Início** — sessão, indicadores e saldo por conta | ![Frente de loja](docs/img/16-pdv.jpg) **Frente de loja** — venda numa tela: carrinho com preço e promoção, pagamentos e troco |
+| ![Início](docs/img/03-inicio.jpg) **Início** — sessão, indicadores e saldo por conta | ![PDV](docs/img/25-pdv-web-crypto.jpg) **PDV** — frente de caixa web (`public/pdv.html`): login próprio, carrinho, pagamentos, troco e QR crypto |
 | ![Fiscal](docs/img/04-modulo-fiscal.jpg) **Fiscal** — produtos, notas e Simples em abas; operações em formulários | ![Documentos eletrônicos](docs/img/18-documentos-eletronicos.jpg) **Documentos eletrônicos** — emitente, configuração, SEFAZ, NFS-e e EFD |
 | ![Financeiro](docs/img/05-modulo-financeiro.jpg) **Financeiro** — contas, títulos, baixa com juros e banco | ![Estoque](docs/img/06-modulo-estoque.jpg) **Estoque** — saldos, lotes e endereços, fechamento do mês |
 | ![Compras](docs/img/20-modulo-compras.jpg) **Compras** — fornecedores, pedidos, NF-e de fornecedores | ![Grade de itens](docs/img/17-formulario-itens.jpg) **Formulário com grade de itens** (pedido de compra) |
@@ -48,9 +48,9 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 | ![Núcleo](docs/img/09-modulo-nucleo.jpg) **Núcleo** — empresas, unidades, filiais, usuários, permissões e agendamentos | ![Usuários](docs/img/10-nucleo-usuarios.jpg) **Usuários** — cadastro e vínculos por empresa |
 | ![Rastreabilidade](docs/img/19-rastreabilidade.jpg) **Rastreabilidade** — o caminho de um documento em árvore | |
 
-## Frente de loja: crypto, Sarney e regime de venda
+## PDV: crypto, Sarney e regime de venda
 
-Três recursos da operação de balcão, propagados por PDV, faturamento, fiscal, financeiro e contábil:
+A frente de caixa é o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv` — ex.: `http://servidor:8090/pdv`). O antigo módulo "Frente de loja" do TUI foi descontinuado. Três recursos da operação de balcão, propagados por PDV, faturamento, fiscal, financeiro e contábil:
 
 - **Crypto** — pagamento em BTC, ETH, XMR, USDC e USDT. O caixa escolhe a moeda, o sistema converte o total de BRL pela cotação e gera o QR Code para o cliente pagar. Exige wallet do estabelecimento cadastrada; o lançamento cai na conta crypto configurada e o cancelamento estorna a moeda.
 - **Gatilho Sarney** — reajuste automático de preços sem etiquetadora: percentual geral ou por produto, número de repetições e frequência diária, executado pelo agendador com histórico de cada rodada.

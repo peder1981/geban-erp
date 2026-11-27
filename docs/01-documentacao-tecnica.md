@@ -252,8 +252,9 @@ navegador é uma sessão (VM própria).
   colunas de credencial (`TUISigilo`)); clicar numa linha preenche os campos ligados dos formulários.
   Abaixo, os formulários em abas pelo prefixo do título: Operações, Relatórios, Banco,
   NF-e de fornecedores, Simples Nacional e Documentos eletrônicos.
-- **Frente de loja** (`TUIPdvPg`): venda numa tela (carrinho, preço/promoção, pagamentos múltiplos,
-  troco), caixa, orçamentos, consultas, cadastros, relatórios, TEF/NFC-e e devolução.
+- **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv`): frente de caixa com login próprio,
+  carrinho, preço/promoção, pagamentos múltiplos (inclusive crypto com QR Code), troco e abrir/fechar caixa.
+  Substituiu o módulo TUI "Frente de loja" (`GEBTUIPDV`, removido).
 - **Rastreabilidade** (`TUIRastreio`): origem + número → árvore com os registros de cada etapa (`GEBTRAK*`).
 - **Resultado**: relatórios (`GBR1` ou a tabela do relatório) com botão Voltar (`GEBTUIBRW`).
 
@@ -525,7 +526,7 @@ Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks an
 | `src/GEBEXP_TRAK.prw` | `GEBTRAKCOMPRA`, `GEBTRAKVENDA`, `GEBTRAKNOTAFISCAL`, `GEBTRAKDERRAMA` | `tests/T_GeExp_REL_BIZ.prw` |
 | `src/GEBEXP_REL_NUC.prw` | `GEBRELEMPRESAS`, `GEBRELUSUARIOS`, `GEBRELAUDITORIA`, `GEBRELMENTOR`, `GEBRELCADASTROS` | `tests/T_GeExp_REL_NUC.prw` |
 | `src/GEBTUI.prw` | Interface PO-UI: login, empresa/filial, menu, Início, páginas de módulo, formulários (`TUIFormularios`), rastreabilidade | `tests/T_GEBTUI_OPS.prw`, `tests/T_GEBTUI_FLUXOS.prw`, `tests/T_GEBTUI_PERM.prw` |
-| `src/GEBTUIPDV.prw` | Frente de loja (PDV): venda, caixa, orçamentos, consultas, devolução | `tests/T_GEBTUIPDV.prw` |
+| `public/pdv.html` | PDV web (frente de caixa): venda, caixa, crypto, regime | — |
 | `src/GEBTUIBO.prw` | DANFE da NFC-e do cupom | `tests/T_GEBTUIBO.prw` |
 | massas | carga + regressão | `tests/T_GeExp_MASSA.prw` (3 empresas × 20 NFs + 5 guias + 10 pedidos + 10 CTB) + `tests/T_GEBAN_MASSA.prw`, `T_GEBFIS_MASSA`, `T_GEBDER_MASSA`, `T_GEBV_MASSA`, `T_GEBCTB_MASSA`, `T_GEBFIN_MASSA`, `T_GEBCOM_MASSA` |
 

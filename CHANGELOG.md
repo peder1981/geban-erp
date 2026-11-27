@@ -5,6 +5,10 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 
 ## [Não lançado]
 
+### Frente de caixa
+- **O módulo "Frente de loja" do TUI (`GEBTUIPDV`) foi descontinuado e removido.** A frente de caixa passa a ser o PDV web (`public/pdv.html`), servido pelo GEBWEB em `/pdv`. Backend inalterado (`GEBLOJVEN`, tabelas GLJ*, rotas `/api/pdv/*`, permissões `LOJA/*`). Orçamentos, devolução, TEF/NFC-e, cadastros e relatórios de caixa seguem disponíveis via API (`/api/pdv/*` e BOs `loja/*`), sem tela própria no TUI.
+- PDV web: alias `POST /api/pdv/login` (mesmo handler de `/api/login`) para publicação em bordas que bloqueiam `/api/login`; tema claro do ERP.
+
 ### Documentação
 - **Manual do usuário** (`docs/08-manual-do-usuario.md` e PDF): passo a passo de todas as telas, com capturas reais anotadas (moldura numerada e balão no menu, campo ou botão a usar), a rotina executada numa empresa de demonstração e a referência dos 153 formulários dos 9 módulos.
 

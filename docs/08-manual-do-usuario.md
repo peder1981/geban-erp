@@ -77,7 +77,7 @@ dados totalmente separados.
 
 ## 1.5 Como funciona cada módulo
 
-Todos os módulos (exceto a Frente de loja) têm o mesmo desenho:
+Todos os módulos têm o mesmo desenho:
 
 ![Desenho de um módulo](img/manual/m02-financeiro.png)
 
@@ -343,7 +343,9 @@ também precisam permitir.
 7. **Filial** (vazio = matriz).
 8. **Confirmar**. Aviso: *gravado*.
 
-## 2.12 Frente de loja (PDV)
+## 2.12 PDV (frente de caixa)
+
+> **Nota:** a frente de caixa é o **PDV web** (`/pdv` no servidor GEBWEB, porta 8090 — ex.: `http://servidor:8090/pdv`), com login próprio (empresa/usuário/senha), carrinho, formas de pagamento (inclusive crypto com QR Code) e abrir/fechar caixa. O antigo módulo "Frente de loja" do TUI foi descontinuado; as seções abaixo descrevem as operações de caixa que seguem valendo — os cadastros e relatórios de loja podem ser usados via API `/api/pdv/*` ou pelos BOs `loja/*`.
 
 ### Preparar a loja (uma vez)
 
@@ -2215,7 +2217,9 @@ Curva ABC dos produtos pelo faturamento do período.
 3. **Confirmar**: executa a operação.
 
 
-## 3.8 Frente de loja
+## 3.8 Frente de loja (descontinuada)
+
+> **Nota:** este módulo do TUI foi descontinuado e removido do menu — a frente de caixa agora é o **PDV web** em `/pdv` no servidor GEBWEB (porta 8090). O texto abaixo ficou como referência das operações de caixa, que continuam existindo no backend (`/api/pdv/*`, BOs `loja/*`).
 
 ![Frente de loja](img/manual/m08-frente-de-loja.png)
 
