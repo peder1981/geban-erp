@@ -546,7 +546,10 @@ Static Function GEBRESTRLIMIT(cIP, nLim)
 
     cData := DToS(Date())
     cHora := Time()
-    cSeg := SubStr(cHora, 1, 5) // MM:SS -> apenas minutos
+    cSeg := SubStr(cHora, 1, 5) // HH:MM -> janela de um minuto
+    // RL_MIN guarda data+minuto (largura fixa, ordem lexicografica = cronologica)
+    // para o cleanup apagar registros de dias anteriores tambem.
+    cMinAct := cData + cSeg
 
     cKey := cIP + "|" + cData + "|" + cSeg
 
@@ -575,11 +578,11 @@ Static Function GEBRESTRLIMIT(cIP, nLim)
             TCSqlExec("UPDATE GE_REST_RL SET RL_CNT = " + cValToChar(nCnt) + " WHERE RL_KEY = " + GEBDBQuote(cKey) + " AND D_E_L_E_T_ = ' '")
         EndIf
     Else
-        TCSqlExec("INSERT INTO GE_REST_RL (D_E_L_E_T_, RL_KEY, RL_CNT, RL_MIN) VALUES (' ', " + GEBDBQuote(cKey) + ", 1, " + GEBDBQuote(cSeg) + ")")
+        TCSqlExec("INSERT INTO GE_REST_RL (D_E_L_E_T_, RL_KEY, RL_CNT, RL_MIN) VALUES (' ', " + GEBDBQuote(cKey) + ", 1, " + GEBDBQuote(cMinAct) + ")")
     EndIf
 
-    // Cleanup: remove registros com mais de 2 minutos.
-    TCSqlExec("DELETE FROM GE_REST_RL WHERE D_E_L_E_T_ = ' ' AND RL_MIN < " + GEBDBQuote(cSeg) + "")
+    // Cleanup: remove registros de janelas anteriores a atual.
+    TCSqlExec("DELETE FROM GE_REST_RL WHERE D_E_L_E_T_ = ' ' AND RL_MIN < " + GEBDBQuote(cMinAct) + "")
 
     If Len(aArea) > 0
         RestArea(aArea)

@@ -302,7 +302,7 @@ User Function GEBPDVRELCOM(cUsuario, aBody)
 Return PDVRES(aR[1], aR[2], aR)
 
 /*/{Protheus.doc} GEBPDVPERIFLIST
-    Lista perifÃ©ricos configurados via API REST.
+    Lista periféricos configurados via API REST.
     @type Consulta periferico
     @author Peder Munksgaard
     @since 21/10/2026
@@ -345,7 +345,7 @@ User Function GEBPDVPERIFLIST(cUsuario, cTipo)
 Return PDVRES(.T., "perifericos_listados", aR)
 
 /*/{Protheus.doc} GEBPDVPERIFREG
-    Registra perifÃ©rico via API REST.
+    Registra periférico via API REST.
     @type Cadastro periferico
     @author Peder Munksgaard
     @since 21/10/2026
@@ -381,6 +381,9 @@ User Function GEBPDVPERIFREG(cUsuario, aBody)
     TCSqlExec("INSERT INTO GEP_PERIFERICOS (D_E_L_E_T_, GEP_FILIAL, GEP_TIPO, GEP_DRIVER, GEP_CONFIG, GEP_NOME, GEP_ATIVO, GEP_STATUS, GEP_DTALT, GEP_USALT) " + ;
         "VALUES (' ', " + GEBDBQuote(cFil) + ", " + GEBDBQuote(cTipo) + ", " + GEBDBQuote(cDriver) + ", " + GEBDBQuote(jConfig) + ", " + GEBDBQuote(cNome) + ", 'S', 'DESCONNECTED', " + GEBDBQuote(cData) + ", '')")
 
+    // ponytail: LAST_VALUE da sequence pode devolver o id de outro registro
+    // se dois registros correrem em paralelo (tela admin, raro). Upgrade:
+    // INSERT ... RETURNING quando o runtime expuser retorno de linhas no exec.
     aSeq := TCSqlQuery("SELECT LAST_VALUE FROM GEP_PERIFERICOS_R_E_C_N_O_seq")
     If Len(aSeq) > 0
         nId := Val(cValToChar(aSeq[1]:LAST_VALUE))
@@ -393,7 +396,7 @@ User Function GEBPDVPERIFREG(cUsuario, aBody)
 Return PDVRES(.T., "periferico_registrado: " + cNome, nId)
 
 /*/{Protheus.doc} GEBPDVPERIFDEL
-    Remove perifÃ©rico via API REST.
+    Remove periférico via API REST.
     @type Remocao periferico
     @author Peder Munksgaard
     @since 21/10/2026
@@ -462,7 +465,7 @@ User Function GEBPDVSANGRIA(cUsuario, aBody)
 
 Return PDVRES(aR[1], aR[2], {})
 
-// ===== RELATÃ“RIOS COM EXPORTAÃ‡ÃƒO =====
+// ===== RELATÓRIOS COM EXPORTAÇÃO =====
 
 /*/{Protheus.doc} GEBPDVRELGERCSV
     Relatorio gerencial exportado como CSV.

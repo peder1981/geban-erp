@@ -2,9 +2,9 @@
 #include "GEBDB_CORE.prw"
 
 /*/{Protheus.doc} GEBPDVHTML
-    Serve a interface PDV (pÃ¡gina HTML autocontida).
-    LÃª o arquivo public/pdv.html e retorna como resposta HTTP.
-    @type Rota HTTP (HTML estÃ¡tico)
+    Serve a interface PDV (página HTML autocontida).
+    Lê o arquivo public/pdv.html e retorna como resposta HTTP.
+    @type Rota HTTP (HTML estático)
     @author Peder Munksgaard
     @since 21/10/2026
 /*/
@@ -33,8 +33,8 @@ User Function GEBPDVHTML(oReq)
 Return {"__RAW_HTTP__", "text/html; charset=utf-8", cContent, 200}
 
 /*/{Protheus.doc} GEBPDVWS
-    Health check do serviÃ§o WebSocket de perifÃ©ricos.
-    Retorna status do serviÃ§o (porta 9100).
+    Health check do serviço WebSocket de periféricos.
+    Retorna status do serviço (porta 9100).
     @type Rota HTTP (JSON)
     @author Peder Munksgaard
     @since 21/10/2026

@@ -2,7 +2,7 @@
 #include "GEBDB_CORE.prw"
 
 /*/{Protheus.doc} GEBPERIF_MIG
-    Migracao idempotente do modulo de perifÃ©ricos GEBAN (schema de empresa).
+    Migracao idempotente do modulo de periféricos GEBAN (schema de empresa).
     Cria GEP_PERIFERICOS (configuracao de impressoras, TEFs, leitores,
     balancas e gavetas) via GEBDBTableEnsure.
     @type Modulo de migracao (por empresa)
