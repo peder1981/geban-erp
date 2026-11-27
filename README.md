@@ -48,6 +48,20 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 | ![Núcleo](docs/img/09-modulo-nucleo.jpg) **Núcleo** — empresas, unidades, filiais, usuários, permissões e agendamentos | ![Usuários](docs/img/10-nucleo-usuarios.jpg) **Usuários** — cadastro e vínculos por empresa |
 | ![Rastreabilidade](docs/img/19-rastreabilidade.jpg) **Rastreabilidade** — o caminho de um documento em árvore | |
 
+## Frente de loja: crypto, Sarney e regime de venda
+
+Três recursos da operação de balcão, propagados por PDV, faturamento, fiscal, financeiro e contábil:
+
+- **Crypto** — pagamento em BTC, ETH, XMR, USDC e USDT. O caixa escolhe a moeda, o sistema converte o total de BRL pela cotação e gera o QR Code para o cliente pagar. Exige wallet do estabelecimento cadastrada; o lançamento cai na conta crypto configurada e o cancelamento estorna a moeda.
+- **Gatilho Sarney** — reajuste automático de preços sem etiquetadora: percentual geral ou por produto, número de repetições e frequência diária, executado pelo agendador com histórico de cada rodada.
+- **DIFAL extraoficial** — o regime é negociado no balcão: **comprovante** (só garantia, sem documento fiscal, com teto de desconto em dinheiro mais vantajoso) ou **fiscal** (emite NFC-e/NF-e normalmente). No comprovante nada entra na apuração de impostos.
+
+| | |
+|---|---|
+| ![Gatilho Sarney](docs/img/21-faturamento-sarney.jpg) **Gatilho Sarney** — regras de reajuste no Faturamento | ![Wallets crypto](docs/img/22-faturamento-wallets-crypto.jpg) **Wallets crypto** — endereços por moeda |
+| ![Regime no pedido](docs/img/23-faturamento-pedido-regime.jpg) **Regime no pedido** — comprovante ou fiscal | ![PDV crypto](docs/img/24-pdv-crypto.jpg) **PDV crypto** — forma CRYPTO com QR Code |
+| ![PDV web crypto](docs/img/25-pdv-web-crypto.jpg) **PDV web** — cotação BTC e regime comprovante | ![Venda comprovante](docs/img/26-pdv-web-venda-finalizada.jpg) **Venda finalizada** — comprovante sem documento fiscal |
+
 ## Como funciona
 
 ```mermaid

@@ -113,6 +113,7 @@ User Function GEBWEB(nPorta)
     oSrv:AddRoute("GET", "/api/dfe/efd", "U_GEBWAPI_DFEEFD")
     // Rotas PDV (frente de loja)
     oSrv:AddRoute("GET", "/api/pdv/caixa/lista", "U_GEBWAPI_PDVCAIXALST")
+    oSrv:AddRoute("GET", "/api/pdv/caixa/sessoes", "U_GEBWAPI_PDVCAIXASS")
     oSrv:AddRoute("POST", "/api/pdv/caixa/abrir", "U_GEBWAPI_PDVCAIXAABR")
     oSrv:AddRoute("POST", "/api/pdv/caixa/fechar", "U_GEBWAPI_PDVCAIXAFECH")
     oSrv:AddRoute("GET", "/api/pdv/caixa/resumo/{sessao}", "U_GEBWAPI_PDVCAIXARESUMO")
@@ -325,6 +326,14 @@ User Function GEBWAPI_PDVCAIXALST(oReq)
         Return GEBWAPIDENY()
     EndIf
 Return GEBPDVCAIXALST(cUsu)
+
+User Function GEBWAPI_PDVCAIXASS(oReq)
+    Local cUsu := GEBPDV_AUTH(oReq) as Character
+
+    If cUsu == ""
+        Return GEBWAPIDENY()
+    EndIf
+Return GEBPDVCAIXASS(cUsu)
 
 User Function GEBWAPI_PDVCAIXAABR(oReq)
     Local cUsu := GEBPDV_AUTH(oReq) as Character

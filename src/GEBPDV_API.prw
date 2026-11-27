@@ -42,6 +42,42 @@ User Function GEBPDVCAIXALST(cUsuario)
 
 Return PDVRES(.T., "caixas_listados", aR)
 
+/*/{Protheus.doc} GEBPDVCAIXASS
+    Lista sessoes de caixa abertas (GLJ2) via API REST -- permite ao PDV web
+    retomar uma sessao ja aberta em vez de depender so do GLJ1.
+    @type Consulta caixa
+    @author Peder Munksgaard
+    @since 26/11/2026
+/*/
+User Function GEBPDVCAIXASS(cUsuario)
+    Local aArea := GetArea()
+    Local cFil  := FWxFilial("GLJ2")
+    Local aHit  := {}
+    Local aR    := {}
+    Local nI    := 0
+
+    If !GEBSECRBAC(cUsuario, "PDV", "01")
+        Return PDVRES(.F., "sem_permissao", {})
+    EndIf
+
+    If !GEBDBTableExistsHere("GLJ2")
+        Return PDVRES(.F., "tabela_nao_existente", {})
+    EndIf
+
+    aHit := TCSqlQuery("SELECT GLJ2_SESSAO, GLJ2_CAIXA, GLJ2_OPER, GLJ2_FUNDO, GLJ2_ABERT, GLJ2_HORA FROM GLJ2 " + ;
+        "WHERE GLJ2_FILIAL = " + GEBDBQuote(cFil) + " AND GLJ2_STATUS = 'ABERTA' AND D_E_L_E_T_ = ' ' " + ;
+        "ORDER BY GLJ2_ABERT, GLJ2_SESSAO")
+
+    For nI := 1 To Len(aHit)
+        aAdd(aR, {BOCOL(aHit[nI]:GLJ2_SESSAO), BOCOL(aHit[nI]:GLJ2_CAIXA), BOCOL(aHit[nI]:GLJ2_OPER), BOVAL(aHit[nI]:GLJ2_FUNDO), BOCOL(aHit[nI]:GLJ2_ABERT), BOCOL(aHit[nI]:GLJ2_HORA)})
+    Next
+
+    If Len(aArea) > 0
+        RestArea(aArea)
+    EndIf
+
+Return PDVRES(.T., "sessoes_listadas", aR)
+
 /*/{Protheus.doc} GEBPDVCAIXAABR
     Abre sessao de caixa via API REST.
     @type Operacao caixa

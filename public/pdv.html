@@ -410,18 +410,20 @@ let S = {
 // ============================================================
 // API HELPERS
 // ============================================================
+const API_PREFIX = '/api/pdv';
 async function apiPost(rota, dados) {
   const body = {token: S.token, empresa: S.empresa, ...dados};
-  const r = await fetch('/api' + rota, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const r = await fetch(API_PREFIX + rota, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
   return r.json();
 }
 async function apiGet(rota) {
+  const sep = rota.indexOf('?') >= 0 ? '&' : '?';
   const q = 'token=' + encodeURIComponent(S.token) + '&empresa=' + encodeURIComponent(S.empresa);
-  const r = await fetch('/api' + rota + '?' + q);
+  const r = await fetch(API_PREFIX + rota + sep + q);
   return r.json();
 }
 async function apiDelete(rota) {
-  const r = await fetch('/api' + rota, {method:'DELETE', headers:{'Content-Type':'application/json'}});
+  const r = await fetch(API_PREFIX + rota, {method:'DELETE', headers:{'Content-Type':'application/json'}});
   return r.json();
 }
 
@@ -436,7 +438,12 @@ async function doLogin() {
   if (!emp || !user || !pass) { msg.textContent='Preencha todos os campos'; msg.className='msg err'; return; }
   try {
     const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({empresa:emp, usuario:user, senha:pass})});
-    const d = await r.json();
+    let d = await r.json();
+    if (Array.isArray(d)) {
+      const o = {};
+      for (let i = 0; i + 1 < d.length; i += 2) o[d[i]] = d[i + 1];
+      d = o;
+    }
     if (d.ok) {
       S.token = d.token; S.empresa = d.empresa; S.usuario = user;
       document.getElementById('login-screen').style.display = 'none';
@@ -502,7 +509,7 @@ async function initPDV() {
   updateTime(); setInterval(updateTime, 1000);
   await loadCaixas();
   connectWebSocket();
-  loadDrivers();
+  loadPerifericos();
   // Focus scanner
   document.getElementById('barcode-input').focus();
 }
@@ -516,18 +523,18 @@ function updateTime() {
 // ============================================================
 async function loadCaixas() {
   try {
+    const rs = await apiGet('/caixa/sessoes');
+    if (rs.ok && rs.dados && rs.dados.length > 0) {
+      const s = rs.dados.find(x => x[2] === S.usuario) || rs.dados[0];
+      S.sessao = s[0];
+      if (S.sessao) document.getElementById('t-caixa').textContent = 'Sessão: ' + S.sessao;
+      return;
+    }
     const r = await apiGet('/caixa/lista');
     if (r.ok && r.dados && r.dados.length > 0) {
-      // Auto-open first active or first caixa
-      const aberto = r.dados.find(c => c[3] === 'ABERTA');
-      if (aberto) {
-        S.sessao = abrirSessao(aberto[0], aberto[1]);
-      } else {
-        const c = r.dados[0];
-        const r2 = await apiPost('/caixa/abrir', {caixa: c[0], operador: S.usuario, fundo: 100});
-        if (r2.ok) S.sessao = r2.dados[2];
-      }
-      if (S.sessao) document.getElementById('t-caixa').textContent = 'Sessão: ' + S.sessao;
+      const c = r.dados[0];
+      const r2 = await apiPost('/caixa/abrir', {caixa: c[0], operador: S.usuario, fundo: 100});
+      if (r2.ok) { S.sessao = r2.dados[2]; document.getElementById('t-caixa').textContent = 'Sessão: ' + S.sessao; }
     }
   } catch(e) { console.error('loadCaixas', e); }
 }
@@ -548,11 +555,12 @@ async function execCaixa() {
     // Fechar caixa
     const r = await apiPost('/caixa/fechar', {sessao: S.sessao, contado: contado});
     if (r.ok) {
-      const diff = r.dados[2]; // nDiferenca
+      const d = (Array.isArray(r.dados) && Array.isArray(r.dados[2])) ? r.dados[2] : r.dados;
+      const diff = d[2]; // nDiferenca
       const diffColor = diff >= 0 ? 'var(--success)' : 'var(--danger)';
       const diffText = (diff >= 0 ? '+' : '') + 'R$ ' + diff.toFixed(2).replace('.', ',');
       let html = '<b>Sessão fechada!</b><br>';
-      html += 'Esperado: <b>R$ ' + r.dados[0].toFixed(2).replace('.', ',') + '</b><br>';
+      html += 'Esperado: <b>R$ ' + d[0].toFixed(2).replace('.', ',') + '</b><br>';
       html += 'Contado: <b>R$ ' + contado.toFixed(2).replace('.', ',') + '</b><br>';
       html += 'Diferença: <b style="color:' + diffColor + '">' + diffText + '</b>';
       document.getElementById('mr-title').textContent = 'Caixa Fechado';
@@ -620,7 +628,17 @@ async function addFromBarcode() {
   if (!codigo) return;
   const r = await apiGet('/produto/busca?codigo=' + encodeURIComponent(codigo));
   if (r.ok && r.dados) {
-    addToCart(r.dados);
+    let p = r.dados;
+    if (Array.isArray(p)) {
+      const pairs = Array.isArray(p[2]) ? p[2] : [];
+      p = {};
+      pairs.forEach(kv => { if (Array.isArray(kv) && kv.length >= 2) p[kv[0]] = kv[1]; });
+    }
+    if (p.produto || p.codigo || p.descricao) {
+      addToCart({codigo: p.produto || p.codigo, descricao: p.descricao, preco: p.preco_hoje || p.preco_tabela || p.preco || 0, saldo: p.saldo});
+    } else {
+      addToCart({codigo: codigo, descricao: codigo, preco: 0, saldo: 0});
+    }
   } else {
     // Tentar adicionar diretamente como código
     addToCart({codigo: codigo, descricao: codigo, preco: 0, saldo: 0});
@@ -664,9 +682,9 @@ function renderCart() {
       '</div><div class="ci-right">' +
       '<button onclick="changeQtd(' + idx + ',-1)">-</button>' +
       '<span style="min-width:20px;text-align:center">' + item.qtd + '</span>' +
-      '<button onclick="changeQtd(' + idx ',1)">+</button>' +
+      '<button onclick="changeQtd(' + idx + ',1)">+</button>' +
       '<span style="min-width:70px;text-align:right">R$ ' + total.toFixed(2).replace('.', ',') + '</span>' +
-      '<button onclick="removeFromCart(' + idx ')" style="color:var(--danger)">&times;</button>' +
+      '<button onclick="removeFromCart(' + idx + ')" style="color:var(--danger)">&times;</button>' +
       '</div>';
     container.appendChild(div);
   });
@@ -801,8 +819,9 @@ async function finalizarVenda() {
       regime: document.getElementById('regime-venda').value
     });
     if (r.ok) {
-      S.cupom = r.dados[0];
-      mostrarResultado(r);
+      const d = (Array.isArray(r.dados) && Array.isArray(r.dados[2])) ? r.dados[2] : r.dados;
+      S.cupom = d[0];
+      mostrarResultado({dados: d});
       if (S.periféricos.impressora) printReceipt();
     } else {
       toast(r.erro || 'Erro na venda', 'err');
@@ -898,7 +917,7 @@ function linesToEscPos(lines) {
 // ============================================================
 function connectWebSocket() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = proto + '//' + location.host + ':9100';
+  const wsUrl = proto + '//' + location.host + '/pdv/ws';
   S.ws = new WebSocket(wsUrl);
   S.ws.onopen = () => {
     console.log('WebSocket conectado');

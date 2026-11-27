@@ -991,11 +991,12 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBLOJGER` | `GEBLOJGER(cIni, cFim, cAgrupa)` | Relatorio gerencial da loja no periodo, agrupado por DIA (padrao), CAIXA, OPERADOR ou VENDEDOR. |
 | `GEBLOJCOMIS` | `GEBLOJCOMIS(cIni, cFim)` | Relatorio: comissao por vendedor no periodo. |
 
-**`src/GEBPDV_API.prw`** — 16 funções
+**`src/GEBPDV_API.prw`** — 17 funções
 
 | Função | Assinatura | Propósito |
 |---|---|---|
 | `GEBPDVCAIXALST` | `GEBPDVCAIXALST(cUsuario)` | Lista caixas cadastrados via API REST. |
+| `GEBPDVCAIXASS` | `GEBPDVCAIXASS(cUsuario)` | Lista sessoes de caixa abertas (GLJ2) — o PDV web retoma sessao sem reabrir caixa. |
 | `GEBPDVCAIXAABR` | `GEBPDVCAIXAABR(cUsuario, aBody)` | Abre sessao de caixa via API REST. |
 | `GEBPDVCAIXAFECH` | `GEBPDVCAIXAFECH(cUsuario, aBody)` | Fecha sessao de caixa via API REST. |
 | `GEBPDVCUPOMNOV` | `GEBPDVCUPOMNOV(cUsuario, aBody)` | Cria novo cupom via API REST. |
@@ -1420,7 +1421,7 @@ Todas as funções de negócio devolvem `{lOk, cMsg, xDados}`. Os relatórios de
 
 **Venda da loja (`loja/venda`):** além de `sessao`, `itens`, `pagamentos`, `cliente` e `desconto`, aceita `vendedor`, `cpf`, `supervisor`, `senha_supervisor` (desconto acima de `LOJ_DESC_MAX`) e `regime` (`FISCAL` padrão ou `COMPROVANTE`; `loja/orcamento-finalizar` aceita `regime` também). Em `itens`, `produto` pode ser o código de barras ou a etiqueta da balança. Em `pagamentos`, a forma `VALE` leva o número do vale em `documento`; a forma `CRYPTO` leva `"MOEDA|ENDERECO"` em `documento` (ex.: `BTC|bc1q...`), exige `CRY_CONTA` configurada e wallet ativa da moeda — a cotação BRL→crypto é buscada no CoinGecko uma única vez por pagamento e o QR code é montado no caixa (`/api/pdv/crypto/previa`). Com `regime=COMPROVANTE` a venda não emite NFC-e **nem grava GF3/GF4** (o comprovante interno não entra na apuração de DAS nem de IBS/CBS; o faturamento `GEBFATFAT` segue a mesma regra e zera `GFT5_IBS`/`GFT5_CBS`). Com `LOJ_REG_ATIVO=S`, o teto de desconto passa a depender do regime: `COMPROVANTE` pago em dinheiro usa `LOJ_REG_DESCC`, qualquer outro caso usa `LOJ_REG_DESCF`.
 
-**Propagação da forma CRYPTO pelos módulos:** PDV web (`pdv.html` + `GEBPDV_API`) e PDV TUI (`GEBTUIPDV`, campo `MOEDA|ENDERECO`) → `GEBLOJVEN` valida conta `CRY_CONTA`, wallet e cotação; na liquidação credita `CRY_CONTA` (`GEBFXMOVCONTA`), grava auditoria `GCK2` (moeda, endereço, BRL, quantidade, cotação) e lançamento contábil `LOJ_CRYPTO` (evento padrão débito `1.01.002` / crédito `3.01.001`, conta financeira real no débito); NFC-e leva `tPag=99` com `xPag="Crypto <MOEDA>"`; cancelamento (`GEBLOJCAN`) estorna a conta e o evento; `GEBLOJRESUMO` consolida `forma CRYPTO` por sessão.
+**Propagação da forma CRYPTO pelos módulos:** PDV web (`pdv.html` + `GEBPDV_API`) e PDV TUI (`GEBTUIPDV`, campo `MOEDA|ENDERECO`) → `GEBLOJVEN` valida conta `CRY_CONTA`, wallet e cotação; na liquidação credita `CRY_CONTA` (`GEBFXMOVCONTA`), grava auditoria `GCK2` (moeda, endereço, BRL, quantidade, cotação) e lançamento contábil `LOJ_CRYPTO` (evento padrão débito `1.01.002` / crédito `3.01.001`, conta financeira real no débito); NFC-e leva `tPag=99` com `xPag="Crypto <MOEDA>"`; cancelamento (`GEBLOJCAN`) estorna a conta e o evento; `GEBLOJRESUMO` consolida `forma CRYPTO` por sessão. O PDV web ganhou `GET /api/pdv/caixa/sessoes` (`GEBPDVCAIXASS`) para retomar sessão de caixa já aberta — `pdv.html` passa a chamar as rotas sob `/api/pdv/*` (antes prefixo `/api` não batia com nenhuma rota).
 
 **Entrada de compra (`compras/entrada`):** além de `nota`, `pedido`, `itens`, `frete` e `data`, aceita `retencoes` (códigos da GRT1 separados por vírgula, ex.: `ISS5,IR15`).
 
