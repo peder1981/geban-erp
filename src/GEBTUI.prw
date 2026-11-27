@@ -597,12 +597,12 @@ Return { ;
         {|u, a| GEBFATCLI(a[1], a[2], a[3], a[4], a[5], a[6], a[7])}, "BO", "", aFat}, ;
     {"Faturamento", 0, 0, "Preco na tabela", {{"Tabela (vazio = PADRAO)", "C", ""}, {"Produto", "C", ""}, {"Preco", "N", 0}}, ;
         {|u, a| GEBFATPRC(a[1], a[2], a[3])}, "BO", "", aFat}, ;
-    {"Faturamento", 0, 0, "Regra Sarney (reajuste programado de precos)", {{"Codigo", "C", ""}, {"Descricao", "C", ""}, {"Percentual geral %", "N", 0}, ;
+    {"Faturamento", 0, 0, "Sarney: regra de reajuste programado de precos", {{"Codigo", "C", ""}, {"Descricao", "C", ""}, {"Percentual geral %", "N", 0}, ;
         {"Total de aplicacoes", "N", 1}, {"Horarios HHMM separados por espaco (ex.: 0800 1200 1800)", "C", "0800"}, {"Ativo", aSN, "S"}}, ;
         {|u, a| GESSARCFG(a[1], a[2], a[3], a[4], a[5], a[6])}, "BO", "", aFat}, ;
-    {"Faturamento", 0, 0, "% proprio do produto na regra Sarney (0 remove)", {{"Regra (codigo)", "C", ""}, {"Produto", "C", ""}, {"Percentual %", "N", 0}}, ;
+    {"Faturamento", 0, 0, "Sarney: % proprio do produto na regra (0 remove)", {{"Regra (codigo)", "C", ""}, {"Produto", "C", ""}, {"Percentual %", "N", 0}}, ;
         {|u, a| GESSARPROD(a[1], a[2], a[3])}, "BO", "", aFat}, ;
-    {"Faturamento", 0, 0, "Wallet crypto (recebimento em moeda digital)", {{"Moeda", {"BTC", "ETH", "XMR", "USDC", "USDT"}, "BTC"}, ;
+    {"Faturamento", 0, 0, "Crypto: wallet (recebimento em moeda digital)", {{"Moeda", {"BTC", "ETH", "XMR", "USDC", "USDT"}, "BTC"}, ;
         {"Endereco da wallet", "C", ""}, {"Ativo", aSN, "S"}}, {|u, a| GEBCRYWAL(a[1], a[2], a[3])}, "BO", "", aFat}, ;
     {"Faturamento", 0, 0, "Liberar pedido (credito/estoque)", {{"Pedido", "C", ""}, {"Forcar mesmo bloqueado", aSN, "N"}}, ;
         {|u, a| TUILibera(u, a)}, "BO", "", aFat}, ;
@@ -1135,6 +1135,12 @@ Static Function TUIGrupo(cTit)
     EndIf
     If Left(cTit, 5) == "NF-e:"
         Return "NF-e de fornecedores"
+    EndIf
+    If Left(cTit, 7) == "Sarney:"
+        Return "Sarney"
+    EndIf
+    If Left(cTit, 7) == "Crypto:"
+        Return "Crypto"
     EndIf
 Return "Operacoes"
 

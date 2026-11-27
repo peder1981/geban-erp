@@ -26,7 +26,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 
 /* MAIN LAYOUT */
 #pdv-screen{display:none;flex-direction:column;height:100vh}
-.topbar{background:var(--surface);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);flex-shrink:0}
+.topbar{background:var(--surface);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);flex-shrink:0;box-shadow:0 1px 8px rgba(29,35,48,.05);position:relative;z-index:5}
 .topbar .brand{font-size:1.4rem;font-weight:700;color:var(--accent)}
 .topbar .info{display:flex;gap:20px;font-size:.85rem;color:var(--text2)}
 .topbar .info span{display:flex;align-items:center;gap:6px}
@@ -43,9 +43,10 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 .search-bar input{flex:1;font-size:1.2rem;padding:14px}
 .search-bar button{padding:14px 24px;background:var(--accent);color:#fff;font-size:1rem}
 
-.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;overflow-y:auto;flex:1;padding-bottom:8px}
-.product-card{background:var(--surface);border:1px solid var(--bd);border-radius:var(--radius);padding:12px;text-align:center;cursor:pointer;transition:all .15s}
-.product-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));grid-auto-rows:minmax(104px,auto);align-content:start;gap:10px;overflow-y:auto;flex:1;padding-bottom:8px}
+.product-card{background:var(--surface);border:2px solid var(--bd);border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 1px 3px rgba(29,35,48,.05);min-height:88px;display:flex;flex-direction:column;justify-content:center}
+.product-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 16px rgba(15,118,110,.12)}
+.product-grid-empty{grid-column:1/-1;color:var(--text2);font-size:.85rem;text-align:center;padding:30px 10px;border:1px dashed var(--bd);border-radius:var(--radius)}
 .product-card .code{font-size:.7rem;color:var(--text2);word-break:break-all}
 .product-card .name{font-size:.85rem;margin:4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .product-card .price{font-size:1.1rem;font-weight:700;color:var(--accent)}
@@ -67,8 +68,9 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
 .right-panel h2{font-size:1rem;color:var(--text2);text-align:center}
 
 .payment-methods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.pm-btn{padding:16px 8px;font-size:.85rem;background:var(--surface2);color:var(--text);border:2px solid transparent;border-radius:var(--radius)}
-.pm-btn.active{border-color:var(--accent);background:var(--accent2);color:#fff}
+.pm-btn{padding:18px 8px;font-size:.85rem;background:var(--surface2);color:var(--text);border:2px solid transparent;border-radius:var(--radius);transition:all .15s}
+.pm-btn:hover{border-color:var(--accent2);transform:translateY(-1px)}
+.pm-btn.active{border-color:var(--accent);background:var(--accent2);color:#fff;box-shadow:0 4px 12px rgba(13,148,136,.25)}
 .pm-btn .pm-icon{font-size:1.4rem;display:block;margin-bottom:4px}
 
 .payment-inputs{display:flex;flex-direction:column;gap:10px}
@@ -661,6 +663,7 @@ label{font-size:.8rem;color:var(--text2);margin-bottom:4px;display:block}
   <div class="modal">
     <h2 id="mr-title">Resultado</h2>
     <div id="mr-body" style="margin-bottom:16px;font-size:.9rem;line-height:1.6"></div>
+    <div id="mr-receipt" class="receipt-preview" style="display:none"></div>
     <div class="btn-row">
       <button class="btn-secondary" onclick="closeModal('modal-result')">Fechar</button>
       <button class="btn-primary" id="mr-btn-print" onclick="printReceipt()" style="display:none">Imprimir Cupom</button>
@@ -704,7 +707,7 @@ let S = {
   token: '', empresa: '', usuario: '', filial: '',
   sessao: '', caixa: '', operador: '',
   cupom: '', itens: [], formaPag: 'DINHEIRO',
-  ws: null, periféricos: {}, drivers: []
+  ws: null, periféricos: {}, drivers: [], produtos: []
 };
 
 // ============================================================
@@ -810,6 +813,7 @@ async function initPDV() {
   await loadCaixas();
   connectWebSocket();
   loadPerifericos();
+  loadProductGrid();
   // Focus scanner
   document.getElementById('barcode-input').focus();
 }
@@ -945,6 +949,65 @@ async function addFromBarcode() {
   }
   document.getElementById('barcode-input').value = '';
   document.getElementById('barcode-input').focus();
+}
+
+// Catalogo de produtos como cards clicaveis (quick-pick).
+async function loadProductGrid() {
+  const grid = document.getElementById('product-grid');
+  if (!grid) return;
+  try {
+    const q = 'token=' + encodeURIComponent(S.token) + '&empresa=' + encodeURIComponent(S.empresa);
+    const r = await fetch('/api/produtos?' + q).then(x => x.json());
+    const dados = (r && r.dados) || [];
+    S.produtos = dados.map(p => Array.isArray(p) ? {codigo: p[0], descricao: p[2] || p[0]} : p);
+  } catch(e) { S.produtos = []; }
+  if (S.produtos.length) { renderProductGrid(); return; }
+  grid.innerHTML = '<div class="product-grid-empty">Busque um produto pelo código ou nome para adicioná-lo à venda.</div>';
+}
+function renderProductGrid() {
+  const grid = document.getElementById('product-grid');
+  grid.innerHTML = '';
+  S.produtos.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    card.innerHTML = '<div class="code">' + escapeHtml(p.codigo) + '</div>' +
+      '<div class="name">' + escapeHtml(p.descricao || p.codigo) + '</div>' +
+      '<div class="price">' + escapeHtml(p.preco != null ? 'R$ ' + Number(p.preco).toFixed(2).replace('.', ',') : '') + '</div>';
+    card.onclick = () => pickProduct(p.codigo);
+    grid.appendChild(card);
+    if (p.preco == null && i < 24) fillCardPrice(p, card.querySelector('.price'));
+  });
+}
+// Preco nao vem na lista /produtos: busca sob demanda e preenche o card.
+async function fillCardPrice(p, el) {
+  try {
+    const r = await apiGet('/produto/busca?codigo=' + encodeURIComponent(p.codigo));
+    let d = r && r.dados;
+    if (Array.isArray(d)) {
+      const pairs = Array.isArray(d[2]) ? d[2] : [];
+      const o = {};
+      pairs.forEach(kv => { if (Array.isArray(kv) && kv.length >= 2) o[kv[0]] = kv[1]; });
+      d = o;
+    }
+    const pr = d && (d.preco_hoje || d.preco_tabela || d.preco);
+    if (pr != null) { p.preco = pr; el.textContent = 'R$ ' + Number(pr).toFixed(2).replace('.', ','); }
+  } catch(e) {}
+}
+async function pickProduct(codigo) {
+  const r = await apiGet('/produto/busca?codigo=' + encodeURIComponent(codigo));
+  if (r.ok && r.dados) {
+    let p = r.dados;
+    if (Array.isArray(p)) {
+      const pairs = Array.isArray(p[2]) ? p[2] : [];
+      p = {};
+      pairs.forEach(kv => { if (Array.isArray(kv) && kv.length >= 2) p[kv[0]] = kv[1]; });
+    }
+    if (p.produto || p.codigo || p.descricao) {
+      addToCart({codigo: p.produto || p.codigo || codigo, descricao: p.descricao || codigo, preco: p.preco_hoje || p.preco_tabela || p.preco || 0, saldo: p.saldo});
+      return;
+    }
+  }
+  toast('Produto não encontrado: ' + codigo, 'err');
 }
 async function addToCart(prod) {
   const existing = S.itens.find(i => i.codigo === prod.codigo);
@@ -1141,6 +1204,16 @@ function mostrarResultado(r) {
   document.getElementById('mr-body').innerHTML = html;
   document.getElementById('mr-btn-print').style.display = '';
   document.getElementById('modal-result').classList.add('show');
+  const rc = document.getElementById('mr-receipt');
+  rc.style.display = 'none';
+  if (d[0]) {
+    apiGet('/cupom/' + encodeURIComponent(d[0])).then(rc2 => {
+      if (rc2.ok && rc2.dados && Array.isArray(rc2.dados[2])) {
+        rc.textContent = rc2.dados[2].join('\n');
+        rc.style.display = '';
+      }
+    });
+  }
 }
 function cancelarCupom() {
   if (!S.cupom) { toast('Nenhum cupom para cancelar', 'info'); return; }
