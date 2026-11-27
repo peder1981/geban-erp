@@ -414,7 +414,7 @@ Return { ;
     {"Compras", "an an-shopping-cart", "COMPRAS", {{"GCP1", "Fornecedores"}, {"GCP3", "Pedidos"}}}, ;
     {"Faturamento", "an an-file-text", "FATURAMENTO", {{"GFT1", "Clientes"}, {"GFT2", "Precos"}, {"GFT3", "Pedidos de venda"}, {"GSK1", "Regras Sarney"}, ;
         {"GSK3", "Historico Sarney"}, {"GCK1", "Wallets crypto"}, {"GCK2", "Pagamentos crypto"}}}, ;
-    {"Frente de loja", "an an-cash-register", "LOJA", {}, {|oApp| TUIPdvPg(oApp, cUsu)}}, ;
+    {"Frente de loja", "an an-cash-register", "LOJA", {}, {|oApp| TUIPdvPg(oApp, cUsu, cEmp, cFil)}}, ;
     {"Nucleo", "an an-gear", "ADMIN", {{"GE1", "Empresas"}, {"GEU1", "Unidades"}, {"GEF1", "Filiais"}, {"GE2", "Usuarios"}}} ;
     }
 

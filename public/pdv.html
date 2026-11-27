@@ -1742,6 +1742,36 @@ async function nfceTransmitir() {
   document.getElementById('tf-result').textContent = r.ok ? ('OK: ' + (r.msg || '')) : ('Erro: ' + (r.erro || ''));
   toast(r.ok ? 'Transmissão concluída' : (r.erro || 'Erro'), r.ok ? 'ok' : 'err');
 }
+
+// ============================================================
+// MODO EMBUTIDO — PDV dentro do ERP (TUI/FwCallApp)
+// Quando servido pelo advplc como app PO-UI, o shim injetado cria
+// window.twebchannel: mandamos PDV-INIT e o JsToAdvpl do ERP devolve
+// um token real da sessão TUI. O login local é pulado e todas as
+// chamadas (apiGet/apiPost/WS/DANFE) seguem HTTP normal, inalteradas.
+// Sem o shim (PDV web standalone em /pdv) este bloco não faz nada.
+// ============================================================
+(function () {
+  var tc = window.twebchannel;
+  if (!tc || !tc.jsToAdvpl || !tc.eventTarget) return;
+  document.getElementById('login-screen').style.display = 'none';
+  tc.eventTarget.addEventListener('pdv-init', function (ev) {
+    var d;
+    try { d = JSON.parse(ev.protheusResponse); } catch (e) { return; }
+    if (!d || !d.ok) {
+      document.getElementById('login-screen').style.display = 'flex';
+      var m = document.getElementById('m-login');
+      if (m) { m.textContent = 'Sessão do PDV indisponível — feche e reabra a aba'; m.className = 'msg err'; }
+      return;
+    }
+    S.token = d.token; S.empresa = d.empresa; S.usuario = d.usuario; S.filial = d.filial || '';
+    document.getElementById('pdv-screen').style.display = 'flex';
+    document.getElementById('t-empresa').textContent = 'Emp: ' + d.empresa;
+    document.getElementById('t-operador').textContent = 'Op: ' + d.usuario;
+    initPDV();
+  });
+  tc.jsToAdvpl('PDV-INIT', '');
+})();
 </script>
 </body>
 </html>
