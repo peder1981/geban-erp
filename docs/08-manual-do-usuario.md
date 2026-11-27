@@ -345,7 +345,7 @@ também precisam permitir.
 
 ## 2.12 PDV (frente de caixa)
 
-> **Nota:** a frente de caixa é o **PDV web** (`/pdv` no servidor GEBWEB, porta 8090 — ex.: `http://servidor:8090/pdv`), com login próprio (empresa/usuário/senha) e abas equivalentes às do antigo módulo: **Venda** (carrinho, formas de pagamento inclusive crypto com QR Code), **Caixa** (abrir/fechar, sangria/suprimento, cancelar cupom, resumo), **Orçamentos**, **Devolução**, **Consultas** (preço, vale, fiado, 2ª via, DANFE), **Cadastros** (caixa, barras/PLU, promoção, vendedor), **Relatórios** e **TEF / NFC-e**. O antigo módulo "Frente de loja" do TUI foi descontinuado; as seções abaixo descrevem as mesmas operações de caixa — no PDV web elas aparecem nas abas correspondentes.
+> **Nota:** a frente de caixa é o módulo **Frente de loja** do menu lateral — PDV embutido no TUI, na mesma sessão (sem segundo login), com abas **Venda** (carrinho, formas de pagamento inclusive crypto com QR Code), **Caixa** (abrir/fechar, sangria/suprimento, cancelar cupom, resumo), **Orçamentos**, **Devolução**, **Consultas** (preço, vale, fiado, 2ª via, DANFE), **Cadastros** (caixa, barras/PLU, promoção, vendedor), **Relatórios** e **TEF / NFC-e**. Existe também o **PDV web** (`/pdv` no GEBWEB, porta 8090) para totens/tablets com login próprio; as operações são as mesmas.
 
 ### As abas do PDV web
 
@@ -2253,9 +2253,9 @@ Curva ABC dos produtos pelo faturamento do período.
 3. **Confirmar**: executa a operação.
 
 
-## 3.8 Frente de loja (descontinuada)
+## 3.8 Frente de loja (PDV embutido)
 
-> **Nota:** este módulo do TUI foi descontinuado e removido do menu — a frente de caixa agora é o **PDV web** em `/pdv` no servidor GEBWEB (porta 8090), com abas equivalentes (Venda, Caixa, Orçamentos, Devolução, Consultas, Cadastros, Relatórios, TEF/NFC-e). O texto abaixo ficou como referência das operações de caixa.
+> **Nota:** este módulo do TUI é a frente de caixa oficial — abre direto no menu lateral, na mesma sessão do ERP (sem login extra). As abas são **Venda**, **Caixa**, **Orçamentos**, **Devolução**, **Consultas**, **Cadastros**, **Relatórios** e **TEF / NFC-e**. O PDV web em `/pdv` (GEBWEB) oferece as mesmas operações para totens/tablets.
 
 ![Frente de loja](img/manual/m08-frente-de-loja.png)
 

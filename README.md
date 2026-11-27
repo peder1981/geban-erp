@@ -50,7 +50,7 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 
 ## PDV: crypto, Sarney e regime de venda
 
-A frente de caixa é o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv` — ex.: `http://servidor:8090/pdv`). O antigo módulo "Frente de loja" do TUI foi descontinuado e suas funcionalidades portadas para o PDV web, organizado em abas:
+A frente de caixa está **embutida no ERP**: o módulo **Frente de loja** do menu lateral abre o PDV nativo do TUI (`GEBTUIPDV.prw`), na mesma sessão e permissão LOJA — sem aba extra e sem segundo login. Também existe o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv`) para totens/tablets com login próprio. Ambos usam a mesma camada de negócio `GEBLOJ*` e as mesmas abas:
 
 - **Venda** — carrinho, desconto, regime (fiscal/comprovante), pagamentos (dinheiro, PIX, cartões, fiado, vale, crypto) e QR Code
 - **Caixa** — abrir/fechar sessão, sangria/suprimento, cancelar cupom e resumo da sessão

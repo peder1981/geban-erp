@@ -41,6 +41,7 @@
 #include "GEBEXP_REL_BIZ.prw"
 #include "GEBEXP_REL_NUC.prw"
 #include "GEBEXP_TRAK.prw"
+#include "GEBTUIPDV.prw"
 
 // bTUIBrw: com o app ativo, GEBTUIBRW mostra a tabela na pagina Resultado.
 Static bTUIBrw := Nil
@@ -413,7 +414,7 @@ Return { ;
     {"Compras", "an an-shopping-cart", "COMPRAS", {{"GCP1", "Fornecedores"}, {"GCP3", "Pedidos"}}}, ;
     {"Faturamento", "an an-file-text", "FATURAMENTO", {{"GFT1", "Clientes"}, {"GFT2", "Precos"}, {"GFT3", "Pedidos de venda"}, {"GSK1", "Regras Sarney"}, ;
         {"GSK3", "Historico Sarney"}, {"GCK1", "Wallets crypto"}, {"GCK2", "Pagamentos crypto"}}}, ;
-    {"Frente de loja", "an an-cash-register", "LOJA", {}, {|oApp| TUIPdvLoja(oApp)}}, ;
+    {"Frente de loja", "an an-cash-register", "LOJA", {}, {|oApp| TUIPdvPg(oApp, cUsu)}}, ;
     {"Nucleo", "an an-gear", "ADMIN", {{"GE1", "Empresas"}, {"GEU1", "Unidades"}, {"GEF1", "Filiais"}, {"GE2", "Usuarios"}}} ;
     }
 
@@ -464,29 +465,6 @@ Static Function TUIModPg(oApp, aMod, aForms, cUsu)
     Next nI
     oPg:AddAction("Atualizar", bRel)
     TUIRecarrega(aTabs)
-Return oPg
-
-/*/{Protheus.doc} TUIPdvLoja
-    Pagina do modulo "Frente de loja": a frente de caixa e' o PDV web
-    (GEBWEB :8090, public/pdv.html — venda, caixa, orcamentos, devolucao,
-    consultas, cadastros, relatorios, TEF/NFC-e, crypto e Sarney). Aqui so'
-    fica o atalho que abre o PDV em nova aba; o PDV tem login proprio.
-    URL: GEBAN_URL + /pdv quando o parametro existe; senao /pdv relativo (mesma origem via cloudflared).
-    @type function
-    @author Peder Munksgaard
-    @since 27/11/2026
-/*/
-Static Function TUIPdvLoja(oApp)
-    Local oPg   := PoPage():New(oApp, "Frente de loja")
-    Local cBase := BOPARM("GEBAN_URL", "") as Character
-    Local cUrl  := "/pdv" as Character
-
-    If !Empty(cBase) .And. At("SEU-DOMINIO", cBase) == 0
-        cUrl := cBase + "/pdv"
-    EndIf
-
-    PoInfo():New(oPg, "", "A frente de caixa do GEBAN e' o PDV web: venda, caixa, orcamentos, devolucao, consultas, cadastros, relatorios, TEF/NFC-e, crypto e Sarney. Ele abre em nova aba e pede login proprio (usuario e empresa do PDV).")
-    PoLink():New(oPg, "Abrir Frente de loja (PDV)", cUrl):SetOpenNewTab(.T.)
 Return oPg
 
 Static Function TUIRecarrega(aTabs)
