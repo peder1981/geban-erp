@@ -91,7 +91,8 @@ User Function SEED_FULL()
     lOk := SF_PAR() .And. lOk
     lOk := SF_NUC() .And. lOk
     lOk := SF_CAD() .And. lOk
-    // Proximas etapas: SF_FIS(), SF_FIN(), SF_CTB(), SF_LOJ().
+    lOk := SF_FIS() .And. lOk
+    // Proximas etapas: SF_FIN(), SF_CTB(), SF_LOJ().
     ConOut("SEED_FULL " + IIf(lOk, "PASS", "FAIL"))
 Return lOk
 
@@ -278,6 +279,220 @@ Static Function SF_CAD()
     lOk := SF_CNT("GCC1", "LEFT(GCC1_COD, 6) = 'DEM-CC'", Len(aCC)) .And. lOk
     ConOut("SEED_FULL cadastros " + IIf(lOk, "OK", "FAIL"))
 Return lOk
+
+/*/{Protheus.doc} SF_FIS
+    Ciclo fiscal real no emulador: documentos DEM, eventos, entradas e EFD.
+    Reutiliza documentos finais e recusa repetir tentativas pendentes/rejeitadas.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-10-03
+    @return .T. se todas as quantidades e a EFD forem comprovadas
+/*/
+Static Function SF_FIS()
+    Local lOk := .T.
+    Local oE := JsonObject():New()
+    Local oC := JsonObject():New()
+    Local oP := Nil
+    Local aR := {}
+    Local aH := {}
+    Local aCert := {}
+    Local cDir := "/tmp/geban-seed-full"
+    Local cSenha := StrZero(Randomize(1, 999999999), 9)
+    Local cDoc := ""
+    Local cCh := ""
+    Local cMod := ""
+    Local aD := {}
+    Local cFilQ := GEBDBQuote(FWxFilial("GDF5"))
+    Local nI := 0
+    Local nMod := 0
+    Local nLim := 0
+    Local nNfe := 0
+    Local nNfce := 0
+    Local nCanc := 0
+    Local nCce := 0
+    Local nEnt := 0
+    oE["CNPJ"] := "11222333000181"
+    oE["IE"] := "110042490114"
+    oE["RAZAO"] := "Mercado Demo Completo Ltda"
+    oE["CRT"] := "3"
+    oE["LOGRADOURO"] := "Rua A"
+    oE["NUMERO"] := "1"
+    oE["BAIRRO"] := "Centro"
+    oE["UF"] := "SP"
+    oE["MUNICIPIO"] := "3550308"
+    oE["CEP"] := "01001000"
+    If GEBDFEEMITLE() == Nil
+        lOk := SF_FCHK("emitente", GEBDFEEMIT(oE)) .And. lOk
+    EndIf
+    // Serie exclusiva do DEM; nao altera as URLs ja configuradas em SF_PAR.
+    oC["SERIE_NFE"] := "99"
+    oC["SERIE_NFCE"] := "99"
+    oC["QR_VERSAO"] := "3"
+    oC["CONT_NOME"] := "Contabilidade Demo"
+    oC["CONT_CPF"] := "11144477735"
+    oC["CONT_CRC"] := "1SP123456"
+    oC["CONT_EMAIL"] := "contab@example.com"
+    oC["CONT_MUNICIPIO"] := "3550308"
+    oC["EFD_PERFIL"] := "B"
+    oC["EFD_COD_REC"] := "046-2"
+    lOk := SF_FCHK("configuracao", GEBDFECONFIG(oC)) .And. lOk
+    lOk := SF_SET("DFE_CERT_DIR", cDir + "/cert") .And. lOk
+    aCert := GEBDFECERTLE()
+    If Len(aCert) == 0
+        // Mesmo certificado autoassinado de teste usado por T_GEBDFE_DIST.
+        If ProcRun("mkdir", {"-p", cDir}, {|c| c}) != 0
+            Return .F.
+        EndIf
+        If ProcRun("openssl", {"req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", cDir + "/k.pem", "-out", cDir + "/c.pem", ;
+                "-days", "365", "-subj", "/C=BR/O=ICP-Brasil/CN=MERCADO DEMO LTDA:11222333000181"}, {|c| c}, {|c| c}) != 0
+            Return .F.
+        EndIf
+        If ProcRun("openssl", {"pkcs12", "-export", "-inkey", cDir + "/k.pem", "-in", cDir + "/c.pem", "-out", cDir + "/emp.pfx", ;
+                "-passout", "pass:" + cSenha}, {|c| c}, {|c| c}) != 0
+            Return .F.
+        EndIf
+        lOk := SF_FCHK("certificado", GEBDFECERT(Encode64(MemoRead(cDir + "/emp.pfx")), cSenha)) .And. lOk
+    EndIf
+    If !lOk
+        Return .F.
+    EndIf
+    aR := GEBDFESTATSVC("55")
+    If !SF_FCHK("conexao (certificado local: use ADVPP_HTTP_INSECURE=1 apenas no demo)", aR)
+        Return .F.
+    EndIf
+    // Reenvia somente o mesmo XML/chave que ficou sem resposta, nunca nova emissao.
+    aH := TCSqlQuery("SELECT GDF5_CHAVE AS C FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND GDF5_FILIAL = " + cFilQ + ;
+        " AND GDF5_MOD = '55' AND GDF5_DOC LIKE 'DEM-55-%' AND GDF5_STATUS = 'PENDENTE'")
+    For nI := 1 To Len(aH)
+        cCh := BOCOL(aH[nI]:C)
+        aD := GEBDFEDOC(cCh)
+        aR := GEBDFEENVIA("55", "SP", "2", "NfeAutorizacao", GEBDFELOTE(aD[3], StrZero(Val(BOSEQ("DFE_LOTE", 9)), 15)))
+        lOk := aR[1] .And. lOk
+        lOk := SF_FCHK("consulta pendente", GEBDFECONSULTAR(cCh, .T.)) .And. lOk
+    Next
+    aH := TCSqlQuery("SELECT GDF5_CHAVE AS C FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND GDF5_FILIAL = " + cFilQ + ;
+        " AND GDF5_MOD = '65' AND GDF5_DOC LIKE 'DEM-65-%' AND GDF5_STATUS = 'CONTINGENCIA'")
+    If Len(aH) > 0
+        lOk := SF_FCHK("transmitir contingencias", GEBDFETRANSMITE()) .And. lOk
+    EndIf
+    // Destinatario consumidor de SP (sem DIFAL), usando cadastro ja semeado.
+    If !SF_HAS("GDF7", "GDF7_COD", "DEM-C001", " AND GDF7_TIPO = 'C' AND GDF7_FILIAL = " + cFilQ)
+        oE["TIPO"] := "C"
+        oE["CODIGO"] := "DEM-C001"
+        oE["DOC"] := "52998224725"
+        oE["CONTRIBUINTE"] := "9"
+        lOk := SF_FCHK("participante", GEBDFEPART(oE)) .And. lOk
+    EndIf
+    For nMod := 1 To 2
+        cMod := "55"
+        nLim := 40
+        If nMod == 2
+            cMod := "65"
+            nLim := 15
+        EndIf
+        For nI := 1 To nLim
+            cDoc := "DEM-" + cMod + "-" + StrZero(nI, 3)
+            aH := TCSqlQuery("SELECT GDF5_CHAVE AS C, GDF5_STATUS AS S FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND GDF5_FILIAL = " + ;
+                cFilQ + " AND GDF5_MOD = " + GEBDBQuote(cMod) + " AND GDF5_DOC = " + GEBDBQuote(cDoc))
+            If Len(aH) == 0
+                // Faixa fixa e independente da data; reexecucao nao consome numero.
+                lOk := GEBDFESETNUM(cMod, 99, 990000 + nI) .And. lOk
+                If nMod == 1
+                    oP := JsonObject():New()
+                    oP["ORIGEM"] := "DEM"
+                    oP["DOC"] := cDoc
+                    oP["TIPO_PART"] := "C"
+                    oP["PART"] := "DEM-C001"
+                    oP["ITENS"] := {{"DEM-P" + StrZero(nI, 2), 1 + nI % 3, 10 + nI, 0}}
+                    oP["PARCELAS"] := {}
+                    oP["REFS"] := {}
+                    oP["NATOP"] := "Venda de mercadoria"
+                    aR := GEBDFENFE(oP)
+                Else
+                    aR := GEBDFENFCE(cDoc, {{"DEM-P" + StrZero(nI, 2), 1, 10 + nI, 0}}, {{"01", 10 + nI}}, "")
+                EndIf
+                lOk := SF_FCHK(cDoc, aR) .And. lOk
+                aH := TCSqlQuery("SELECT GDF5_CHAVE AS C, GDF5_STATUS AS S FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND GDF5_FILIAL = " + ;
+                    cFilQ + " AND GDF5_MOD = " + GEBDBQuote(cMod) + " AND GDF5_DOC = " + GEBDBQuote(cDoc))
+            EndIf
+            If Len(aH) != 1
+                ConOut("SEED_FULL FIS documento ausente/duplicado " + cDoc)
+                lOk := .F.
+                Loop
+            EndIf
+            cCh := BOCOL(aH[1]:C)
+            If nMod == 1 .And. nI <= 3
+                If BOCOL(aH[1]:S) == "AUTORIZADA"
+                    lOk := SF_FCHK("cancelamento " + cDoc, GEBDFECANCELA(cCh, "Cancelamento de demonstracao sem circulacao de mercadoria")) .And. lOk
+                EndIf
+                If GEBDFEDOC(cCh)[1] == "CANCELADA"
+                    nCanc++
+                Else
+                    lOk := .F.
+                EndIf
+            ElseIf BOCOL(aH[1]:S) == "AUTORIZADA"
+                If nMod == 1
+                    nNfe++
+                    If nI == 4
+                        If !SF_HAS("GDF6", "GDF6_CHAVE", cCh, " AND GDF6_TIPO = 'CCE' AND GDF6_CSTAT IN ('135','136') AND GDF6_FILIAL = " + cFilQ)
+                            lOk := SF_FCHK("cce", GEBDFECCE(cCh, "Corrige complemento do endereco de entrega para sala dois")) .And. lOk
+                        EndIf
+                        If SF_HAS("GDF6", "GDF6_CHAVE", cCh, " AND GDF6_TIPO = 'CCE' AND GDF6_CSTAT IN ('135','136') AND GDF6_FILIAL = " + cFilQ)
+                            nCce++
+                        EndIf
+                    EndIf
+                Else
+                    nNfce++
+                EndIf
+            Else
+                ConOut("SEED_FULL FIS nao reemite " + cDoc + " status=" + BOCOL(aH[1]:S))
+                lOk := .F.
+            EndIf
+        Next
+    Next
+    // Nao consulta repetidamente sem novidade (SEFAZ rejeitaria com 656).
+    aH := TCSqlQuery("SELECT GDFE_CHAVE AS C FROM GDFE WHERE D_E_L_E_T_ = ' ' AND GDFE_FILIAL = " + cFilQ + ;
+        " AND GDFE_CNPJ = '11444777000161' AND GDFE_IMPORT <> '' AND GDFE_SIT = 'AUTORIZADA'")
+    If Len(aH) < 8
+        // Releitura segura dos resumos apos reinicio/ampliacao da massa do emulador.
+        // DSTGrava preserva XML completo e vinculo de importacoes existentes.
+        lOk := SF_SET("DFE_ULTNSU", "0") .And. lOk
+        lOk := SF_FCHK("distribuicao", GEBDFEDISTBUSCA()) .And. lOk
+    EndIf
+    lOk := GEBCMFOR("F77000161", "Fornecedor Fiscal Demo") .And. lOk
+    lOk := SF_FCHK("depara banana", GEBDFEDEPARA("F77000161", "FORN-BAN", "DEM-P01", 12)) .And. lOk
+    lOk := SF_FCHK("depara maca", GEBDFEDEPARA("F77000161", "FORN-MAC", "DEM-P02", 1)) .And. lOk
+    aH := TCSqlQuery("SELECT GDFE_CHAVE AS C, GDFE_IMPORT AS I FROM GDFE WHERE D_E_L_E_T_ = ' ' AND GDFE_FILIAL = " + ;
+        cFilQ + " AND GDFE_CNPJ = '11444777000161' AND GDFE_SIT = 'AUTORIZADA' ORDER BY GDFE_CHAVE LIMIT 8")
+    For nI := 1 To Len(aH)
+        If BOCOL(aH[nI]:I) == ""
+            cCh := BOCOL(aH[nI]:C)
+            If SF_FCHK("ciencia", GEBDFEMANIF(cCh, "CIENCIA", ""))
+                lOk := SF_FCHK("importacao", GEBDFEIMPORTA(cCh, "", BOHOJE())) .And. lOk
+            Else
+                lOk := .F.
+            EndIf
+        EndIf
+    Next
+    aH := TCSqlQuery("SELECT GDFE_CHAVE AS C FROM GDFE WHERE D_E_L_E_T_ = ' ' AND GDFE_FILIAL = " + cFilQ + ;
+        " AND GDFE_CNPJ = '11444777000161' AND GDFE_SIT = 'AUTORIZADA' AND GDFE_IMPORT <> ''")
+    nEnt := Len(aH)
+    ConOut("SEED_FULL FIS nfe=" + cValToChar(nNfe + nCanc) + " autorizadas=" + cValToChar(nNfe) + " canceladas=" + cValToChar(nCanc) + ;
+        " cce=" + cValToChar(nCce) + " nfce=" + cValToChar(nNfce) + " recebidas=" + cValToChar(nEnt) + "/8")
+    If nEnt < 8
+        ConOut("SEED_FULL FIS FAIL massa insuficiente: emulador deve distribuir 8 NF-e autorizadas do fornecedor; nao fabricar entradas locais")
+    EndIf
+    lOk := nNfe == 37 .And. nCanc == 3 .And. nCce == 1 .And. nNfce == 15 .And. nEnt == 8 .And. lOk
+    aR := GEBDFEEFD(Left(BOHOJE(), 6), "0")
+    lOk := SF_FCHK("efd", aR) .And. lOk
+    If aR[1]
+        ConOut("SEED_FULL FIS efd documentos=" + cValToChar(aR[4][5]) + " bytes=" + cValToChar(Len(aR[3])))
+    EndIf
+Return lOk
+
+Static Function SF_FCHK(cEtapa, aR)
+    ConOut("SEED_FULL FIS " + cEtapa + " " + aR[2])
+Return aR[1]
 
 // BOSETPARM versiona linhas: nao gerar historico quando o valor ja e igual.
 Static Function SF_SET(cChave, cValor)
