@@ -12,7 +12,11 @@
 # Veredito: procura "T_NOME PASS"/"PASS" na saida; FAIL explicito ou
 # ausencia de veredito positivo conta como falha. Testes que precisam
 # dos emuladores (SEFAZ :18766, Cielo :18765, Banco :18767) falham sem eles — suba
-# tests/emuladores/ antes se for o caso.
+# tests/emuladores/ antes se for o caso. O watchdog :18768 NAO e'
+# necessario: os emuladores podem vir das units systemd ou de qualquer
+# outro meio; T_GEBAN_DEMO apenas dispara /ensure como cortesia e
+# tolera o watchdog fora do ar. T_GEBAN_DEMO exige o ambiente demo
+# semeado (emp_99 via scripts/geban-demo.sh seed) e e' read-only.
 #
 # Rode SEMPRE num banco de teste dedicado, nunca em producao.
 set -uo pipefail
