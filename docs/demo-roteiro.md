@@ -93,8 +93,8 @@ Menu **Contabil** (competência **202611**):
   `DEM-CC01`–`DEM-CC06`.
 - 3 lançamentos manuais `DEM-CTB-001`–`003`; o restante veio dos módulos
   (vendas, compras, baixas, DAS).
-- **Balancete**: débitos = créditos = **R$ 29.083,56** (fechado = S).
-- **DRE**: receita bruta > 0 e **resultado = +R$ 1.400,34**.
+- **Balancete**: débitos = créditos = **R$ 30.711,74** (fechado = S).
+- **DRE**: receita bruta > 0 e **resultado = +R$ 1.658,50**.
 
 ### 5. Simples Nacional — apuração e DAS
 
@@ -114,7 +114,7 @@ Menu **Fiscal → aba Simples Nacional** (e tabelas `GSN1`–`GSN3`):
 
 Menu **Frente de loja** (PDV embutido) ou **/pdv**:
 
-- Caixa **01** ("DEM Caixa Loja Centro"), última sessão **`S0000003`**:
+- Caixa **01** ("DEM Caixa Loja Centro"), última sessão **`S0000005`**:
   **19 cupons** (18 vendidos + 1 cancelado "desistência no balcão").
 - **7 formas de pagamento** em `GLJ5`: DINHEIRO, PIX, DEBITO, CREDITO
   (TEF **Cielo** no emulador `:18765`), FIADO, VALE (vale-troca) e
@@ -174,6 +174,6 @@ scripts/geban-demo.sh up && scripts/geban-demo.sh seed
 | Entradas | `DEM-NF-001`–`018` | Compras → NF-e fornecedor |
 | Contábil | `DEM-CTB-001`–`003`, balancete `202611` | Contabil |
 | Simples | `GSN2` comp `202611`, DAS R$ 211,59, fator_r 0,343886 | Fiscal → Simples |
-| Loja | sessão `S0000003` (19 cupons), `DEM-PV-001`–`050` | Frente de loja / Faturamento |
+| Loja | sessão `S0000005` (19 cupons), `DEM-PV-001`–`050` | Frente de loja / Faturamento |
 | Derrama | `DEM-*-202611`, `DEM-GD-ICMS` | Derrama |
 | Periférico | `cupom-*.png` em `periferico/saidas/` | PDV web → Periféricos |
