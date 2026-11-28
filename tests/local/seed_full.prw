@@ -282,7 +282,7 @@ Return lOk
 
 /*/{Protheus.doc} SF_FIS
     Ciclo fiscal real no emulador: documentos DEM, eventos, entradas e EFD.
-    Reutiliza documentos finais e recusa repetir tentativas pendentes/rejeitadas.
+    Reutiliza documentos finais e recupera pendentes reenviando o mesmo XML/chave.
     @type Seed de demonstracao
     @author Peder Munksgaard
     @since 2026-10-03
@@ -301,6 +301,7 @@ Static Function SF_FIS()
     Local cDoc := ""
     Local cCh := ""
     Local cMod := ""
+    Local cComp := ""
     Local aD := {}
     Local cFilQ := GEBDBQuote(FWxFilial("GDF5"))
     Local nI := 0
@@ -335,7 +336,9 @@ Static Function SF_FIS()
     oC["CONT_MUNICIPIO"] := "3550308"
     oC["EFD_PERFIL"] := "B"
     oC["EFD_COD_REC"] := "046-2"
-    lOk := SF_FCHK("configuracao", GEBDFECONFIG(oC)) .And. lOk
+    If SF_CFGDEMO()
+        lOk := SF_FCHK("configuracao", GEBDFECONFIG(oC)) .And. lOk
+    EndIf
     lOk := SF_SET("DFE_CERT_DIR", cDir + "/cert") .And. lOk
     aCert := GEBDFECERTLE()
     If Len(aCert) == 0
@@ -460,8 +463,8 @@ Static Function SF_FIS()
         lOk := SF_FCHK("distribuicao", GEBDFEDISTBUSCA()) .And. lOk
     EndIf
     lOk := GEBCMFOR("F77000161", "Fornecedor Fiscal Demo") .And. lOk
-    lOk := SF_FCHK("depara banana", GEBDFEDEPARA("F77000161", "FORN-BAN", "DEM-P01", 12)) .And. lOk
-    lOk := SF_FCHK("depara maca", GEBDFEDEPARA("F77000161", "FORN-MAC", "DEM-P02", 1)) .And. lOk
+    lOk := SF_FCHK("depara banana", SF_DEPARA("F77000161", "FORN-BAN", "DEM-P01", 12)) .And. lOk
+    lOk := SF_FCHK("depara maca", SF_DEPARA("F77000161", "FORN-MAC", "DEM-P02", 1)) .And. lOk
     aH := TCSqlQuery("SELECT GDFE_CHAVE AS C, GDFE_IMPORT AS I FROM GDFE WHERE D_E_L_E_T_ = ' ' AND GDFE_FILIAL = " + ;
         cFilQ + " AND GDFE_CNPJ = '11444777000161' AND GDFE_SIT = 'AUTORIZADA' ORDER BY GDFE_CHAVE LIMIT 8")
     For nI := 1 To Len(aH)
@@ -483,12 +486,51 @@ Static Function SF_FIS()
         ConOut("SEED_FULL FIS FAIL massa insuficiente: emulador deve distribuir 8 NF-e autorizadas do fornecedor; nao fabricar entradas locais")
     EndIf
     lOk := nNfe == 37 .And. nCanc == 3 .And. nCce == 1 .And. nNfce == 15 .And. nEnt == 8 .And. lOk
-    aR := GEBDFEEFD(Left(BOHOJE(), 6), "0")
-    lOk := SF_FCHK("efd", aR) .And. lOk
+    // Competencia vem dos documentos semeados, nao do mes corrente da execucao.
+    aH := TCSqlQuery("SELECT MAX(LEFT(GDF5_DATA, 6)) AS C FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND GDF5_FILIAL = " + ;
+        cFilQ + " AND GDF5_DOC LIKE 'DEM-%'")
+    If Len(aH) > 0
+        cComp := BOCOL(aH[1]:C)
+    EndIf
+    If Len(cComp) != 6
+        ConOut("SEED_FULL FIS FAIL competencia dos documentos DEM nao encontrada")
+        Return .F.
+    EndIf
+    aR := GEBDFEEFD(cComp, "0")
+    lOk := SF_FCHK("efd competencia " + cComp, aR) .And. lOk
     If aR[1]
-        ConOut("SEED_FULL FIS efd documentos=" + cValToChar(aR[4][5]) + " bytes=" + cValToChar(Len(aR[3])))
+        ConOut("SEED_FULL FIS efd competencia=" + cComp + " documentos=" + cValToChar(aR[4][5]) + "/" + ;
+            cValToChar(nNfe + nCanc + nNfce + nEnt) + " bytes=" + cValToChar(Len(aR[3])))
+        If aR[4][5] < nNfe + nCanc + nNfce + nEnt
+            ConOut("SEED_FULL FIS FAIL efd " + cComp + " incompleta: " + cValToChar(aR[4][5]) + "/" + ;
+                cValToChar(nNfe + nCanc + nNfce + nEnt) + " documentos")
+            lOk := .F.
+        EndIf
     EndIf
 Return lOk
+
+// Configuracao fiscal DEM: compara os parametros antes de versionar GE4.
+Static Function SF_CFGDEMO()
+    Local aCfg := {{"DFE_SERIE_55", "99"}, {"DFE_SERIE_65", "99"}, {"DFE_QR_VERSAO", "3"}, ;
+        {"DFE_EFD_CONT_NOME", "Contabilidade Demo"}, {"DFE_EFD_CONT_CPF", "11144477735"}, ;
+        {"DFE_EFD_CONT_CRC", "1SP123456"}, {"DFE_EFD_CONT_EMAIL", "contab@example.com"}, ;
+        {"DFE_EFD_CONT_MUN", "3550308"}, {"DFE_EFD_PERFIL", "B"}, {"DFE_EFD_COD_REC", "046-2"}}
+    Local nI := 0
+    For nI := 1 To Len(aCfg)
+        If !(BOPARM(aCfg[nI][1], "") == aCfg[nI][2])
+            Return .T.
+        EndIf
+    Next
+Return .F.
+
+// De-para fiscal: a rotina oficial versiona mesmo o valor igual.
+Static Function SF_DEPARA(cForn, cProdForn, cProd, nFator)
+    Local aH := TCSqlQuery("SELECT GDFF_PROD AS P, GDFF_FATOR AS F FROM GDFF WHERE D_E_L_E_T_ = ' ' AND GDFF_FILIAL = " + ;
+        GEBDBQuote(FWxFilial("GDFF")) + " AND GDFF_FORN = " + GEBDBQuote(cForn) + " AND GDFF_CPROD = " + GEBDBQuote(cProdForn) + " LIMIT 1")
+    If Len(aH) > 0 .And. BOCOL(aH[1]:P) == cProd .And. BOVAL(aH[1]:F) == nFator
+        Return {.T., "de-para preservado: " + cProdForn + " -> " + cProd}
+    EndIf
+Return GEBDFEDEPARA(cForn, cProdForn, cProd, nFator)
 
 Static Function SF_FCHK(cEtapa, aR)
     ConOut("SEED_FULL FIS " + cEtapa + " " + aR[2])
