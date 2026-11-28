@@ -18,13 +18,17 @@ import json
 import logging
 import os
 import sys
+import tempfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import serial
-import serial.tools.list_ports
+try:
+    import serial
+    import serial.tools.list_ports
+except ImportError:
+    serial = None
 try:
     import usb.core
     import usb.util
@@ -249,6 +253,162 @@ class EscPosNetwork(PerifericoDriver):
             return False
 
 
+class EscPosVirtual(PerifericoDriver):
+    """Impressora térmica emulada, sem hardware.
+
+    Configuração: {"out_dir": "saidas", "colunas": 48}.
+    Caminhos relativos de saída partem da pasta deste serviço.
+    """
+
+    name = "escpos_virtual"
+    tipo = "IMPRESSORA"
+
+    async def connect(self) -> bool:
+        self.out_dir = Path(self.config.get("out_dir", "saidas"))
+        if not self.out_dir.is_absolute():
+            self.out_dir = Path(__file__).resolve().parent / self.out_dir
+        try:
+            self.out_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            self.out_dir = Path(tempfile.mkdtemp(prefix="geban-cupons-"))
+            logger.warning(f"Saída de cupons indisponível ({error}); usando {self.out_dir}")
+        self.connected = True
+        return True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def open_cash_drawer(self) -> bool:
+        return True
+
+    @staticmethod
+    def _decode(data: bytes) -> str:
+        # O PDV envia UTF-8 (TextEncoder); cp850 cobre impressoras legadas.
+        for encoding in ("utf-8", "cp850"):
+            try:
+                return data.decode(encoding)
+            except UnicodeDecodeError:
+                pass
+        return data.decode("latin-1")
+
+    async def print_receipt(self, data: bytes) -> bool:
+        if not self.connected:
+            await self.connect()
+        # ponytail: parser simplificado ignora bitmap download/codepage;
+        # evolução: biblioteca dedicada de emulação ESC/POS.
+        coupons = []
+        chars = []
+        alignment, bold = 0, False
+        text = bytearray()
+
+        def flush_text():
+            # Decodifica a sequência inteira para preservar caracteres UTF-8 multibyte.
+            if text:
+                chars.extend((c, alignment, bold) for c in self._decode(bytes(text)))
+                text.clear()
+
+        i = 0
+        while i < len(data):
+            if data[i] not in (10, 13, 0x1b, 0x1d):
+                text.append(data[i])
+                i += 1
+                continue
+            flush_text()
+            if data[i] in (10, 13):
+                chars.append(("\n", alignment, bold))
+                i += 2 if data[i:i + 2] == b"\r\n" else 1
+            elif data[i:i + 2] == b"\x1b@":
+                alignment, bold = 0, False
+                i += 2
+            elif data[i:i + 2] in (b"\x1ba", b"\x1bE"):
+                if i + 2 >= len(data):
+                    break
+                value = data[i + 2]
+                if data[i + 1] == ord("a"):
+                    alignment = value - 48 if value in (48, 49, 50) else value
+                else:
+                    bold = bool(value & 1)
+                i += 3
+            elif data[i:i + 2] in (b"\x1dV", b"\x1bi"):
+                if chars:
+                    coupons.append(chars)
+                    chars = []
+                if data[i + 1] == ord("V"):
+                    mode = data[i + 2] if i + 2 < len(data) else 0
+                    i += 4 if mode in (65, 66, 97, 98) else 3
+                else:
+                    i += 2
+            elif data[i:i + 3] == b"\x1d(k":
+                if i + 5 > len(data):
+                    break
+                size = int.from_bytes(data[i + 3:i + 5], "little")
+                command = data[i + 5:i + 5 + size]
+                # cn=49, fn=80, m=48: armazenamento do conteúdo QR.
+                if command[:3] == b"1P0":
+                    marker = "[QR: " + self._decode(command[3:]) + "]"
+                    chars.extend((c, alignment, bold) for c in marker)
+                i += 5 + size
+            else:
+                i += 1  # Comando ESC/GS não suportado: descarta só o prefixo.
+        flush_text()
+        if chars:
+            coupons.append(chars)
+        try:
+            for coupon in coupons:
+                self._save_coupon(coupon)
+        except Exception as error:
+            self.last_error = str(error)
+            logger.warning(f"Falha ao salvar cupom virtual: {error}")
+            return False
+        return True
+
+    def _save_coupon(self, chars) -> None:
+        stem = self.out_dir / ("cupom-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+        stem.with_suffix(".txt").write_text("".join(c[0] for c in chars), encoding="utf-8")
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except ImportError:
+            return  # Texto sempre disponível, mesmo sem Pillow.
+
+        try:
+            columns = max(1, int(self.config.get("colunas", 48)))
+        except (TypeError, ValueError):
+            columns = 48
+        rows, row = [], []
+        for char in chars:
+            if char[0] == "\n":
+                rows.append(row)
+                row = []
+            else:
+                if len(row) == columns:
+                    rows.append(row)
+                    row = []
+                row.append(char)
+        if row or not rows:
+            rows.append(row)
+        try:
+            font = ImageFont.truetype("DejaVuSansMono.ttf", 14)
+        except OSError:
+            font = ImageFont.load_default()
+        cell_width = max(1, int(font.getlength("M")) + 1)
+        line_height = font.getbbox("Ag")[3] + 5
+        margin = 12
+        image = Image.new("RGB", (columns * cell_width + 2 * margin,
+                                  len(rows) * line_height + 2 * margin), "white")
+        draw = ImageDraw.Draw(image)
+        for line_no, row in enumerate(rows):
+            alignment = row[0][1] if row else 0
+            spare = (columns - len(row)) * cell_width
+            x = margin + (spare // 2 if alignment == 1 else spare if alignment == 2 else 0)
+            y = margin + line_no * line_height
+            for char, _, bold in row:
+                draw.text((x, y), char, font=font, fill="black")
+                if bold:
+                    draw.text((x + 1, y), char, font=font, fill="black")
+                x += cell_width
+        image.save(stem.with_suffix(".png"))
+
+
 # =============================================================================
 # Driver: TEF (Terminal de Cartão)
 # =============================================================================
@@ -404,6 +564,8 @@ class BarcodeReaderSerial(PerifericoDriver):
         try:
             port = self.config.get("port", "/dev/ttyUSB0")
             baudrate = int(self.config.get("baudrate", "9600"))
+            if serial is None:
+                raise RuntimeError("pyserial nao instalado")
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
             self.connected = True
             logger.info(f"Leitor serial conectado: {port}")
@@ -447,6 +609,8 @@ class ScaleSerial(PerifericoDriver):
         try:
             port = self.config.get("port", "/dev/ttyS0")
             baudrate = int(self.config.get("baudrate", "2400"))
+            if serial is None:
+                raise RuntimeError("pyserial nao instalado")
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
             self.connected = True
             logger.info(f"Balança serial conectada: {port}")
@@ -544,6 +708,7 @@ class DriverRegistry:
         builtins = [
             EscPosUSB,
             EscPosNetwork,
+            EscPosVirtual,
             TEFGenericTCP,
             TEFHTTPREST,
             BarcodeReaderKBWedge,
@@ -604,7 +769,7 @@ class DriverRegistry:
                 detected.append(info)
         
         # Escanear seriais
-        for port in serial.tools.list_ports.comports():
+        for port in (serial.tools.list_ports.comports() if serial is not None else []):
             info = {
                 "tipo": "serial",
                 "path": port.device,
@@ -806,7 +971,8 @@ async def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='GEBAN Periférico Service')
-    parser.add_argument('--config', default='config/perifericos.json', help='Arquivo de configuração')
+    parser.add_argument('--config', default=str(Path(__file__).resolve().parent / 'config/perifericos.json'),
+                        help='Arquivo de configuração')
     parser.add_argument('--port', type=int, default=9100, help='Porta do WebSocket')
     args = parser.parse_args()
     
@@ -836,6 +1002,9 @@ async def main():
         if pid:
             logger.info(f"Periférico carregado: ID={pid}, nome={periph_config.get('nome')}")
     
+    connected = await manager.connect_all()
+    logger.info(f"Periféricos conectados: {connected}/{len(manager.instances)}")
+
     # Iniciar servidor WebSocket
     import websockets
     async def _ws_handler(websocket, path=None):

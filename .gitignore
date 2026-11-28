@@ -3,6 +3,7 @@
 *.db-wal
 .worktrees/
 tests/.out/
+periferico/saidas/cupom-*
 
 # artefatos de build do pacote Windows
 packaging/windows/dist/
