@@ -324,6 +324,7 @@ Static Function SF_FIS()
     Local nCanc := 0
     Local nCce := 0
     Local nEnt := 0
+    Local nCP := 0
     oE["CNPJ"] := "11222333000181"
     oE["IE"] := "110042490114"
     oE["RAZAO"] := "Mercado Demo Completo Ltda"
@@ -518,12 +519,21 @@ Static Function SF_FIS()
     aR := GEBDFEEFD(cComp, "0")
     lOk := SF_FCHK("efd competencia " + cComp, aR) .And. lOk
     If aR[1]
+        // Alem da massa DEM-*, o EFD inclui as NFC-e/NF-e emitidas pelo
+        // caixa (docs CP*, criados no SF_LOJ/SF_PDV de execucoes anteriores
+        // — na primeira execucao ainda nao existem e nCP = 0).
+        aH := TCSqlQuery("SELECT COUNT(*) AS N FROM GDF5 WHERE GDF5_FILIAL = " + cFilQ + " AND GDF5_DOC LIKE 'CP%' AND " + ;
+            "GDF5_MOD IN ('55','65') AND GDF5_TPAMB = " + GEBDBQuote(BOPARM("DFE_AMBIENTE", "2")) + " AND " + ;
+            "GDF5_STATUS IN ('AUTORIZADA','CANCELADA','DENEGADA') AND GDF5_DATA BETWEEN " + GEBDBQuote(cComp + "01") + " AND " + ;
+            GEBDBQuote(BODTADD(BOMESADD(cComp, 1) + "01", -1)) + " AND D_E_L_E_T_ = ' '")
+        nCP := BOVAL(aH[1]:N)
         ConOut("SEED_FULL FIS efd competencia=" + cComp + " documentos=" + cValToChar(aR[4][5]) + "/" + ;
-            cValToChar(nNfe + nCanc + nNfce + nEnt) + " bytes=" + cValToChar(Len(aR[3])))
+            cValToChar(nNfe + nCanc + nNfce + nEnt + nCP) + " (massa " + cValToChar(nNfe + nCanc + nNfce + nEnt) + " + caixa " + ;
+            cValToChar(nCP) + ") bytes=" + cValToChar(Len(aR[3])))
         // Chave emitida so' pode gerar um C100; quantidade tem de ser exata.
-        If aR[4][5] != nNfe + nCanc + nNfce + nEnt
+        If aR[4][5] != nNfe + nCanc + nNfce + nEnt + nCP
             ConOut("SEED_FULL FIS FAIL efd " + cComp + " divergente: " + cValToChar(aR[4][5]) + "/" + ;
-                cValToChar(nNfe + nCanc + nNfce + nEnt) + " documentos")
+                cValToChar(nNfe + nCanc + nNfce + nEnt + nCP) + " documentos")
             lOk := .F.
         EndIf
     EndIf
