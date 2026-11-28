@@ -114,8 +114,9 @@ Menu **Fiscal → aba Simples Nacional** (e tabelas `GSN1`–`GSN3`):
 
 Menu **Frente de loja** (PDV embutido) ou **/pdv**:
 
-- Caixa **01** ("DEM Caixa Loja Centro"), última sessão **`S0000005`**:
-  **19 cupons** (18 vendidos + 1 cancelado "desistência no balcão").
+- Caixa **01** ("DEM Caixa Loja Centro"), última sessão fechada
+  **`S0000011`**: **19 cupons** (18 vendidos + 1 cancelado
+  "desistência no balcão").
 - **Venda com NFC-e real**: o regime **FISCAL** do PDV emite NFC-e
   modelo 65 de verdade contra o emulador SEFAZ (:18766) — já provado
   com cupom `CP00000063` (venda por **código de barras** EAN-13,
@@ -126,8 +127,16 @@ Menu **Frente de loja** (PDV embutido) ou **/pdv**:
   (TEF **Cielo** no emulador `:18765`), FIADO, VALE (vale-troca) e
   **CRYPTO** (BTC/USDT — wallets `GCK1` ativas; a cotação vem do
   CoinGecko ao vivo, sem internet a forma é pulada na sessão).
-- Impressora virtual `escpos_virtual` (:9100) gera o cupom em
-  `periferico/saidas/cupom-*.png` — configure no PDV → Periféricos.
+- Devolução no caixa de cupom **com NFC-e** exige o consumidor
+  (CPF/CNPJ + endereço) — a NF-e de devolução (finalidade 4) referencia
+  a NFC-e; sem isso o caixa recusa com `devolucao_de_nfce`. O PDV web
+  pede os dados na aba Devolução.
+- Periféricos 100% virtuais (:9100, drivers `*_virtual` que nunca
+  falham): `escpos_virtual` grava o cupom em
+  `periferico/saidas/cupom-*.png`, `barcode_virtual` lê EANs demo,
+  `peso_virtual` devolve peso plausível, `gaveta_virtual` registra o
+  pulso e `tef_virtual` aprova transação — os 5 já vêm cadastrados em
+  `GEP_PERIFERICOS` e em `periferico/config/perifericos.json`.
 - Sangria R$ 400 e suprimento R$ 150 (`GLJ6`), fechamento **sem
   diferença**.
 - **50 pedidos** `DEM-PV-001`–`050` liberados e faturados (notas `NS*`)
@@ -151,12 +160,15 @@ Menu **Derrama** (guias `GD1`):
 
 ### 8. Periférico virtual — cupom impresso em PNG
 
-- Serviço `geban-periferico` (`periferico_service.py`, WebSocket `:9100`,
-  driver **`escpos_virtual`**) grava cada cupom como imagem em
-  **`periferico/saidas/cupom-<timestamp>.png`**.
-- No **PDV web** (`/pdv`): aba **Periféricos** — cadastre/consulte a
-  impressora "Cupom Demo" (`GET/POST /api/pdv/perifericos`); ao finalizar
-  uma venda, o navegador fala WS com `:9100` e o PNG aparece em `saidas/`.
+- Serviço `geban-periferico` (`periferico_service.py`, WebSocket `:9100`)
+  com **5 periféricos virtuais** (`escpos_virtual`, `barcode_virtual`,
+  `peso_virtual`, `gaveta_virtual`, `tef_virtual`) — impressora grava
+  cada cupom como imagem em **`periferico/saidas/cupom-<timestamp>.png`**.
+- No **PDV web** (`/pdv`): aba **Periféricos** — liste/consulte os 5
+  periféricos (`GET /api/pdv/perifericos`); ao finalizar uma venda, o
+  navegador fala WS com `:9100` (`print_receipt`, `read_barcode`,
+  `read_weight`, `open_cash_drawer`, `authorize_transaction`) e o PNG
+  aparece em `saidas/`.
 - O TUI não fala WS: a geração do PNG é **cobertura manual** (não assertada
   pelo `T_GEBAN_DEMO`, que valida o schema `GEP_PERIFERICOS`).
 
@@ -182,6 +194,6 @@ scripts/geban-demo.sh up && scripts/geban-demo.sh seed
 | Entradas | `DEM-NF-001`–`018` | Compras → NF-e fornecedor |
 | Contábil | `DEM-CTB-001`–`003`, balancete `202611` | Contabil |
 | Simples | `GSN2` comp `202611`, DAS R$ 211,59, fator_r 0,343886 | Fiscal → Simples |
-| Loja | sessão `S0000005` (19 cupons), `DEM-PV-001`–`050` | Frente de loja / Faturamento |
+| Loja | sessão `S0000011` (19 cupons), `DEM-PV-001`–`050` | Frente de loja / Faturamento |
 | Derrama | `DEM-*-202611`, `DEM-GD-ICMS` | Derrama |
 | Periférico | `cupom-*.png` em `periferico/saidas/` | PDV web → Periféricos |

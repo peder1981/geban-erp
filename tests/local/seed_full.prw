@@ -12,6 +12,7 @@
 #include "../../src/GEBCTB_MIG.prw"
 #include "../../src/GEBV_MIG.prw"
 #include "../../src/GEBV_EST.prw"
+#include "../../src/GEBV_FIA.prw"
 #include "../../src/GEBBOLIB.prw"
 #include "../../src/GEBCTX.prw"
 #include "../../src/GEBEST.prw"
@@ -958,9 +959,10 @@ Static Function SF_LOJ()
             EndIf
             nVen++
             If nI == 14
-                // Devolucao em dinheiro de 1 item da venda 14.
+                // Devolucao em dinheiro de 1 item da venda 14. O cupom tem
+                // NFC-e: a devolucao exige consumidor (NF-e de entrada).
                 cCup := aR[3][1]
-                aR := GEBLOJDEV(cSes, cCup, {{"DEM-P02", 1}}, "DINHEIRO", "defeito")
+                aR := GEBLOJDEV(cSes, cCup, {{"DEM-P02", 1}}, "DINHEIRO", "defeito", SF_CONS())
                 If !aR[1]
                     ConOut("SEED_FULL LOJ devolucao dinheiro " + aR[2])
                 EndIf
@@ -969,7 +971,7 @@ Static Function SF_LOJ()
             If nI == 15
                 // Devolucao em vale-troca de 1 item da venda 15.
                 cCup := aR[3][1]
-                aR := GEBLOJDEV(cSes, cCup, {{"DEM-P03", 1}}, "VALE", "trocou")
+                aR := GEBLOJDEV(cSes, cCup, {{"DEM-P03", 1}}, "VALE", "trocou", SF_CONS())
                 If !aR[1]
                     ConOut("SEED_FULL LOJ devolucao vale " + aR[2])
                 EndIf
@@ -1469,6 +1471,30 @@ Static Function SF_PDV()
         lOk := GEBCRYWAL("USDT", "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb", "S")[1] .And. lOk
     EndIf
 
+    // Perifericos do demo (GEP_PERIFERICOS): espelham
+    // periferico/config/perifericos.json — todos drivers virtuais que
+    // nunca falham, para a tela de perifericos do PDV web.
+    lOk := SF_PERIF() .And. lOk
+
+    // Promocao vigente num produto DEM-P (GLJ9): preenche o campo
+    // "promocao" da consulta de preco do PDV.
+    If !SF_HAS("GLJ9", "GLJ9_COD", "PROMO-DEM", " AND GLJ9_PROD = 'DEM-P30'")
+        aR := GEBLOJPROMO("PROMO-DEM", "DEM-P30", "PRECO", 0, 9.90, "20260101", "20261231")
+        lOk := aR[1] .And. lOk
+        If !aR[1]
+            ConOut("SEED_FULL PDV promocao " + aR[2])
+        EndIf
+    EndIf
+
+    // Fiado em aberto (GV3) para GET /pdv/fiado/saldo: uma linha ABERTA
+    // por cliente demo, via GEBVFIA (grava tambem titulo e receita).
+    If !SF_HAS("GV3", "GV3_CLI", "DEM-C005", " AND GV3_STATUS = 'ABERTA'")
+        lOk := GEBVFIA("DEM-C005", 75.90) .And. lOk
+    EndIf
+    If !SF_HAS("GV3", "GV3_CLI", "DEM-C010", " AND GV3_STATUS = 'ABERTA'")
+        lOk := GEBVFIA("DEM-C010", 42.50) .And. lOk
+    EndIf
+
     // Prova PDV: uma venda regime FISCAL paga em dinheiro com codigo de
     // barras — GEBLOJVEN resolve o EAN via GLJ8 e emite a NFC-e (DFE_NFCE=S).
     // NFC-e emitida pelo caixa tem GDF5_DOC = cupom ("CP..."); as DEM-65-*
@@ -1521,6 +1547,51 @@ Static Function SF_PDV()
     lOk := SF_CNT("GLJ8", "GLJ8_FILIAL = " + GEBDBQuote(FWxFilial("GLJ8")) + " AND LEFT(GLJ8_PROD, 5) = 'DEM-P'", 60) .And. lOk
     lOk := SF_CNT("GCK1", "GCK1_FILIAL = " + GEBDBQuote(FWxFilial("GCK1")) + " AND GCK1_MOEDA IN ('BTC','USDT') AND GCK1_ATIVO = 'S'", 2) .And. lOk
     ConOut("SEED_FULL pdv " + IIf(lOk, "OK", "FAIL"))
+Return lOk
+
+// Consumidor da devolucao no caixa: JsonObject no formato que GEBLOJDEV
+// repassa a GEBDFEPART (a NF-e de devolucao de NFC-e exige destinatario).
+Static Function SF_CONS()
+    Local o := JsonObject():New()
+    o["DOC"] := "52998224725"
+    o["NOME"] := "Cliente Demo"
+    o["LOGRADOURO"] := "Rua do Cliente"
+    o["NUMERO"] := "10"
+    o["BAIRRO"] := "Centro"
+    o["MUNICIPIO"] := "3550308"
+    o["UF"] := "SP"
+    o["CEP"] := "20000000"
+Return o
+
+// Perifericos do PDV demo em GEP_PERIFERICOS (idempotente por NOME).
+// Drivers virtuais do periferico_service.py: nunca falham e devolvem
+// valores plausiveis — base do "PLENO funcionamento" da apresentacao.
+Static Function SF_PERIF()
+    Local lOk := .T.
+    Local cFil := FWxFilial("GEP_PERIFERICOS")
+    Local aPer := {}
+    Local nI := 0
+
+    aPer := {
+        {"IMPRESSORA", "escpos_virtual", "Cupom Demo", '{"out_dir":"saidas","colunas":48}'},;
+        {"LEITOR", "barcode_virtual", "Leitor Demo", '{}'},;
+        {"PESADORA", "peso_virtual", "Balanca Demo", '{}'},;
+        {"GAVETA", "gaveta_virtual", "Gaveta Demo", '{}'},;
+        {"TEF", "tef_virtual", "TEF Demo", '{}'}
+    }
+
+    For nI := 1 To Len(aPer)
+        If !SF_HAS("GEP_PERIFERICOS", "GEP_NOME", aPer[nI][3], " AND GEP_FILIAL = " + GEBDBQuote(cFil))
+            TCSqlExec("INSERT INTO GEP_PERIFERICOS (D_E_L_E_T_, GEP_FILIAL, GEP_TIPO, GEP_DRIVER, GEP_CONFIG, GEP_NOME, GEP_ATIVO, GEP_STATUS, GEP_DTALT, GEP_USALT) VALUES (' ', " + ;
+                GEBDBQuote(cFil) + ", " + GEBDBQuote(aPer[nI][1]) + ", " + GEBDBQuote(aPer[nI][2]) + ", " + GEBDBQuote(aPer[nI][4]) + ", " + ;
+                GEBDBQuote(aPer[nI][3]) + ", 'S', 'CONNECTED', " + GEBDBQuote(BOHOJE()) + ", 'SEED')")
+        EndIf
+    Next
+
+    lOk := SF_CNT("GEP_PERIFERICOS", "GEP_FILIAL = " + GEBDBQuote(cFil) + " AND GEP_NOME IN ('Cupom Demo','Leitor Demo','Balanca Demo','Gaveta Demo','TEF Demo')", 5) .And. lOk
+    If !lOk
+        ConOut("SEED_FULL perif minic FAIL")
+    EndIf
 Return lOk
 
 // Pasta persistente dos certificados do demo: ~/.geban-demo/cert
