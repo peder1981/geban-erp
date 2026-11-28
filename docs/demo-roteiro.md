@@ -15,7 +15,7 @@ scripts/geban-demo.sh status # saúde: units + portas
 
 Interface: **http://127.0.0.1:8081** (TUI `GEBTUI`; suba com
 `advplc serve src/GEBTUI.prw` se ainda não estiver no ar).
-PDV web (totem/tablet): **http://127.0.0.1:8081/pdv** — login próprio.
+PDV web (totem/tablet): **http://127.0.0.1:8090/pdv** — login próprio (servido pelo GEBWEB; o :8081 é só a TUI).
 
 **Login:** usuário `DEM_ADMIN`, senha `Demo#2026`, empresa **99**.
 Outros perfis demo (mesma senha): `DEM_GESTOR`, `DEM_CAIXA1`, `DEM_CAIXA2`,

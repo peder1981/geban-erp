@@ -105,7 +105,7 @@ up() {
     fi
     sleep 2
     status || true
-    say "Demo: http://127.0.0.1:8081 (suba 'advplc serve src/GEBTUI.prw' fora deste script se precisar da TUI)."
+    say "Demo: TUI http://127.0.0.1:8081 | PDV/API http://127.0.0.1:8090/pdv (suba 'advplc serve src/GEBTUI.prw' fora deste script se precisar da TUI)."
     say "Login empresa 99: DEM_ADMIN / Demo#2026 (criado no primeiro 'geban-demo seed'). Conta super: Geban#2026 (troca obrigatória no 1º login)."
     say "Primeiro uso: rode 'scripts/geban-demo.sh seed'. Logs: journalctl --user -u geban-demo-watchdog -u geban-emu-sefaz -u geban-emu-cielo -u geban-emu-banco -u geban-periferico"
 }
