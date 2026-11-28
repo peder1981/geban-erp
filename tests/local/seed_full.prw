@@ -55,6 +55,10 @@
 /*/{Protheus.doc} SEED_FULL
     Carga persistente da demonstracao, exclusivamente geban_test/emp_99.
     Nao executa testes de massa, cleanup ou movimentos operacionais.
+    Restricao do demo: os blocos SN/CTB/DER e EFD trabalham na competencia
+    corrente (AAAAMM de hoje). Reexecutar o seed em outro mes abre uma
+    competencia nova e exige ajuste/novo seed — e' intencionalmente
+    "same-month".
     @type Seed de demonstracao
     @author Peder Munksgaard
     @since 2026-10-03
@@ -806,6 +810,7 @@ Static Function SF_LOJ()
     Local cSt := ""
     Local cProd := ""
     Local cProd2 := ""
+    Local cForma := ""
     Local cPed := ""
     Local cCli := ""
     Local cCup := ""
@@ -858,10 +863,11 @@ Static Function SF_LOJ()
     If cSt == "FECHADA"
         nCup := BOVAL(TCSqlQuery("SELECT COUNT(*) AS N FROM GLJ3 WHERE GLJ3_FILIAL = " + cFilQ + ;
             " AND GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND D_E_L_E_T_ = ' '")[1]:N)
-        aH := TCSqlQuery("SELECT GLJ5_CUPOM AS C FROM GLJ5 JOIN GLJ3 ON GLJ3_FILIAL = GLJ5_FILIAL AND GLJ3_CUPOM = GLJ5_CUPOM " + ;
+        aH := TCSqlQuery("SELECT COUNT(DISTINCT GLJ5_FORMA) AS N FROM GLJ5 JOIN GLJ3 ON GLJ3_FILIAL = GLJ5_FILIAL AND GLJ3_CUPOM = GLJ5_CUPOM " + ;
             "AND GLJ3.D_E_L_E_T_ = ' ' WHERE GLJ5_FILIAL = " + GEBDBQuote(FWxFilial("GLJ5")) + " AND GLJ5.D_E_L_E_T_ = ' ' AND " + ;
-            "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA = 'VALE' LIMIT 1")
-        If nCup < 19 .Or. Len(aH) == 0
+            "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA IN ('DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'FIADO', 'VALE')")
+        // Completa = 18+ cupons e as 6 formas obrigatorias; crypto e' opcional.
+        If nCup < 18 .Or. BOVAL(aH[1]:N) < 6
             // Sessao fechada incompleta (rodada parcial): abre outra do zero.
             ConOut("SEED_FULL LOJ sessao " + cSes + " fechada incompleta (" + cValToChar(nCup) + " cupons): nova sessao")
             cSes := ""
@@ -879,6 +885,11 @@ Static Function SF_LOJ()
                 ConOut("SEED_FULL LOJ sessao " + cSes + " aberta com " + cValToChar(nCup) + " cupons: fechando")
                 aR := GEBLOJFECHA(cSes, GEBLOJESP(cSes))
                 lOk := aR[1] .And. lOk
+                If !aR[1]
+                    // Caixa ainda ocupado: nao abre outra sessao por cima.
+                    ConOut("SEED_FULL LOJ FAIL fechando sessao antiga " + cSes + ": " + aR[2])
+                    Return .F.
+                EndIf
                 cSes := ""
                 cSt := ""
             EndIf
@@ -920,12 +931,12 @@ Static Function SF_LOJ()
                 aAdd(aIt, {aVen[nI][1][3], aVen[nI][1][4]})
                 nTot := Round(nTot + aVen[nI][1][4] * SF_PRC(aVen[nI][1][3]), 2)
             EndIf
-            cProd := aVen[nI][2]
-            If cProd == "DINHEIRO"
+            cForma := aVen[nI][2]
+            If cForma == "DINHEIRO"
                 aPg := {{"DINHEIRO", Round(nTot + 50, 2)}}
-            ElseIf cProd == "PIX" .Or. cProd == "FIADO"
-                aPg := {{cProd, nTot}}
-            ElseIf cProd == "DEBITO"
+            ElseIf cForma == "PIX" .Or. cForma == "FIADO"
+                aPg := {{cForma, nTot}}
+            ElseIf cForma == "DEBITO"
                 aPg := {{"DEBITO", nTot, aVen[nI][3]}}
             Else
                 aPg := {{"CREDITO", nTot, aVen[nI][3]}}
@@ -1014,12 +1025,12 @@ Static Function SF_LOJ()
     lOk := SF_CNT("GLJ3", "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ3_STATUS = 'CANCELADO'", 1) .And. lOk
     // Uma venda de cada forma obrigatoria na sessao.
     For nI := 1 To 6
-        cProd := {"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE"}[nI]
+        cForma := {"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE"}[nI]
         aH := TCSqlQuery("SELECT GLJ5_CUPOM AS C FROM GLJ5 JOIN GLJ3 ON GLJ3_FILIAL = GLJ5_FILIAL AND GLJ3_CUPOM = GLJ5_CUPOM " + ;
             "AND GLJ3.D_E_L_E_T_ = ' ' WHERE GLJ5_FILIAL = " + GEBDBQuote(FWxFilial("GLJ5")) + " AND GLJ5.D_E_L_E_T_ = ' ' AND " + ;
-            "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA = " + GEBDBQuote(cProd) + " LIMIT 1")
+            "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA = " + GEBDBQuote(cForma) + " LIMIT 1")
         If Len(aH) == 0
-            ConOut("SEED_FULL LOJ FAIL forma ausente " + cProd)
+            ConOut("SEED_FULL LOJ FAIL forma ausente " + cForma)
             lOk := .F.
         EndIf
     Next
@@ -1297,6 +1308,8 @@ Static Function SF_CTB()
     Local nI := 0
     Local nRB := 0
     Local nRes := 0
+    Local nDeb := 0
+    Local nCre := 0
 
     // Lancamentos manuais (um so; GC2_ORIGEM marca o documento).
     For nI := 1 To Len(aLanc)
@@ -1338,9 +1351,15 @@ Static Function SF_CTB()
             If aPar[nI][1] == "fechado" .And. aPar[nI][2] == "S"
                 lFech := .T.
             EndIf
+            If aPar[nI][1] == "debitos"
+                nDeb := aPar[nI][2]
+            EndIf
+            If aPar[nI][1] == "creditos"
+                nCre := aPar[nI][2]
+            EndIf
         Next nI
-        ConOut("SEED_FULL CTB balancete " + cComp + " debitos=" + cValToChar(aPar[2][2]) + ;
-            " creditos=" + cValToChar(aPar[3][2]) + " fechado=" + IIf(lFech, "S", "N"))
+        ConOut("SEED_FULL CTB balancete " + cComp + " debitos=" + cValToChar(nDeb) + ;
+            " creditos=" + cValToChar(nCre) + " fechado=" + IIf(lFech, "S", "N"))
         If !lFech
             lOk := .F.
         EndIf
