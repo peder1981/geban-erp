@@ -92,7 +92,9 @@ User Function SEED_FULL()
     lOk := SF_NUC() .And. lOk
     lOk := SF_CAD() .And. lOk
     lOk := SF_FIS() .And. lOk
-    // Proximas etapas: SF_FIN(), SF_CTB(), SF_LOJ().
+    lOk := SF_FIN() .And. lOk
+    lOk := SF_COM() .And. lOk
+    // Proximas etapas: SF_CTB(), SF_LOJ().
     ConOut("SEED_FULL " + IIf(lOk, "PASS", "FAIL"))
 Return lOk
 
@@ -501,12 +503,278 @@ Static Function SF_FIS()
     If aR[1]
         ConOut("SEED_FULL FIS efd competencia=" + cComp + " documentos=" + cValToChar(aR[4][5]) + "/" + ;
             cValToChar(nNfe + nCanc + nNfce + nEnt) + " bytes=" + cValToChar(Len(aR[3])))
-        If aR[4][5] < nNfe + nCanc + nNfce + nEnt
-            ConOut("SEED_FULL FIS FAIL efd " + cComp + " incompleta: " + cValToChar(aR[4][5]) + "/" + ;
+        // Chave emitida so' pode gerar um C100; quantidade tem de ser exata.
+        If aR[4][5] != nNfe + nCanc + nNfce + nEnt
+            ConOut("SEED_FULL FIS FAIL efd " + cComp + " divergente: " + cValToChar(aR[4][5]) + "/" + ;
                 cValToChar(nNfe + nCanc + nNfce + nEnt) + " documentos")
             lOk := .F.
         EndIf
     EndIf
+Return lOk
+
+/*/{Protheus.doc} SF_FIN
+    Ciclo financeiro do demo: contas, 120 titulos a receber DEM (30 baixados
+    com juros/desconto, 20 vencidos, 70 em aberto) e CNAB 240 ponta a ponta
+    contra o banco emulador em FIN_BANCO_URL (boleto -> remessa POST ->
+    retorno GET -> baixa automatica). Idempotente: titulo/boleto/remessa so
+    sao criados uma vez.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-10-18
+    @return .T. se todas as quantidades forem comprovadas
+/*/
+Static Function SF_FIN()
+    Local lOk := .T.
+    Local aR := {}
+    Local aH := {}
+    Local cDoc := ""
+    Local cCli := ""
+    Local cUrl := ""
+    Local cResp := ""
+    Local cFilQ := GEBDBQuote(FWxFilial("GFN2"))
+    Local dHoje := BOHOJE()
+    Local nI := 0
+    Local nVal := 0
+    Local nSaldo := 0
+    Local nJur := 0
+    Local nMul := 0
+    Local nDesc := 0
+    Local nLiq := 0
+
+    // Contas do demo; GEBFNCON ja recusa duplicata.
+    lOk := GEBFNCON("CAIXA", "Caixa matriz") .And. lOk
+    lOk := GEBFNCON("BANCO", "Banco cobranca demo") .And. lOk
+    lOk := GEBFNCON("CRYPTO", "Carteira cripto demo") .And. lOk
+
+    // 120 titulos a receber: 30 pagos com atraso, 20 vencidos, 70 em aberto.
+    For nI := 1 To 120
+        cDoc := "DEM-REC-" + StrZero(nI, 3)
+        cCli := "DEM-C" + StrZero(((nI - 1) % 40) + 1, 3)
+        nVal := 120 + nI * 3.75
+        If !SF_HAS("GFN2", "GFN2_DOC", cDoc, " AND GFN2_FILIAL = " + cFilQ)
+            If nI <= 30
+                aR := GEBFXTIT("R", cDoc, cCli, nVal, "30", BODTADD(dHoje, -50), "SEED_FIN", "")
+            ElseIf nI <= 50
+                aR := GEBFXTIT("R", cDoc, cCli, nVal, "30", BODTADD(dHoje, -60), "SEED_FIN", "")
+            Else
+                aR := GEBFXTIT("R", cDoc, cCli, nVal, "30", dHoje, "SEED_FIN", "")
+            EndIf
+            If !aR[1]
+                ConOut("SEED_FULL FIN " + cDoc + " " + aR[2])
+                lOk := .F.
+            EndIf
+        EndIf
+    Next
+    // Baixa manual dos 30 primeiros, juros/multa/desconto variados.
+    For nI := 1 To 30
+        cDoc := "DEM-REC-" + StrZero(nI, 3)
+        aH := TCSqlQuery("SELECT GFN2_SALDO AS S, GFN2_STATUS AS T FROM GFN2 WHERE GFN2_FILIAL = " + cFilQ + ;
+            " AND GFN2_DOC = " + GEBDBQuote(cDoc) + " AND D_E_L_E_T_ = ' '")
+        If Len(aH) == 1 .And. BOCOL(aH[1]:T) == "ABERTO"
+            nSaldo := BOVAL(aH[1]:S)
+            nJur := Round(nSaldo * 0.01 * ((nI - 1) % 3 + 1), 2)
+            nMul := Round(nSaldo * 0.02 * (nI % 2), 2)
+            nDesc := Round(nSaldo * 0.05 * IIf((nI + 1) % 4 == 0, 1, 0), 2)
+            aR := GEBFXBAI("R", cDoc, nSaldo, nJur, nMul, nDesc, "CAIXA", dHoje)
+            If !aR[1]
+                ConOut("SEED_FULL FIN baixa " + cDoc + " " + aR[2])
+                lOk := .F.
+            EndIf
+        EndIf
+    Next
+
+    // CNAB 240 ponta a ponta: 5 titulos vencidos (DEM-REC-031..035).
+    If !SF_HAS("GBC1", "GBC1_CONTA", "BANCO", " AND GBC1_FILIAL = " + cFilQ)
+        aR := GEBBCOCFG("BANCO", "033", "1234", "", "123456", "", "101", "1234567", ;
+            "MERCADO DEMO COMPLETO LTDA", "11222333000181", "240", "")
+        lOk := aR[1] .And. lOk
+        If !aR[1]
+            ConOut("SEED_FULL FIN cfg cobranca " + aR[2])
+        EndIf
+    EndIf
+    For nI := 31 To 35
+        cDoc := "DEM-REC-" + StrZero(nI, 3)
+        If !SF_HAS("GBC2", "GBC2_DOC", cDoc, " AND GBC2_FILIAL = " + cFilQ)
+            aR := GEBBCOBOL(cDoc, "BANCO")
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL FIN boleto " + cDoc + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+    // Remessa so sai uma vez: boletos GERADO viram REMETIDO na geracao.
+    aH := TCSqlQuery("SELECT GBC2_DOC AS D FROM GBC2 WHERE GBC2_FILIAL = " + cFilQ + ;
+        " AND GBC2_CONTA = 'BANCO' AND GBC2_STATUS = 'GERADO' AND GBC2_DOC LIKE 'DEM-REC-%' AND D_E_L_E_T_ = ' '")
+    If Len(aH) > 0
+        aR := GEBBCOREM("BANCO", "")
+        lOk := aR[1] .And. lOk
+        If aR[1]
+            cUrl := BOPARM("FIN_BANCO_URL", "http://127.0.0.1:18767")
+            // HttpQuote e' o cliente HTTP do runtime (mesmo do TEF/SEFAZ).
+            cResp := HttpQuote(cUrl + "/cnab/remessa", "POST", "", aR[3][3], 15, {"Content-Type: text/plain"})
+            If cResp == Nil .Or. !('"ok": true' $ BOSTR(cResp))
+                ConOut("SEED_FULL FIN remessa banco falhou: " + BOSTR(cResp))
+                lOk := .F.
+            EndIf
+        EndIf
+    EndIf
+    // Recuperacao: REMETIDO (remessa ja saiu) ainda nao liquidado busca o
+    // retorno mesmo que o POST tenha falhado numa execucao anterior.
+    aH := TCSqlQuery("SELECT GBC2_DOC AS D FROM GBC2 WHERE GBC2_FILIAL = " + cFilQ + ;
+        " AND GBC2_DOC LIKE 'DEM-REC-%' AND GBC2_STATUS = 'REMETIDO' AND D_E_L_E_T_ = ' '")
+    If Len(aH) > 0
+        If cUrl == ""
+            cUrl := BOPARM("FIN_BANCO_URL", "http://127.0.0.1:18767")
+        EndIf
+        cResp := HttpQuote(cUrl + "/cnab/retorno", "GET", "", "", 15, {})
+        If cResp == Nil
+            ConOut("SEED_FULL FIN retorno banco sem resposta")
+            lOk := .F.
+        Else
+            aR := GEBBCORET("BANCO", BOSTR(cResp))
+            lOk := aR[1] .And. lOk
+            ConOut("SEED_FULL FIN retorno: " + aR[2])
+        EndIf
+    EndIf
+    aH := TCSqlQuery("SELECT GBC2_DOC AS D FROM GBC2 WHERE GBC2_FILIAL = " + cFilQ + ;
+        " AND GBC2_DOC LIKE 'DEM-REC-%' AND GBC2_STATUS = 'LIQUIDADO' AND D_E_L_E_T_ = ' '")
+    nLiq := Len(aH)
+    ConOut("SEED_FULL FIN cnab liquidados=" + cValToChar(nLiq) + "/5")
+    lOk := nLiq == 5 .And. lOk
+    lOk := SF_CNT("GFN1", "GFN1_CONTA IN ('CAIXA','BANCO','CRYPTO')", 3) .And. lOk
+    lOk := SF_CNT("GFN2", "GFN2_DOC LIKE 'DEM-REC-%'", 120) .And. lOk
+    lOk := SF_CNT("GFN2", "GFN2_DOC LIKE 'DEM-REC-%' AND GFN2_STATUS = 'RECEBIDA'", 35) .And. lOk
+    lOk := SF_CNT("GFN2", "GFN2_DOC LIKE 'DEM-REC-%' AND GFN2_STATUS = 'ABERTO'", 85) .And. lOk
+    ConOut("SEED_FULL financeiro " + IIf(lOk, "OK", "FAIL"))
+Return lOk
+
+/*/{Protheus.doc} SF_COM
+    Compras/estoque do demo: 5 solicitacoes atendidas via cotacao (SC ->
+    GEBCPXGERA), 30 pedidos DEM-PED (18 recebidos com NF DEM-NF, 3 aprovados
+    por alcada, 3 pendentes, 6 liberados em aberto) e saldo inicial DEM-EST.
+    Idempotente: pedido, entrada e movimento so sao criados uma vez.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-10-18
+    @return .T. se todas as quantidades forem comprovadas
+/*/
+Static Function SF_COM()
+    Local lOk := .T.
+    Local aR := {}
+    Local aH := {}
+    Local aCh := {}
+    Local aIt := {}
+    Local cPed := ""
+    Local cNF := ""
+    Local cForn := ""
+    Local cProd1 := ""
+    Local cProd2 := ""
+    Local cChave := ""
+    Local cFilQ := GEBDBQuote(FWxFilial("GCP3"))
+    Local dHoje := BOHOJE()
+    Local nI := 0
+    Local nTot := 0
+
+    // Alcada de compras: total acima fica PENDENTE ate GEBCPXAPR.
+    lOk := SF_SET("COM_ALCADA", "800") .And. lOk
+
+    // Saldo inicial de 3 produtos (estoque antes das compras).
+    For nI := 1 To 3
+        If !SF_HAS("GES2", "GES2_DOC", "DEM-EST-" + StrZero(nI, 3), " AND GES2_FILIAL = " + GEBDBQuote(FWxFilial("GES2")))
+            aR := GEBESTMOV("DEM-P" + StrZero(nI, 2), "01", "E", 50 + nI * 10, 5 + nI, "SALDO_INI", ;
+                "DEM-EST-" + StrZero(nI, 3), dHoje, {}, "", .F.)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL COM estoque " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    // Cotacoes minimas para a SC gerar pedido pelo menor preco.
+    For nI := 1 To 5
+        cProd1 := "DEM-P" + StrZero(40 + nI, 2)
+        If !SF_HAS("GCP2", "GCP2_FORN", "DEM-F001", " AND GCP2_PROD = " + GEBDBQuote(cProd1) + ;
+                " AND GCP2_FILIAL = " + cFilQ)
+            lOk := GEBCMCOT("DEM-F001", cProd1, 4 + nI) .And. lOk
+        EndIf
+    Next
+    // 5 solicitacoes -> pedido gerado pela cotacao (PCxxxxx, uma vez so).
+    For nI := 1 To 5
+        cPed := "DEM-SC-" + StrZero(nI, 2)
+        If !SF_HAS("GCQ1", "GCQ1_NUM", cPed, " AND GCQ1_FILIAL = " + cFilQ)
+            cProd1 := "DEM-P" + StrZero(40 + nI, 2)
+            aR := GEBCPXSC(cPed, {{cProd1, 10 + nI, dHoje}}, "DEM_COMPRAS")
+            lOk := aR[1] .And. lOk
+            If aR[1]
+                aR := GEBCPXGERA(cPed, "30", "01", dHoje)
+                lOk := aR[1] .And. lOk
+                If !aR[1]
+                    ConOut("SEED_FULL COM gera " + cPed + " " + aR[2])
+                EndIf
+            EndIf
+        EndIf
+    Next
+
+    // Chaves das NF-e de fornecedor importadas (vinculo de entrada).
+    aCh := TCSqlQuery("SELECT GDFE_CHAVE AS C FROM GDFE WHERE GDFE_FILIAL = " + GEBDBQuote(FWxFilial("GDFE")) + ;
+        " AND GDFE_IMPORT <> '' AND D_E_L_E_T_ = ' ' ORDER BY GDFE_CHAVE LIMIT 3")
+
+    // 30 pedidos: 001..018 recebidos; 019..021 aprovados; 022..024 pendentes;
+    // 025..030 liberados em aberto. Total dos itens acima da alcada nos 19..24.
+    For nI := 1 To 30
+        cPed := "DEM-PED-" + StrZero(nI, 3)
+        cNF := "DEM-NF-" + StrZero(nI, 3)
+        cForn := "DEM-F" + StrZero(((nI - 1) % 15) + 1, 3)
+        cProd1 := "DEM-P" + StrZero(((nI * 2 - 1) % 60) + 1, 2)
+        cProd2 := "DEM-P" + StrZero(((nI * 2) % 60) + 1, 2)
+        If nI >= 16 .And. nI <= 18 .And. Len(aCh) >= nI - 15
+            cForn := "F77000161"
+        EndIf
+        nTot := IIf(nI >= 19 .And. nI <= 24, 400, 60)
+        aIt := {{cProd1, 2 + nI % 5, nTot}, {cProd2, 1 + nI % 3, 20 + nI % 10}}
+        If !SF_HAS("GCP3", "GCP3_NUM", cPed, " AND GCP3_FILIAL = " + cFilQ)
+            aR := GEBCPXPED(cPed, cForn, aIt, "30", "01", dHoje)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL COM pedido " + cPed + " " + aR[2])
+                Loop
+            EndIf
+        EndIf
+        // Aprovacao de alcada dos pedidos 019..021.
+        If nI >= 19 .And. nI <= 21
+            aH := TCSqlQuery("SELECT GCQ2_LIB AS L FROM GCQ2 WHERE GCQ2_FILIAL = " + cFilQ + ;
+                " AND GCQ2_PED = " + GEBDBQuote(cPed) + " AND GCQ2_LIB = 'PENDENTE' AND D_E_L_E_T_ = ' '")
+            If Len(aH) == 1
+                aR := GEBCPXAPR(cPed, "DEM_COMPRAS", .T.)
+                lOk := aR[1] .And. lOk
+                If !aR[1]
+                    ConOut("SEED_FULL COM aprova " + cPed + " " + aR[2])
+                EndIf
+            EndIf
+        EndIf
+        // Recebimento dos 18 primeiros com NF do fornecedor.
+        If nI <= 18 .And. !SF_HAS("GCP5", "GCP5_NF", cNF, " AND GCP5_FILIAL = " + cFilQ)
+            cChave := ""
+            If nI >= 16 .And. Len(aCh) >= nI - 15
+                cChave := BOCOL(aCh[nI - 15]:C)
+            EndIf
+            aR := GEBCPXENT(cNF, cPed, {}, 0, dHoje, {}, cChave)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL COM entrada " + cNF + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    lOk := SF_CNT("GCQ1", "GCQ1_NUM LIKE 'DEM-SC-%' AND GCQ1_STATUS = 'ATENDIDA'", 5) .And. lOk
+    lOk := SF_CNT("GCP3", "GCP3_NUM LIKE 'DEM-PED-%'", 30) .And. lOk
+    lOk := SF_CNT("GCP3", "GCP3_NUM LIKE 'DEM-PED-%' AND GCP3_STATUS = 'RECEBIDO'", 18) .And. lOk
+    lOk := SF_CNT("GCQ2", "GCQ2_PED LIKE 'DEM-PED-%' AND GCQ2_LIB = 'PENDENTE'", 3) .And. lOk
+    lOk := SF_CNT("GCQ2", "GCQ2_PED LIKE 'DEM-PED-%' AND GCQ2_APROV = 'DEM_COMPRAS'", 3) .And. lOk
+    lOk := SF_CNT("GCP5", "GCP5_NF LIKE 'DEM-NF-%'", 18) .And. lOk
+    lOk := SF_CNT("GFN3", "GFN3_DOC LIKE 'DEM-NF-%'", 18) .And. lOk
+    lOk := SF_CNT("GES2", "GES2_DOC LIKE 'DEM-EST-%'", 3) .And. lOk
+    ConOut("SEED_FULL compras " + IIf(lOk, "OK", "FAIL"))
 Return lOk
 
 // Configuracao fiscal DEM: compara os parametros antes de versionar GE4.
