@@ -17,8 +17,9 @@ openssl) e responde como a SEFAZ:
   envEvento cancelamento: 128 + 135 (nProt confere), 580 se ja cancelada,
             217 se a nota nao existe, 222 protocolo divergente.
   inutNFe   102; 241 se um numero da faixa ja foi autorizado.
-  distDFeInt (AN): semeia 2 notas do fornecedor 11444777000161 para o CNPJ
-            consultado (a 2a cancelada por evento); ciencia/confirmacao (2102xx)
+  distDFeInt (AN): semeia SEFAZ_SEED_NOTAS notas (padrao 2; demo: 9) do
+            fornecedor 11444777000161 para o CNPJ consultado (a 2a cancelada
+            por evento, demais importaveis); ciencia/confirmacao (2102xx)
             liberam a nota completa (procNFe); 137 sem novidade, 656 na 2a vazia.
 NFS-e nacional (REST/JSON, mesmo endereco): POST .../nfse (DPS gzip+Base64;
   assinatura conferida; cTribNac 999999 => 400 E0310; xDescServ com DEMORA
@@ -291,6 +292,10 @@ def dist(msg):
             d["docs"].append(("resNFe_v1.01.xsd", res_nfe(b, "50.00")))
             d["docs"].append(("procEventoNFe_v1.00.xsd", '<procEventoNFe xmlns="%s" versao="1.00"><evento versao="1.00"><infEvento><chNFe>%s</chNFe>'
                               "<tpEvento>110111</tpEvento></infEvento></evento></procEventoNFe>" % (NS, b)))
+            for nnf in range(458, 456 + max(2, int(os.environ.get("SEFAZ_SEED_NOTAS", "2")))):
+                ch = chave_forn(nnf)
+                d["chaves"][ch] = False
+                d["docs"].append(("resNFe_v1.01.xsd", res_nfe(ch, "288.00")))
         cab = '<retDistDFeInt xmlns="%s" versao="1.01"><tpAmb>%s</tpAmb><verAplic>EMU-1.0</verAplic>' % (NS, tpamb)
         chc = txt(r, N + "consChNFe/" + N + "chNFe")
         if chc:
