@@ -1,9 +1,9 @@
 # 05 — Referência Técnica Completa do ERP GEBAN
 
 > **Autor:** Peder Munksgaard · **Data:** 26/09/2026 · **Idioma:** PT-BR
-> **Fontes primárias:** `src/*.prw` (81 arquivos, 633 `User Function` — todas catalogadas na seção 8,
+> **Fontes primárias:** `src/*.prw` (83 arquivos, 635 `User Function` — todas catalogadas na seção 8,
 > gerada por `scripts/doc-funcoes.py`), `docs/02-regras-negocio.md`, planos e ledgers em `documentacao interna`.
-> **Estado verificado:** suíte completa **89/89 PASS** contra Postgres real (`geban_test`) sob o runtime
+> **Estado verificado:** suíte completa **90/90 PASS** contra Postgres real (`geban_test`) sob o runtime
 > **AdvPP advplc** — ver seção 9. Interface em componentes PO-UI (`src/GEBTUI.prw`), todas as operações
 > em formulários de tela única.
 > PDFs gerados com o template `jmpm` (`md2pdf.py --template jmpm --cover`).
@@ -377,7 +377,7 @@ chama a mesma função de negócio da API REST, com a permissão conferida antes
   (`GEBTUITROCASENHA`: política e confirmação; outro usuário só via `GEBSECPODE`;
   ninguém muda o próprio perfil; derruba as sessões do alvo).
 
-## 8. Referência completa de funções por arquivo (633 funções)
+## 8. Referência completa de funções por arquivo (635 funções)
 
 Gerada por `scripts/doc-funcoes.py` a partir dos fontes: assinatura exata da
 declaração e propósito da primeira linha do `Protheus.doc` (ou do comentário
@@ -1242,6 +1242,12 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBTUIPERMSETEMP` | `GEBTUIPERMSETEMP(cUsuLog, cEmpresa, cPerfil, cMenu, cItem, lPermite)` | Concede (lPermite .T.) ou revoga (.F.) uma area para um perfil, numa empresa. |
 | `GEBTUIPERMSET` | `GEBTUIPERMSET(cUsuLog, cPerfil, cMenu, cItem, lPermite)` | Concede ou revoga uma area para um perfil em TODAS as empresas. |
 
+**`src/GEBTUIPDV.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `TUIPdvAbre` | `TUIPdvAbre(cUsu, cEmp, cFil)` | Acao direta do menu/atalho "Frente de loja": gera token real da sessao (GEBSECTOKEN) e abre /pdv#tok=... |
+
 ### GEB_REST_WEB
 
 **`src/GEBREST.prw`** — 52 funções
@@ -1427,6 +1433,12 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 | `GEBCRYPAGA` | `GEBCRYPAGA(cCupom, cMoeda, cEndereco, nBRL, nQtd, nCot)` | Grava o pagamento crypto do cupom em GCK2 (auditoria/segunda via). |
 | `GEBCRYPAGOS` | `GEBCRYPAGOS(cCupom)` | Pagamentos crypto de um cupom (para a segunda via). |
 
+**`src/GEBDEMO.prw`** — 1 funções
+
+| Função | Assinatura | Propósito |
+|---|---|---|
+| `GEBDEMOENSURE` | `GEBDEMOENSURE()` | — |
+
 **`src/GESSAR.prw`** — 8 funções
 
 | Função | Assinatura | Propósito |
@@ -1446,20 +1458,32 @@ logo acima). Só `User Function` (as `Static Function` são internas ao fonte).
 |---|---|---|
 | `TEST_INIT` | `TEST_INIT()` | — |
 
-## 9. Testes (89 suítes `tests/T_*.prw`)
+## 9. Testes (90 suítes `tests/T_*.prw`)
 
 Runner local: **`tests/run-all.sh`** — roda cada `tests/T_*.prw` via `advplc run` contra o
 Postgres de teste (`GEBAN_PG_*` apontando para `geban_test`, nunca produção), imprime
 `PASS/FAIL/ERRO/TIMEOUT` por teste e o placar final; aceita um filtro por nome
 (`./tests/run-all.sh GEBSEC`). Testes que tocam SEFAZ/Cielo precisam dos emuladores de
-`tests/emuladores/` no ar (`ADVPP_HTTP_INSECURE=1`): `sefaz_emulador.py` (:18766) e
-`cielo_emulador.py` (:18765). O emulador SEFAZ deduplica DPS em memória — se
-`T_GEBDFE_NFSE` falhar com rejeição de duplicidade, reinicie o emulador antes de rerodar.
+`tests/emuladores/` no ar (`ADVPP_HTTP_INSECURE=1`): `sefaz_emulador.py` (:18766, HTTPS —
+NF-e/NFC-e/NFS-e; a quantidade de NF-e de fornecedor semeadas é controlada por
+`SEFAZ_SEED_NOTAS`, padrão 2, a demo usa 9 → 8 NF-e importáveis + 1 cancelada) e
+`cielo_emulador.py` (:18765, TEF). Existe também `banco_emulador.py` (:18767, CNAB
+240 remessa/retorno/boleto), usado pela demo — ver seção 14. O watchdog
+`demo_watchdog.py` (:18768) **não é exigido** pela suíte: ele só serve ao ambiente de
+demonstração (subir os emuladores sob demanda). O emulador SEFAZ deduplica DPS em
+memória — se `T_GEBDFE_NFSE` falhar com rejeição de duplicidade, reinicie o emulador
+antes de rerodar.
 
 Cada suíte cria schemas descartáveis (`test_*`, `emp_*` de teste) e os remove ao final;
 o catálogo de identidade (`GE1`, `GE2*`, `GE2_TOK`) é global em `public` — fixtures gravam
-lá com prefixo `T_`/`REST-` e limpam depois. Rodada de referência: **89/89 PASS**
+lá com prefixo `T_`/`REST-` e limpam depois. Rodada de referência: **90/90 PASS**
 (`geban_test`, advplc local).
+
+`tests/local/seed_full.prw` não é suíte de assert: é o seed da empresa demo 99 (seção 14),
+rodado por `advplc run` com `GEBAN_PG_*` + `ADVPP_HTTP_INSECURE=1`; idempotente (chaves
+`DEM-*`) e grava massa fiscal, financeira, de compras, contábil, Simples, loja e Derrama.
+`tests/T_GEBAN_DEMO.prw` é o health-check read-only dessa massa (schema `GEP_PERIFERICOS`,
+notas, títulos, guias, balancete/DRE e sessão de caixa fechada).
 
 ## 10. Deploy e operação
 
@@ -1864,7 +1888,7 @@ Situações em GDF5: `AUTORIZADA`, `CONTINGENCIA`, `REJEITADA`, `REJEITADA_CONTI
 - **`GEBDFE_EFD.prw`:**
   - `GEBDFEEFDMIG` (GDFG: competência, finalidade, saldo credor, a recolher, linhas, data e arquivo);
   - `GEBDFEEFDVER(cComp)`: versão do leiaute pelo ano;
-  - `GEBDFEEFD(cComp, cFin)`: coleta GDF5/GDF6/GDF8+GCQ4+GDFE+GDFF, valida e grava; devolve `{lOk, msg, arquivo, {débitos, créditos, recolher, saldo credor, docs, linhas}}`;
+  - `GEBDFEEFD(cComp, cFin)`: coleta GDF5/GDF6/GDF8+GCQ4+GDFE+GDFF, valida e grava; devolve `{lOk, msg, arquivo, {débitos, créditos, recolher, saldo credor, docs, linhas}}`. As NF-e de entrada deduplicam por chave (`DISTINCT ON (GDF8_CHAVE)` no vínculo GDF8) — a mesma NF-e de fornecedor não sai duplicada no SPED;
   - `GEBDFEEFDTXT(oE, oP, aDocs)`: montador puro (sem banco);
   - `GEBDFEEFDLE(cComp)`: arquivo guardado;
   - `GEBDFEEFDBLOCOS(cXml, cTag)`: blocos de uma tag em ordem.
@@ -1891,3 +1915,62 @@ Situações em GDF5: `AUTORIZADA`, `CONTINGENCIA`, `REJEITADA`, `REJEITADA_CONTI
   - `T_GEBDFE_EFD` (com banco): recusas, coleta, apuração, arquivo guardado e saldo credor na competência seguinte;
   - local `T_GEBDFE_EFD.sh`: montador com notas do motor real e validador independente em Python (campos por registro, obrigatórios, formatos, ordem dos blocos, 9900/x990/9999, C190 × C100, fórmula do E110 e E116).
 - **Pendente:** validação do arquivo no PVA da Receita (ainda não feita; fazer antes da primeira entrega real).
+
+## 14. Ambiente de demonstração (empresa 99, `emp_99`)
+
+Ambiente local completo para apresentações e testes manuais: empresa **99** no
+`geban_test` com massa semeada por `tests/local/seed_full.prw` (chaves `DEM-*`,
+idempotente) e emuladores que sobem sob demanda. **Só desenvolvimento/demo —
+nunca produção.** O roteiro passo a passo das telas está em
+`docs/demo-roteiro.md`.
+
+**Ponto de entrada: `scripts/geban-demo.sh`** (wrapper sobre units
+`systemd --user`, instaladas a partir de `deploy/systemd-user/` em
+`~/.config/systemd/user`):
+
+| Comando | O quê faz |
+|---|---|
+| `up` | Instala/atualiza as units e habilita **só** `geban-demo-watchdog.service` (modo sob-demanda). `up --all` = modo sempre-online (habilita também as 4 units de emulador). |
+| `down` | Para as 4 units de emulador; o watchdog continua (é a peça always-on) — o próximo acesso à empresa 99 chama `/ensure` e eles sobem de novo. |
+| `reset [-y]` | Para tudo (inclui o watchdog), `DROP SCHEMA emp_99 CASCADE` e limpa `periferico/saidas/cupom-*`. Pede `SIM` salvo `-y`. Depois: `up` + `seed`. |
+| `status` | Tabela de saúde: estado das units + portas. |
+| `seed` | `GET :18768/ensure`, espera as portas e roda `tests/local/seed_full.prw` uma vez (idempotente). |
+
+**Watchdog** (`tests/emuladores/demo_watchdog.py`, HTTP `127.0.0.1:18768`):
+`GET /health` e `GET /ensure` — o `/ensure` sobe os emuladores via
+`systemctl --user start` (fallback `Popen`); é a única peça always-on. Para as
+units rodarem sem sessão de login, é preciso `loginctl enable-linger` (já ativo
+na máquina de demo).
+
+**Auto-spawn no login:** o hook `GEBDEMOENSURE()` (`src/GEBDEMO.prw` —
+`HttpQuote` fire-and-forget com timeout de 4 s para `GET /ensure`) é chamado no
+login da empresa 99 por `GEBWEB_LOGINAPI` (`src/GEBWEB.prw`, cobre `/api/login`
+e `/api/pdv/login`) e por `TUIAbre` (`src/GEBTUI.prw`). A restrição é por
+empresa: o hook só dispara quando `cEmp == "99"`. Falha nunca quebra o login —
+no máximo um `ConOut` de diagnóstico.
+
+**Emuladores (units `geban-emu-*` / `geban-periferico`):**
+
+| Serviço | Porta | O quê |
+|---|---|---|
+| `sefaz_emulador.py` | 18766 (HTTPS) | SEFAZ: NF-e/NFC-e/NFS-e; env `SEFAZ_SEED_NOTAS` (padrão 2; a demo usa 9 → 8 NF-e de fornecedor importáveis + 1 cancelada). |
+| `cielo_emulador.py` | 18765 | TEF Cielo (mesma regra de último dígito da sandbox). |
+| `banco_emulador.py` | 18767 | **Novo:** CNAB 240 remessa/retorno/boleto no layout real do `GEBBCOREM`/`GEBBCORET` (segmento P na saída, T/U na entrada). |
+| `periferico_service.py` | 9100 (WebSocket) | Agente de periféricos do PDV; config demo em `periferico/config/perifericos.json`. |
+
+**Impressora virtual (`escpos_virtual`):** driver novo em
+`periferico/periferico_service.py` — renderiza o ESC/POS recebido em
+`periferico/saidas/cupom-<timestamp>.txt` e `.png` (Pillow opcional; sem ele,
+degrada para só o `.txt`). Conecta sozinho no boot do serviço; cadastro da
+demonstradora pelo PDV web (`/api/pdv/perifericos`) ou direto na config.
+
+**Conteúdo do seed** (`tests/local/seed_full.prw`): fiscal — 40 NF-e modelo 55
+(37 autorizadas + 3 canceladas), 1 CC-e, 15 NFC-e modelo 65, 8 NF-e recebidas e
+EFD gerada (competência 202611, 63 documentos); financeiro — 120 títulos `DEM-*`
++ CNAB com 5 boletos liquidados pelo retorno; compras — 30 pedidos, 5 solicitações;
+contábil — balancete D=C e DRE positivo; Simples Nacional — DAS + Fator R; loja —
+19 cupons multi-forma (dinheiro/PIX/débito/crédito TEF/fiado/vale/crypto); Derrama —
+retenções e guias. Health-check read-only: `tests/T_GEBAN_DEMO.prw`.
+
+**Login demo:** `DEM_ADMIN` / `Demo#2026` (empresa 99); demais perfis `DEM_*`
+com a mesma senha demonstram RBAC. Detalhes e ordem das telas: `docs/demo-roteiro.md`.

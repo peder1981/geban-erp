@@ -696,6 +696,8 @@ Fontes: `GEBBOLIB`, `GEBCTX`, `GEBEST`, `GEBFNX`, `GEBCPX`, `GEBFAT`, `GEBLOJ`, 
   - `HTTP`: contrato JSON com autorizar/confirmar/desfazer/cancelar, Bearer token e tempo limite;
   - `CIELO`: API Cielo e-Commerce 3.0. Autorizar = venda sem captura (`POST /1/sales`); confirmar = captura; desfazer = `void`; cancelar = `void` com o valor. O débito vai como crédito à vista. Como a API é de venda não presencial, o número do cartão vem do parâmetro `LOJ_CIELO_CARTAO`: serve para a sandbox e para o emulador, **não para cobrar de verdade**. Uma loja física de verdade precisa de um terminal (Cielo LIO, SiTef, PayGo) ligado pelo provedor `HTTP`.
 - Emulador local da Cielo em `tests/emuladores/cielo_emulador.py`: imita a sandbox, sem internet nem credenciais. Para testar na sandbox real, cadastre-se em <https://docs.cielo.com.br/ecommerce-cielo/page/sandbox-api-ecommerce> e informe MerchantId e MerchantKey.
+- Emulador local do banco em `tests/emuladores/banco_emulador.py` (`127.0.0.1:18767`): responde remessa CNAB 240, devolve retorno liquidando os boletos e serve o boleto — no mesmo layout que `GEBBCOREM`/`GEBBCORET` geram/consomem (segmento P na saída, T/U na entrada). Serve para demonstrar o ciclo remessa → retorno → baixa sem banco de verdade.
+- Impressora virtual `escpos_virtual` (`periferico/periferico_service.py`): em vez de hardware, grava cada cupom ESC/POS em `periferico/saidas/cupom-<timestamp>.txt`/`.png` — usado pelo ambiente de demonstração (empresa 99, `scripts/geban-demo.sh`).
 
 **Simples Nacional:** devoluções de venda (GFT7) deduzem a receita do mês no mesmo balde da venda e reduzem o RBT12 dos meses seguintes. A sobra sem receita gera aviso.
 

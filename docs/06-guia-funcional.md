@@ -167,6 +167,12 @@ por chave/competência: reemissão não duplica). Auditoria: GE3 (B.O.s), GEH
 (acessos), trackers por documento. Detalhe de comandos e troubleshooting completo:
 `docs/04-manual-utilizacao.md`.
 
+> **Ambiente de demonstração:** para ver todos esses fluxos com dados prontos,
+> existe a empresa 99 (`emp_99`) semeada por `tests/local/seed_full.prw` — suba com
+> `scripts/geban-demo.sh up && scripts/geban-demo.sh seed` (emuladores de SEFAZ,
+> Cielo, banco CNAB e periférico sobem sob demanda no login da empresa 99) e siga o
+> roteiro em `docs/demo-roteiro.md`.
+
 ## 10. Glossário rápido
 
 `D_E_L_E_T_` (exclusão lógica), `R_E_C_N_O_` (chave interna), `ABERTA/RECEBIDA/PAGA/

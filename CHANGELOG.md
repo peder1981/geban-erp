@@ -94,6 +94,16 @@ Mudanças desde a última tag (`v0.9`) estão em **Não lançado**, agrupadas po
 - Agente de periféricos PDV para Windows documentado em
   `packaging/windows/pdv/` (build via PyInstaller, no Windows).
 
+### Ambiente de demonstração
+- **Empresa 99 (`emp_99`) pronta para apresentar**, semeada por `tests/local/seed_full.prw` (idempotente, chaves `DEM-*`): 40 NF-e + 15 NFC-e autorizadas no SEFAZ emulado, 8 NF-e de fornecedor recebidas, EFD gerada, 120 títulos com CNAB liquidado pelo retorno, 30 pedidos de compra, balancete/DRE fechados, DAS do Simples com Fator R, 19 cupons de loja multi-forma e guias da Derrama.
+- **`scripts/geban-demo.sh`** como ponto de entrada (`up`/`up --all`/`down`/`reset`/`status`/`seed`) sobre units `systemd --user` em `deploy/systemd-user/`; modo sob-demanda com watchdog always-on `tests/emuladores/demo_watchdog.py` (`127.0.0.1:18768`, `GET /health` e `/ensure`).
+- **Auto-spawn dos emuladores no login da empresa 99:** hook `GEBDEMOENSURE()` (`src/GEBDEMO.prw`, fire-and-forget 4 s) chamado por `GEBWEB_LOGINAPI` (`/api/login` e `/api/pdv/login`) e `TUIAbre` (`GEBTUI.prw`); falha nunca quebra o login.
+- **Emulador de banco novo** `tests/emuladores/banco_emulador.py` (`:18767`): CNAB 240 remessa/retorno/boleto no layout real do `GEBBCOREM`/`GEBBCORET` (segmento P out, T/U in).
+- **Driver `escpos_virtual`** no serviço de periféricos: renderiza o cupom ESC/POS em `periferico/saidas/cupom-<ts>.txt`/`.png` (Pillow opcional) e conecta sozinho no boot.
+- **`tests/T_GEBAN_DEMO.prw`**: health-check read-only da massa demo (suíte agora com **90 testes**).
+- **Correção EFD:** entradas deduplicam por chave (`DISTINCT ON (GDF8_CHAVE)` em `src/GEBDFE_EFD.prw`) — a mesma NF-e de fornecedor não sai duplicada no SPED.
+- **`docs/demo-roteiro.md`**: roteiro de apresentação passo a passo por módulo.
+
 ## [v0.10]
 - Integração do PDV ao GEBWEB; correção do boot do gebweb em produção.
 

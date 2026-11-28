@@ -479,6 +479,15 @@ financeiro `T_GEBFIN_{MIG,CON_LAN,BAI,FLX,MASSA}`; compras
 interface `T_GEBTUI_{OPS,FLUXOS,PERM}`, `T_GEBTUIBO`, `T_GEBPDV_API` e `T_GEBLOJ*` (PDV web).
 Padrão dos testes: cleanup por `DELETE` p/ rerun limpo, regressão das tasks anteriores.
 
+> **Estado atual:** a suíte cresceu para **90 testes** (`tests/run-all.sh`, Postgres
+> `geban_test`, `advplc run`) — ver `docs/05-referencia-tecnica.md`, seção 9. Existe um
+> **ambiente de demonstração** pronto na empresa 99 (`emp_99`): `scripts/geban-demo.sh`
+> (up/down/reset/status/seed), watchdog `tests/emuladores/demo_watchdog.py` (:18768) que
+> sobe sob demanda os emuladores SEFAZ :18766, Cielo :18765, banco CNAB :18767 e o
+> periférico :9100, hook de auto-spawn no login (`GEBDEMOENSURE`, `src/GEBDEMO.prw`),
+> seed `tests/local/seed_full.prw` e health-check `tests/T_GEBAN_DEMO.prw`. Detalhes na
+> seção 14 da referência técnica e roteiro em `docs/demo-roteiro.md`.
+
 ---
 
 ## 9. Segurança

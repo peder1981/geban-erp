@@ -988,3 +988,21 @@ A lista "O que falta para emitir" fica no alto da página e também em Fiscal > 
 3. Gere em **SPED Fiscal (EFD ICMS/IPI) da competência**, informando o mês (AAAAMM). A mensagem traz débitos, créditos, ICMS a recolher e saldo credor, e avisa as entradas que ficaram fora.
 4. Baixe o arquivo pela página `/api/dfe/configurar` (botão "Baixar arquivo"). Abra-o no PVA da Receita, valide, assine com o certificado e transmita.
 5. Corrigiu algo depois? Gere de novo a mesma competência como **substituto** (finalidade 1).
+
+## 29. Ambiente de demonstração
+
+Para treinar ou apresentar sem configurar nada, existe uma empresa pronta:
+a **empresa 99** ("Empresa Demo Completa", schema `emp_99` do banco de teste),
+com notas fiscais, títulos, boletos liquidados, pedidos de compra, balancete,
+DAS do Simples e cupons de loja já gravados — tudo com chaves `DEM-*`.
+
+- **Subir:** `scripts/geban-demo.sh up` e depois `scripts/geban-demo.sh seed`
+  (o seed é idempotente; os emuladores de SEFAZ, Cielo, banco e o periférico
+  sobem sozinhos quando alguém entra na empresa 99).
+- **Usar:** entre com o usuário `DEM_ADMIN` / senha `Demo#2026`, empresa 99.
+- **Zerar:** `scripts/geban-demo.sh reset -y` remove a massa e para os serviços.
+- **Roteiro das telas:** `docs/demo-roteiro.md` mostra, passo a passo, o que
+  demonstrar em cada módulo.
+
+Detalhes técnicos dos emuladores e das units systemd em
+`docs/05-referencia-tecnica.md`, seção 14.

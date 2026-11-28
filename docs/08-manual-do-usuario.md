@@ -17,6 +17,11 @@ Datas aparecem no formato `AAAAMMDD` (22/11/2026 = `20261122`) e
 competências no formato `AAAAMM` (`202611`). Valores usam ponto decimal no
 campo (`5.90`); o GEBAN mostra `5,90` nas tabelas.
 
+> **Quer treinar sem montar nada?** Existe um ambiente de demonstração pronto
+> na **empresa 99** ("Empresa Demo Completa"), com notas, títulos, pedidos,
+> balancete e cupons já gravados: `scripts/geban-demo.sh up` + `seed`, login
+> `DEM_ADMIN` / `Demo#2026`. Detalhes em `docs/demo-roteiro.md`.
+
 ### Sumário
 
 - Parte 1 — Primeiros passos: entrar, trocar a senha, criar a empresa, tela Início
