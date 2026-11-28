@@ -350,7 +350,7 @@ também precisam permitir.
 
 ## 2.12 PDV (frente de caixa)
 
-> **Nota:** a frente de caixa é o módulo **Frente de loja** do menu lateral — PDV embutido no TUI, na mesma sessão (sem segundo login), com abas **Venda** (carrinho, formas de pagamento inclusive crypto com QR Code), **Caixa** (abrir/fechar, sangria/suprimento, cancelar cupom, resumo), **Orçamentos**, **Devolução**, **Consultas** (preço, vale, fiado, 2ª via, DANFE), **Cadastros** (caixa, barras/PLU, promoção, vendedor), **Relatórios** e **TEF / NFC-e**. Existe também o **PDV web** (`/pdv` no GEBWEB, porta 8090) para totens/tablets com login próprio; as operações são as mesmas.
+> **Nota:** a frente de caixa é o **PDV web**, aberto pelo menu **Frente de loja** do ERP — o TUI gera um token da sua sessão e o PDV sobe em **nova aba do navegador já autenticada** (mesmo usuário/empresa/filial, sem segundo login; requer AdvPP 4.11.0+ e o proxy same-origin `:8081`, que serve `/pdv` na mesma origem do ERP). Para totens/tablets, o mesmo `/pdv` no GEBWEB (`:8090`, ou `:8081/pdv` via proxy) aceita **login próprio**. Abas: **Venda** (carrinho, formas de pagamento inclusive crypto com QR Code), **Caixa** (abrir/fechar, sangria/suprimento, cancelar cupom, resumo), **Orçamentos**, **Devolução**, **Consultas** (preço, vale, fiado, 2ª via, DANFE), **Cadastros** (caixa, barras/PLU, promoção, vendedor), **Relatórios** e **TEF / NFC-e**. As operações são as mesmas nas duas entradas.
 
 ### As abas do PDV web
 
@@ -2258,9 +2258,9 @@ Curva ABC dos produtos pelo faturamento do período.
 3. **Confirmar**: executa a operação.
 
 
-## 3.8 Frente de loja (PDV embutido)
+## 3.8 Frente de loja (PDV)
 
-> **Nota:** este módulo do TUI é a frente de caixa oficial — abre direto no menu lateral, na mesma sessão do ERP (sem login extra). As abas são **Venda**, **Caixa**, **Orçamentos**, **Devolução**, **Consultas**, **Cadastros**, **Relatórios** e **TEF / NFC-e**. O PDV web em `/pdv` (GEBWEB) oferece as mesmas operações para totens/tablets.
+> **Nota:** este item do menu do TUI abre o **PDV web** em nova aba do navegador, já autenticado com a sessão do ERP (token da sessão via `FWOPENTAB` — sem segundo login; requer AdvPP 4.11.0+ e o `geban-proxy` same-origin na `:8081` da demo). As abas são **Venda**, **Caixa**, **Orçamentos**, **Devolução**, **Consultas**, **Cadastros**, **Relatórios** e **TEF / NFC-e**. O mesmo `/pdv` no GEBWEB (`:8090`) atende totens/tablets com login próprio.
 
 ![Frente de loja](img/manual/m08-frente-de-loja.png)
 

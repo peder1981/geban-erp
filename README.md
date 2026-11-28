@@ -58,7 +58,7 @@ Units (modelos em `deploy/systemd-user/`, renderizadas com o caminho real do rep
 | `geban-emu-sefaz` | emulador SEFAZ (NF-e/NFC-e, `SEFAZ_SEED_NOTAS=9`) | HTTPS `:18766` | sob demanda |
 | `geban-emu-cielo` | emulador Cielo | `:18765` | sob demanda |
 | `geban-emu-banco` | emulador CNAB (`/health`) | `:18767` | sob demanda |
-| `geban-periferico` | periférico WebSocket / impressora virtual de cupons | `:9100` | sob demanda |
+| `geban-periferico` | periférico WebSocket — 5 drivers virtuais de demo (impressora/cupom, leitor de código, balança, gaveta e TEF) | `:9100` | sob demanda |
 
 Requer `advplc`, PostgreSQL de teste, Python 3 com `websockets`, `curl` e `systemctl --user` (Linux); `reset` também requer `psql`. Para um venv já preparado com `periferico/requirements.txt`, informe `GEBAN_DEMO_PYTHON=/caminho/venv/bin/python`. Não instala dependências automaticamente.
 
@@ -70,7 +70,7 @@ Conexão via `GEBAN_PG_HOST/PORT/DB/USER/PASSWORD`, padrões `localhost/5432/geb
 
 **Login:** empresa `99`, usuários `DEM_*` com senha `Demo#2026` (criados no primeiro `seed`; o seed não redefine senha de conta existente). Conta `super`: senha inicial `Geban#2026` (ou `GEBAN_SUPER_SENHA`), com troca obrigatória no primeiro login.
 
-A interface web (`advplc serve src/GEBTUI.prw`, `:8081`) **não** é gerenciada pelo `geban-demo`: o serve principal do ERP já roda em dev — suba a TUI por conta própria quando precisar.
+A interface web usa o **geban-proxy** (`scripts/geban-proxy/`, unit `geban-proxy.service`, binário `~/.local/bin/geban-proxy`): reverse proxy **same-origin** na `:8081` que divide o tráfego — `/pdv` e `/api/*` vão para o GEBWEB (`:8090`, PDV web + API REST) e todo o resto para o `advplc serve src/GEBTUI.prw`, que então roda na **`:8082`**. Com tudo na mesma origem, `http://127.0.0.1:8081/pdv` funciona e o menu **Frente de loja** do TUI abre o PDV web sem segundo login. Sem o proxy, suba a TUI direto na porta que preferir (`advplc serve src/GEBTUI.prw --port 8081`) — o menu Frente de loja precisará do proxy (ou de servir o GEBWEB na mesma porta) para o `/pdv` resolver. O `geban-demo` **não** gerencia nem o proxy nem os serves: eles rodam por conta própria em dev.
 
 ## Telas
 
@@ -79,7 +79,7 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 | | |
 |---|---|
 | ![Login](docs/img/01-login.jpg) **Login** — instalação nova já traz a conta `super`; o primeiro acesso pede troca de senha | ![Troca obrigatória](docs/img/11-troca-senha.jpg) **Troca de senha obrigatória**, com as regras da política ao lado |
-| ![Início](docs/img/03-inicio.jpg) **Início** — sessão, indicadores e saldo por conta | ![PDV](docs/img/25-pdv-web-crypto.jpg) **PDV** — frente de caixa web (`public/pdv.html`): login próprio, carrinho, pagamentos, troco e QR crypto |
+| ![Início](docs/img/03-inicio.jpg) **Início** — sessão, indicadores e saldo por conta | ![PDV](docs/img/25-pdv-web-crypto.jpg) **PDV** — frente de caixa web (`public/pdv.html`): abre do menu **Frente de loja** já autenticada (SSO por token da sessão), carrinho, pagamentos, troco e QR crypto |
 | ![Fiscal](docs/img/04-modulo-fiscal.jpg) **Fiscal** — produtos, notas e Simples em abas; operações em formulários | ![Documentos eletrônicos](docs/img/18-documentos-eletronicos.jpg) **Documentos eletrônicos** — emitente, configuração, SEFAZ, NFS-e e EFD |
 | ![Financeiro](docs/img/05-modulo-financeiro.jpg) **Financeiro** — contas, títulos, baixa com juros e banco | ![Estoque](docs/img/06-modulo-estoque.jpg) **Estoque** — saldos, lotes e endereços, fechamento do mês |
 | ![Compras](docs/img/20-modulo-compras.jpg) **Compras** — fornecedores, pedidos, NF-e de fornecedores | ![Grade de itens](docs/img/17-formulario-itens.jpg) **Formulário com grade de itens** (pedido de compra) |
@@ -89,7 +89,7 @@ Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral
 
 ## PDV: crypto, Sarney e regime de venda
 
-A frente de caixa está **embutida no ERP**: o módulo **Frente de loja** do menu lateral abre o PDV nativo do TUI (`GEBTUIPDV.prw`), na mesma sessão e permissão LOJA — sem aba extra e sem segundo login. Também existe o **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv`) para totens/tablets com login próprio. Ambos usam a mesma camada de negócio `GEBLOJ*` e as mesmas abas:
+A frente de caixa é o **PDV web** (`public/pdv.html`, rota `/pdv` do GEBWEB), organizado em abas: Venda, Caixa, Orçamentos, Devolução, Consultas, Cadastros, Relatórios e TEF/NFC-e. O menu **Frente de loja** do TUI abre esse PDV numa **nova aba do navegador já autenticada**: `TUIPdvAbre` (`src/GEBTUIPDV.prw`) gera um token real da sessão (`GEBSECTOKEN`) e chama `FWOPENTAB("/pdv#tok=...")` — mesmo usuário, empresa e filial, **sem segundo login** (o token viaja no fragmento `#tok=`, fora do servidor e de logs; expira pelo TTL normal do token). Requer **AdvPP 4.11.0+** (função `FWOPENTAB`) e same-origin — na demo, o `geban-proxy` na `:8081` faz `/pdv` resolver para o GEBWEB. Para totens/tablets fora do ERP, o mesmo `/pdv` aceita **login próprio**.
 
 - **Venda** — carrinho, desconto, regime (fiscal/comprovante), pagamentos (dinheiro, PIX, cartões, fiado, vale, crypto) e QR Code
 - **Caixa** — abrir/fechar sessão, sangria/suprimento, cancelar cupom e resumo da sessão
@@ -190,7 +190,7 @@ Documentos emitidos, transmitidos, cancelados e inutilizados com a mesma regra d
 
 ## Requisitos
 
-- **advplc 4.6.1** ou mais novo.
+- **advplc 4.11.0** ou mais novo (mínimo para o menu **Frente de loja** abrir o PDV via `FWOPENTAB`).
 - **PostgreSQL**.
 - Certificado digital A1, para emissão real de documentos fiscais.
 
@@ -200,8 +200,11 @@ Documentos emitidos, transmitidos, cancelados e inutilizados com a mesma regra d
 # verificar a sintaxe de um fonte
 advplc check src/GEBTUI.prw --include src
 
-# terminal (TUI)
-advplc serve src/GEBTUI.prw --port 8081
+# terminal (TUI) — na demo roda na :8082, atrás do geban-proxy :8081
+advplc serve src/GEBTUI.prw --port 8082
+
+# proxy same-origin (opcional em dev): :8081 → /pdv+/api/* para :8090, resto para :8082
+go run ./scripts/geban-proxy    # ou o binário geban-proxy instalado
 
 # API e login web
 advplc run src/GEBWEB.prw

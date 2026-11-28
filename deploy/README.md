@@ -43,7 +43,11 @@ O script é idempotente. Ele:
 3. Configure certificado digital A1 e parâmetros fiscais para emissão
    real de documentos (ver `docs/04-manual-utilizacao.md`).
 4. Se houver Cloudflare Tunnel/reverse proxy na frente, aponte
-   `/api/*` para `:8090` e o resto para `:8081`.
+   `/api/*` **e `/pdv`** para `:8090` e o resto para `:8081` — a mesma
+   origem é o que permite ao menu **Frente de loja** do TUI abrir o PDV
+   web via `FWOPENTAB` (token da sessão em `#tok=`, sem segundo login;
+   requer AdvPP 4.11.0+). Sem proxy na frente, o PDV segue acessível em
+   `http://<servidor>:8090/pdv` com login próprio.
 
 ## Operação
 

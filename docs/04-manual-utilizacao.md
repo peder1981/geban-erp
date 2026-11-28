@@ -105,6 +105,7 @@ advplc serve src/GEBTUI.prw --port 8081 --watch
    http://localhost:8081
    ```
    > `localhost` significa "minha própria máquina". `8081` é a porta que você escolheu. Se ela estiver ocupada (mensagem de erro), troque para 8082, 8083, etc.
+   > **Ambiente de demonstração:** a `:8081` é do `geban-proxy` (same-origin), que manda `/pdv` e `/api/*` para o GEBWEB (`:8090`) e o resto para a TUI — por isso a TUI interna roda na **`:8082`** (`advplc serve src/GEBTUI.prw --port 8082`). É o proxy que faz o menu **Frente de loja** abrir o PDV web na mesma origem, sem segundo login. Sem o proxy, sirva a TUI direto na porta que preferir — só o atalho do PDV deixa de resolver `/pdv`.
 3. Na primeira vez o sistema cria o catálogo sozinho (conexão Postgres + tabelas compartilhadas `GE1`/`GE2`/segurança). Você vai ver mensagens como:
    ```
    OK: GEBDBConecta
@@ -846,7 +847,7 @@ Todos os módulos ficam no menu lateral. Na página de cada um, as operações e
 - Razão da conta, balancete do período e DRE.
 - As contas e os eventos de lançamento padrão estão em Plano (GC1) e na GC4.
 
-**PDV — o dia do caixa** *(a frente de caixa é o PDV web: menu **Frente de loja** do ERP abre `/pdv` em nova aba — porta 8090 do GEBWEB, com abas Venda, Caixa, Orçamentos, Devolução, Consultas, Cadastros, Relatórios e TEF/NFC-e; as "abas" citadas abaixo correspondem às abas do PDV web)*
+**PDV — o dia do caixa** *(a frente de caixa é o PDV web: menu **Frente de loja** do ERP abre `/pdv` em nova aba já autenticada — token da sessão via `FWOPENTAB`, sem segundo login; na demo o `geban-proxy` serve `/pdv` na mesma origem `:8081`, e o GEBWEB também atende direto em `:8090` para totens/tablets com login próprio. Abas: Venda, Caixa, Orçamentos, Devolução, Consultas, Cadastros, Relatórios e TEF/NFC-e; as "abas" citadas abaixo correspondem às abas do PDV web)*
 1. **Abrir caixa** (aba Caixa) com o fundo de troco. A situação do caixa fica sempre visível na aba Venda.
 2. **Vender** (aba Venda): adicione os produtos ao carrinho (preço e promoção já aparecem), informe desconto em valor e inclua os pagamentos (dinheiro, PIX, débito, crédito, fiado ou vale; pode misturar). Total, recebido e troco aparecem ao lado; **Finalizar venda** grava o cupom.
 3. **Cancelar cupom** (aba Caixa): só com o caixa aberto e se o cupom não teve devolução.

@@ -15,7 +15,7 @@
 O GEBAN é o ERP da fictícia República das Bananias: monolito modular em **AdvPL** (`.prw`,
 encoding CP-1252, `#include "totvs.ch"`, só `User`/`Static Function`, notação húngara) sobre
 **Postgres multi-tenant**, compilado e executado pelo runtime próprio **AdvPP** (`advplc
-check/run/serve/build`). Entradas: `advplc serve src/GEBTUI.prw` (interface web PO-UI, porta 8081), `advplc run src/GEBWEB.prw` (API REST, porta 8090) e `advplc run src/GEBSCHJOB.prw` (agendador, a cada minuto).
+check/run/serve/build`). Entradas: `geban-proxy` `:8081` (reverse proxy same-origin da demo: `/pdv` e `/api/*` → GEBWEB, resto → `advplc serve src/GEBTUI.prw` na `:8082`), `advplc serve src/GEBTUI.prw` (interface web PO-UI) e `advplc run src/GEBWEB.prw` (API REST + PDV web `/pdv`, porta 8090) e `advplc run src/GEBSCHJOB.prw` (agendador, a cada minuto).
 Ordem de construção dos 9 subprojetos:
 
 ```
@@ -1956,21 +1956,43 @@ no máximo um `ConOut` de diagnóstico.
 | `sefaz_emulador.py` | 18766 (HTTPS) | SEFAZ: NF-e/NFC-e/NFS-e; env `SEFAZ_SEED_NOTAS` (padrão 2; a demo usa 9 → 8 NF-e de fornecedor importáveis + 1 cancelada). |
 | `cielo_emulador.py` | 18765 | TEF Cielo (mesma regra de último dígito da sandbox). |
 | `banco_emulador.py` | 18767 | **Novo:** CNAB 240 remessa/retorno/boleto no layout real do `GEBBCOREM`/`GEBBCORET` (segmento P na saída, T/U na entrada). |
-| `periferico_service.py` | 9100 (WebSocket) | Agente de periféricos do PDV; config demo em `periferico/config/perifericos.json`. |
+| `periferico_service.py` | 9100 (WebSocket) | Agente de periféricos do PDV; config demo em `periferico/config/perifericos.json` com **5 drivers virtuais**: `escpos_virtual` (cupom → `saidas/cupom-<ts>.txt`/`.png`), `barcode_virtual`, `peso_virtual`, `gaveta_virtual` e `tef_virtual` — todos cadastrados em `GEP_PERIFERICOS` (Cupom/Leitor/Balança/Gaveta/TEF Demo). |
 
-**Impressora virtual (`escpos_virtual`):** driver novo em
-`periferico/periferico_service.py` — renderiza o ESC/POS recebido em
+**Periféricos virtuais:** os drivers `*_virtual` de
+`periferico/periferico_service.py` nunca falham — o `escpos_virtual`
+renderiza o ESC/POS recebido em
 `periferico/saidas/cupom-<timestamp>.txt` e `.png` (Pillow opcional; sem ele,
-degrada para só o `.txt`). Conecta sozinho no boot do serviço; cadastro da
-demonstradora pelo PDV web (`/api/pdv/perifericos`) ou direto na config.
+degrada para só o `.txt`), o `barcode_virtual` devolve EANs demo, o
+`peso_virtual` um peso plausível, o `gaveta_virtual` registra o pulso e o
+`tef_virtual` aprova a transação. Conectam sozinhos no boot do serviço;
+cadastro pela tela de periféricos do PDV web (`/api/pdv/perifericos`) ou
+direto na config.
+
+**geban-proxy (same-origin `:8081`):** `scripts/geban-proxy/` (Go,
+`httputil.ReverseProxy`, inclusive upgrade de WebSocket `/pdv/ws`),
+unit `geban-proxy.service`. Divide a porta única: `/pdv`, `/pdv/` e
+`/api/` → GEBWEB `:8090`; todo o resto → `advplc serve src/GEBTUI.prw`
+na `:8082`. É o que permite ao menu **Frente de loja** do TUI abrir o PDV
+web na mesma origem: `TUIPdvAbre` (`src/GEBTUIPDV.prw`) gera token da
+sessão via `GEBSECTOKEN` e chama `FWOPENTAB("/pdv#tok=...&u=...&emp=...")`
+— o token viaja no fragmento (não chega ao servidor, não fica em log nem
+em referer) e expira pelo TTL normal. Requer **AdvPP 4.11.0+**
+(`FWOPENTAB`). Flags: `-listen`, `-erp` (default `http://127.0.0.1:8082`),
+`-web` (default `http://127.0.0.1:8090`). Não é gerenciado pelo
+`geban-demo.sh`.
 
 **Conteúdo do seed** (`tests/local/seed_full.prw`): fiscal — 40 NF-e modelo 55
 (37 autorizadas + 3 canceladas), 1 CC-e, 15 NFC-e modelo 65, 8 NF-e recebidas e
-EFD gerada (competência 202611, 63 documentos); financeiro — 120 títulos `DEM-*`
+EFD gerada (competência 202611; a conferência de exatidão conta também as
+NFC-e/NF-e emitidas pelo caixa, docs `CP*` — ~146 documentos no total);
+financeiro — 120 títulos `DEM-*`
 + CNAB com 5 boletos liquidados pelo retorno; compras — 30 pedidos, 5 solicitações;
 contábil — balancete D=C e DRE positivo; Simples Nacional — DAS + Fator R; loja —
-19 cupons multi-forma (dinheiro/PIX/débito/crédito TEF/fiado/vale/crypto); Derrama —
-retenções e guias. Health-check read-only: `tests/T_GEBAN_DEMO.prw`.
+19 cupons multi-forma (dinheiro/PIX/débito/crédito TEF/fiado/vale/crypto),
+promoção `PROMO-DEM` (DEM-P30 a R$ 9,90), fiado `ABERTA` em `DEM-C005`/`DEM-C010`,
+vale-troca com saldo e consumidor (`SF_CONS`) nas devoluções de NFC-e; Derrama —
+retenções e guias. Os 5 periféricos virtuais ficam cadastrados em
+`GEP_PERIFERICOS`. Health-check read-only: `tests/T_GEBAN_DEMO.prw`.
 
 **Login demo:** `DEM_ADMIN` / `Demo#2026` (empresa 99); demais perfis `DEM_*`
 com a mesma senha demonstram RBAC. Detalhes e ordem das telas: `docs/demo-roteiro.md`.

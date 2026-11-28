@@ -252,12 +252,16 @@ navegador é uma sessão (VM própria).
   colunas de credencial (`TUISigilo`)); clicar numa linha preenche os campos ligados dos formulários.
   Abaixo, os formulários em abas pelo prefixo do título: Operações, Relatórios, Banco,
   NF-e de fornecedores, Simples Nacional e Documentos eletrônicos.
-- **PDV embutido no TUI** (`GEBTUIPDV.prw`, módulo "Frente de loja"): a frente de caixa vive dentro do
-  ERP, na mesma sessão e permissão LOJA — sem aba extra e sem segundo login. Abas: Venda, Caixa,
-  Orçamentos, Devolução, Consultas, Cadastros, Relatórios e TEF/NFC-e. Chama direto as funções de
-  negócio `GEBLOJ*`/`GEBCRY*`/`GEBTEF*` (as mesmas da API `/api/pdv/*`).
-- **PDV web** (`public/pdv.html`, servido pelo GEBWEB em `/pdv`): mesma frente de caixa acessível por
-  navegador dedicado, com login próprio — útil para totens/tablets fora do TUI.
+- **Frente de loja → PDV web** (`GEBTUIPDV.prw`, `TUIPdvAbre`): o menu "Frente de loja" gera um
+  token real da sessão (`GEBSECTOKEN`) e chama `FWOPENTAB("/pdv#tok=...")` — o PDV web abre em
+  nova aba do navegador **já autenticado** (mesmo usuário/empresa/filial, sem segundo login; o
+  token viaja no fragmento, fora do servidor e de logs). Requer AdvPP 4.11.0+ e same-origin —
+  na demo, o `geban-proxy` (`scripts/geban-proxy/`, `:8081`) serve `/pdv` e `/api/*` do GEBWEB
+  (`:8090`) e o resto da TUI (`:8082`). O PDV web tem as abas Venda, Caixa, Orçamentos,
+  Devolução, Consultas, Cadastros, Relatórios e TEF/NFC-e, chamando a API `/api/pdv/*`
+  (backends `GEBPDV*`/`GEBLOJ*`/`GEBCRY*`/`GEBTEF*`).
+- **PDV web standalone** (`public/pdv.html`, servido pelo GEBWEB em `/pdv`): a mesma frente de
+  caixa para totens/tablets fora do ERP, com login próprio.
 - **Rastreabilidade** (`TUIRastreio`): origem + número → árvore com os registros de cada etapa (`GEBTRAK*`).
 - **Resultado**: relatórios (`GBR1` ou a tabela do relatório) com botão Voltar (`GEBTUIBRW`).
 

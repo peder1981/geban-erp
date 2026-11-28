@@ -59,6 +59,11 @@ cd packaging/windows/pdv && ./build-pdv-agent.sh
 
 - Emissão fiscal real exige certificado digital A1 e homologação na
   SEFAZ — configurar depois da instalação (ver manual de utilização).
+- O PDV web roda no GEBWEB (`http://127.0.0.1:8090/pdv`, login próprio).
+  O menu **Frente de loja** do TUI abre `/pdv` na mesma origem via
+  `FWOPENTAB` (AdvPP 4.11.0+) — para funcionar no pacote é preciso um
+  proxy same-origin na frente (como o `scripts/geban-proxy` da demo) ou
+  servir `/pdv`+`/api/*` na `:8081`.
 - O launcher mostra uma janela de console de supervisão; logs em
   `data/*.log`.
 - Antivírus podem questionar o PostgreSQL embarcado na primeira

@@ -13,9 +13,16 @@ scripts/geban-demo.sh seed   # /ensure + espera as portas + roda seed_full.prw (
 scripts/geban-demo.sh status # saúde: units + portas
 ```
 
-Interface: **http://127.0.0.1:8081** (TUI `GEBTUI`; suba com
-`advplc serve src/GEBTUI.prw` se ainda não estiver no ar).
-PDV web (totem/tablet): **http://127.0.0.1:8090/pdv** — login próprio (servido pelo GEBWEB; o :8081 é só a TUI).
+Interface: **http://127.0.0.1:8081** — porta do **geban-proxy**
+(`scripts/geban-proxy/`, unit `geban-proxy.service`), reverse proxy
+same-origin que divide o tráfego: `/pdv` e `/api/*` → GEBWEB (`:8090`),
+todo o resto → TUI. A TUI interna roda em **http://127.0.0.1:8082**
+(`advplc serve src/GEBTUI.prw --port 8082`; suba se ainda não estiver no
+ar). Acesso direto sem proxy: TUI `:8082`, PDV/API `:8090`.
+PDV web (totem/tablet, login próprio): **http://127.0.0.1:8090/pdv** —
+ou **http://127.0.0.1:8081/pdv** via proxy. Do menu **Frente de loja** do
+TUI, o PDV abre em nova aba **já autenticado** (`FWOPENTAB` + token da
+sessão no fragmento `#tok=` — sem segundo login; requer AdvPP 4.11.0+).
 
 **Login:** usuário `DEM_ADMIN`, senha `Demo#2026`, empresa **99**.
 Outros perfis demo (mesma senha): `DEM_GESTOR`, `DEM_CAIXA1`, `DEM_CAIXA2`,
@@ -51,7 +58,8 @@ Menu **Fiscal → aba Documentos eletronicos** (ou `/api/dfe/*`):
 - **15 NFC-e modelo 65**: `DEM-65-001` a `DEM-65-015` — DANFE NFC-e com QR.
 - **8 NF-e recebidas** do fornecedor `11444777000161` (distribuição DFe,
   manifestadas com ciência + importação) — base das entradas de compras.
-- **EFD ICMS/IPI gerada**: competência **202611**, 63 documentos,
+- **EFD ICMS/IPI gerada**: competência **202611**, ~146 documentos
+  (63 da massa `DEM-*` + as NFC-e/NF-e emitidas pelo caixa, docs `CP*`),
   ~17,8 KB (menu Fiscal → SPED Fiscal, ou `GET /api/dfe/efd?comp=202611`).
   O balancete confere: 210 linhas no `GDFG`.
 - Emitente demo: "Mercado Demo Completo Ltda", CNPJ `11.222.333/0001-81`;
@@ -112,8 +120,21 @@ Menu **Fiscal → aba Simples Nacional** (e tabelas `GSN1`–`GSN3`):
 
 ### 6. Loja / Frente de loja — PDV com todas as formas
 
-Menu **Frente de loja** (PDV embutido) ou **/pdv**:
+Menu **Frente de loja** (abre o PDV web em nova aba, já autenticado via
+token da sessão — `FWOPENTAB`, AdvPP 4.11.0+) ou **/pdv**:
 
+- **Promoção demo**: `PROMO-DEM` — `DEM-P30` a **R$ 9,90** (GLJ9,
+  vigente o ano todo); aparece no campo "promoção" da consulta de preço
+  do PDV.
+- **Fiado com saldo**: `DEM-C005` (R$ 75,90) e `DEM-C010` (R$ 42,50) com
+  linhas `GV3` **ABERTA** — mostre `GET /api/pdv/fiado/saldo` na aba
+  Consultas.
+- **Vale-troca com saldo**: a devolução em modo `VALE` gera vale
+  resgatável na forma de pagamento `VALE` + número; saldo na aba
+  Consultas (`GET /api/pdv/vale/{numero}`).
+- **Devolução com consumidor**: cupom com NFC-e devolve só com os dados
+  do consumidor (a NF-e de devolução, finalidade 4, os exige) — o seed
+  já passa `SF_CONS()` nas devoluções, sem `devolucao_de_nfce`.
 - Caixa **01** ("DEM Caixa Loja Centro"), última sessão fechada
   **`S0000011`**: **19 cupons** (18 vendidos + 1 cancelado
   "desistência no balcão").

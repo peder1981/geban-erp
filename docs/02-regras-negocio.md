@@ -493,7 +493,7 @@ A expansão `GEB_EXPANSAO` (`src/GEBEXP_MIG.prw`) adicionou coluna `EMPRESA CHAR
 
 ## 16. Navegação — interface PO-UI (`src/GEBTUI.prw`)
 
-A interface roda no navegador (`advplc serve src/GEBTUI.prw`, porta 8081). Regras:
+A interface roda no navegador (`advplc serve src/GEBTUI.prw`). Na demo, a porta de entrada é o `geban-proxy` same-origin (`:8081`: `/pdv` e `/api/*` → GEBWEB `:8090`, resto → TUI `:8082`), o que permite ao menu **Frente de loja** abrir o PDV web via `FWOPENTAB` com token da sessão (`#tok=`), sem segundo login — requer AdvPP 4.11.0+. Regras:
 
 1. **Acesso:** usuário e senha conferidos com Argon2id; 5 erros seguidos bloqueiam a conta; a recusa
    é sempre genérica ("Credenciais inválidas"), para não revelar se o usuário existe. Senha vencida
@@ -697,7 +697,7 @@ Fontes: `GEBBOLIB`, `GEBCTX`, `GEBEST`, `GEBFNX`, `GEBCPX`, `GEBFAT`, `GEBLOJ`, 
   - `CIELO`: API Cielo e-Commerce 3.0. Autorizar = venda sem captura (`POST /1/sales`); confirmar = captura; desfazer = `void`; cancelar = `void` com o valor. O débito vai como crédito à vista. Como a API é de venda não presencial, o número do cartão vem do parâmetro `LOJ_CIELO_CARTAO`: serve para a sandbox e para o emulador, **não para cobrar de verdade**. Uma loja física de verdade precisa de um terminal (Cielo LIO, SiTef, PayGo) ligado pelo provedor `HTTP`.
 - Emulador local da Cielo em `tests/emuladores/cielo_emulador.py`: imita a sandbox, sem internet nem credenciais. Para testar na sandbox real, cadastre-se em <https://docs.cielo.com.br/ecommerce-cielo/page/sandbox-api-ecommerce> e informe MerchantId e MerchantKey.
 - Emulador local do banco em `tests/emuladores/banco_emulador.py` (`127.0.0.1:18767`): responde remessa CNAB 240, devolve retorno liquidando os boletos e serve o boleto — no mesmo layout que `GEBBCOREM`/`GEBBCORET` geram/consomem (segmento P na saída, T/U na entrada). Serve para demonstrar o ciclo remessa → retorno → baixa sem banco de verdade.
-- Impressora virtual `escpos_virtual` (`periferico/periferico_service.py`): em vez de hardware, grava cada cupom ESC/POS em `periferico/saidas/cupom-<timestamp>.txt`/`.png` — usado pelo ambiente de demonstração (empresa 99, `scripts/geban-demo.sh`).
+- **Periféricos virtuais** (`periferico/periferico_service.py`, WebSocket `:9100`): drivers de demonstração que nunca falham — `escpos_virtual` grava cada cupom ESC/POS em `periferico/saidas/cupom-<timestamp>.txt`/`.png`, `barcode_virtual` devolve EANs demo, `peso_virtual` um peso plausível, `gaveta_virtual` registra o pulso e `tef_virtual` aprova a transação. Os 5 vêm cadastrados no ambiente de demonstração (empresa 99: `GEP_PERIFERICOS` + `periferico/config/perifericos.json`, via `scripts/geban-demo.sh`).
 
 **Simples Nacional:** devoluções de venda (GFT7) deduzem a receita do mês no mesmo balde da venda e reduzem o RBT12 dos meses seguintes. A sobra sem receita gera aviso.
 
