@@ -33,6 +33,45 @@ Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem
 
 ---
 
+## Ambiente de demonstração
+
+Os emuladores da empresa `99` rodam **sob demanda** ("opção B"): a única peça sempre-online é o watchdog `geban-demo-watchdog.service`, que escuta em `127.0.0.1:18768`. No primeiro login na empresa `99` — web (`/api/login`, `/api/pdv/login`) ou TUI — o hook `GEBDEMOENSURE()` (`src/GEBDEMO.prw`, incluído pelos dois entrypoints) chama `GET /ensure` e o watchdog sobe os emuladores que estiverem fora (`systemctl --user start` na unit; fallback `Popen` com log em `~/.local/state/geban-demo/`). `scripts/geban-demo.sh seed` também chama `/ensure` e espera as portas. `GET /health` reporta o estado de cada serviço sem subir nada. Falha do watchdog nunca quebra o login — é fire-and-forget com timeout de 2s.
+
+`scripts/geban-demo.sh` é apenas um wrapper fino sobre as units systemd de usuário:
+
+```bash
+scripts/geban-demo.sh up       # instala/atualiza as units; enable --now SÓ do watchdog
+                                # (emuladores ficam instalados mas desabilitados = sob demanda)
+scripts/geban-demo.sh up --all # modo sempre-online: enable --now nas 4 de emulador + watchdog
+scripts/geban-demo.sh status   # saúde: estado das units + portas
+scripts/geban-demo.sh seed     # /ensure + espera portas + seed_full uma vez (manual; idempotente)
+scripts/geban-demo.sh down     # para os emuladores, mas MANTÉM o watchdog — o próximo acesso à emp_99 os sobe de novo
+scripts/geban-demo.sh reset    # para TUDO (inclui o watchdog) + DROP SCHEMA emp_99 CASCADE + rm periferico/saidas/cupom-*
+                                # pede confirmação "SIM" (ou use -y/--yes); depois rode up + seed
+```
+
+Units (modelos em `deploy/systemd-user/`, renderizadas com o caminho real do repo em `~/.config/systemd/user/` no `up`):
+
+| Unit | Serviço | Porta | Modo default |
+|---|---|---|---|
+| `geban-demo-watchdog` | watchdog `/health` `/ensure` | `:18768` | **always-on** |
+| `geban-emu-sefaz` | emulador SEFAZ (NF-e/NFC-e, `SEFAZ_SEED_NOTAS=9`) | HTTPS `:18766` | sob demanda |
+| `geban-emu-cielo` | emulador Cielo | `:18765` | sob demanda |
+| `geban-emu-banco` | emulador CNAB (`/health`) | `:18767` | sob demanda |
+| `geban-periferico` | periférico WebSocket / impressora virtual de cupons | `:9100` | sob demanda |
+
+Requer `advplc`, PostgreSQL de teste, Python 3 com `websockets`, `curl` e `systemctl --user` (Linux); `reset` também requer `psql`. Para um venv já preparado com `periferico/requirements.txt`, informe `GEBAN_DEMO_PYTHON=/caminho/venv/bin/python`. Não instala dependências automaticamente.
+
+Conexão via `GEBAN_PG_HOST/PORT/DB/USER/PASSWORD`, padrões `localhost/5432/geban_test/postgres/postgres`. O seed aceita apenas `geban_test`; nunca aponte para produção. Certificado local autoassinado: o seed exporta `ADVPP_HTTP_INSECURE=1` apenas para o subprocesso.
+
+**Semântica de `down`/`reset`:** `down` faz `systemctl --user stop` só nas 4 units de emulador — o watchdog **continua** rodando (é a peça always-on) e o próximo login/acesso à empresa `99` chama `/ensure` e sobe tudo de novo. `reset` para tudo (watchdog incluído), apaga `emp_99` e `periferico/saidas/cupom-*`, e orienta a recriar com `up` + `seed`. O script **não mata processos estranhos**: se algo externo ocupar uma porta, a unit falha ao dar bind e o `status` mostra o conflito honestamente — encerre o processo manualmente (`kill <pid>`) para a unit assumir.
+
+**Persistência:** units de usuário exigem sessão de login ou *lingering*. Nesta máquina `Linger=yes` já está ativo; em outra, rode `sudo loginctl enable-linger $USER` uma vez para o watchdog subir sem login. No modo sob-demanda só o watchdog precisa de boot; os emuladores sobem sob demanda mesmo sem login prévio (o primeiro acesso pode levar alguns segundos de cold start). Para desabilitar de vez: `systemctl --user disable geban-demo-watchdog geban-emu-sefaz geban-emu-cielo geban-emu-banco geban-periferico`. Logs: `journalctl --user -u geban-demo-watchdog -u geban-emu-sefaz -u geban-emu-cielo -u geban-emu-banco -u geban-periferico`; no fallback Popen do watchdog, logs em `~/.local/state/geban-demo/<nome>.log`.
+
+**Login:** empresa `99`, usuários `DEM_*` com senha `Demo#2026` (criados no primeiro `seed`; o seed não redefine senha de conta existente). Conta `super`: senha inicial `Geban#2026` (ou `GEBAN_SUPER_SENHA`), com troca obrigatória no primeiro login.
+
+A interface web (`advplc serve src/GEBTUI.prw`, `:8081`) **não** é gerenciada pelo `geban-demo`: o serve principal do ERP já roda em dev — suba a TUI por conta própria quando precisar.
+
 ## Telas
 
 Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral com os módulos permitidos, tabelas ao vivo em abas e cada operação num formulário de tela única. Dados das imagens: empresa de demonstração fictícia.

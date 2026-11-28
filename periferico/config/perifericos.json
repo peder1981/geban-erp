@@ -1,0 +1,13 @@
+{
+  "perifericos": [
+    {
+      "tipo": "IMPRESSORA",
+      "driver": "escpos_virtual",
+      "nome": "Cupom Demo",
+      "config": {
+        "out_dir": "saidas",
+        "colunas": 48
+      }
+    }
+  ]
+}

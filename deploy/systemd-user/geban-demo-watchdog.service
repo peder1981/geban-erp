@@ -1,0 +1,16 @@
+[Unit]
+Description=GEBAN demo — watchdog de emuladores sob demanda (:18768)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__GEBAN_ROOT__
+ExecStart=__GEBAN_PYTHON__ __GEBAN_ROOT__/tests/emuladores/demo_watchdog.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-demo-watchdog
+
+[Install]
+WantedBy=default.target

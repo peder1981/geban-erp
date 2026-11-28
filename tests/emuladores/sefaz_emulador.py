@@ -17,8 +17,9 @@ openssl) e responde como a SEFAZ:
   envEvento cancelamento: 128 + 135 (nProt confere), 580 se ja cancelada,
             217 se a nota nao existe, 222 protocolo divergente.
   inutNFe   102; 241 se um numero da faixa ja foi autorizado.
-  distDFeInt (AN): semeia 2 notas do fornecedor 11444777000161 para o CNPJ
-            consultado (a 2a cancelada por evento); ciencia/confirmacao (2102xx)
+  distDFeInt (AN): semeia SEFAZ_SEED_NOTAS notas (padrao 2; demo: 9) do
+            fornecedor 11444777000161 para o CNPJ consultado (a 2a cancelada
+            por evento, demais importaveis); ciencia/confirmacao (2102xx)
             liberam a nota completa (procNFe); 137 sem novidade, 656 na 2a vazia.
 NFS-e nacional (REST/JSON, mesmo endereco): POST .../nfse (DPS gzip+Base64;
   assinatura conferida; cTribNac 999999 => 400 E0310; xDescServ com DEMORA
@@ -251,6 +252,7 @@ def inutiliza(msg):
 
 # ---------- Distribuicao de DF-e (Ambiente Nacional) ----------
 DIST = {}  # CNPJ destinatario -> {"docs": [(nsu, schema, xml)], "chaves": {...}, "vazias": n}
+SEED_NOTAS_TOTAL = 2
 FORN = "11444777000161"
 
 
@@ -291,6 +293,10 @@ def dist(msg):
             d["docs"].append(("resNFe_v1.01.xsd", res_nfe(b, "50.00")))
             d["docs"].append(("procEventoNFe_v1.00.xsd", '<procEventoNFe xmlns="%s" versao="1.00"><evento versao="1.00"><infEvento><chNFe>%s</chNFe>'
                               "<tpEvento>110111</tpEvento></infEvento></evento></procEventoNFe>" % (NS, b)))
+            for nnf in range(458, 456 + SEED_NOTAS_TOTAL):
+                ch = chave_forn(nnf)
+                d["chaves"][ch] = False
+                d["docs"].append(("resNFe_v1.01.xsd", res_nfe(ch, "288.00")))
         cab = '<retDistDFeInt xmlns="%s" versao="1.01"><tpAmb>%s</tpAmb><verAplic>EMU-1.0</verAplic>' % (NS, tpamb)
         chc = txt(r, N + "consChNFe/" + N + "chNFe")
         if chc:
@@ -486,7 +492,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    global SEED_NOTAS_TOTAL
     porta = int(sys.argv[1]) if len(sys.argv) > 1 else 18766
+    try:
+        SEED_NOTAS_TOTAL = int(os.environ.get("SEFAZ_SEED_NOTAS", "2"))
+    except ValueError:
+        print("SEFAZ_SEED_NOTAS deve ser um inteiro entre 2 e 100", file=sys.stderr)
+        sys.exit(2)
+    if not 2 <= SEED_NOTAS_TOTAL <= 100:
+        print("SEFAZ_SEED_NOTAS deve ser um inteiro entre 2 e 100", file=sys.stderr)
+        sys.exit(2)
     subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", TMP + "/srv.key", "-out", TMP + "/srv.pem",
                     "-days", "2", "-subj", "/CN=127.0.0.1"], check=True, capture_output=True)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

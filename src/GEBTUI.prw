@@ -42,6 +42,7 @@
 #include "GEBEXP_REL_NUC.prw"
 #include "GEBEXP_TRAK.prw"
 #include "GEBTUIPDV.prw"
+#include "GEBDEMO.prw"
 
 // bTUIBrw: com o app ativo, GEBTUIBRW mostra a tabela na pagina Resultado.
 Static bTUIBrw := Nil
@@ -303,6 +304,11 @@ Static Function TUIAbre(oApp, cEmp, cFil, cUsu)
     If !GEBEXPCONTEXTO(cEmp, cFil, cUsu)
         oApp:Notify("Sessao recusada.", "error")
         Return
+    EndIf
+    // Empresa 99 = demo local: acorda os emuladores sob demanda (watchdog
+    // :18768). Fire-and-forget - nunca quebra o login (ver GEBDEMO.prw).
+    If Upper(AllTrim(cEmp)) == "99"
+        GEBDEMOENSURE()
     EndIf
 
     // Resultado de relatorio/consulta (o que antes abria FWMBrowse).
