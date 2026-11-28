@@ -271,7 +271,7 @@ User Function GEBPDVRELGER(cUsuario, aBody)
         Return PDVRES(.F., "periodo_obrigatorio", {})
     EndIf
 
-    aR := GEBLOJGER(cIni, cFim, cAgrupa)
+    aR := GEBLOJGER(PDVDATA(cIni), PDVDATA(cFim), cAgrupa)
 
 Return PDVRES(aR[1], aR[2], aR)
 
@@ -297,7 +297,7 @@ User Function GEBPDVRELCOM(cUsuario, aBody)
         Return PDVRES(.F., "periodo_obrigatorio", {})
     EndIf
 
-    aR := GEBLOJCOMIS(cIni, cFim)
+    aR := GEBLOJCOMIS(PDVDATA(cIni), PDVDATA(cFim))
 
 Return PDVRES(aR[1], aR[2], aR)
 
@@ -495,7 +495,7 @@ User Function GEBPDVRELGERCSV(cUsuario, aBody)
         Return PDVRES(.F., "periodo_obrigatorio", "")
     EndIf
 
-    aR := GEBLOJGER(cIni, cFim, cAgrupa)
+    aR := GEBLOJGER(PDVDATA(cIni), PDVDATA(cFim), cAgrupa)
     If !aR[1]
         Return PDVRES(.F., aR[2], "")
     EndIf
@@ -554,7 +554,7 @@ User Function GEBPDVRELCOMCSV(cUsuario, aBody)
         Return PDVRES(.F., "periodo_obrigatorio", "")
     EndIf
 
-    aR := GEBLOJCOMIS(cIni, cFim)
+    aR := GEBLOJCOMIS(PDVDATA(cIni), PDVDATA(cFim))
     If !aR[1]
         Return PDVRES(.F., aR[2], "")
     EndIf
