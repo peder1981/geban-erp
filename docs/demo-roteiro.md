@@ -116,10 +116,18 @@ Menu **Frente de loja** (PDV embutido) ou **/pdv**:
 
 - Caixa **01** ("DEM Caixa Loja Centro"), última sessão **`S0000005`**:
   **19 cupons** (18 vendidos + 1 cancelado "desistência no balcão").
+- **Venda com NFC-e real**: o regime **FISCAL** do PDV emite NFC-e
+  modelo 65 de verdade contra o emulador SEFAZ (:18766) — já provado
+  com cupom `CP00000063` (venda por **código de barras** EAN-13,
+  DINHEIRO, troco) e `CP00000064` (pagamento **CRYPTO/BTC** com QR
+  `bitcoin:`). `DFE_NFCE=S`, série 65 = 99, CSC demo configurado e
+  certificado A1 autoassinado estável em `~/.geban-demo/cert`.
 - **7 formas de pagamento** em `GLJ5`: DINHEIRO, PIX, DEBITO, CREDITO
   (TEF **Cielo** no emulador `:18765`), FIADO, VALE (vale-troca) e
-  **CRYPTO** (BTC, se o CoinGecko respondeu no seed — há 2 pagamentos
-  crypto na base).
+  **CRYPTO** (BTC/USDT — wallets `GCK1` ativas; a cotação vem do
+  CoinGecko ao vivo, sem internet a forma é pulada na sessão).
+- Impressora virtual `escpos_virtual` (:9100) gera o cupom em
+  `periferico/saidas/cupom-*.png` — configure no PDV → Periféricos.
 - Sangria R$ 400 e suprimento R$ 150 (`GLJ6`), fechamento **sem
   diferença**.
 - **50 pedidos** `DEM-PV-001`–`050` liberados e faturados (notas `NS*`)
