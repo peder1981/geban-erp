@@ -99,6 +99,7 @@ User Function SEED_FULL()
     lOk := SF_FIN() .And. lOk
     lOk := SF_COM() .And. lOk
     lOk := SF_LOJ() .And. lOk
+    lOk := SF_PDV() .And. lOk
     lOk := SF_SN() .And. lOk
     lOk := SF_DER() .And. lOk
     lOk := SF_CTB() .And. lOk
@@ -306,6 +307,7 @@ Static Function SF_FIS()
     Local aH := {}
     Local aCert := {}
     Local cDir := "/tmp/geban-seed-full"
+    Local cCertBase := ""
     Local cSenha := StrZero(Randomize(1, 999999999), 9)
     Local cDoc := ""
     Local cCh := ""
@@ -348,9 +350,16 @@ Static Function SF_FIS()
     If SF_CFGDEMO()
         lOk := SF_FCHK("configuracao", GEBDFECONFIG(oC)) .And. lOk
     EndIf
-    lOk := SF_SET("DFE_CERT_DIR", cDir + "/cert") .And. lOk
+    // Certificado em pasta persistente (~/.geban-demo/cert): /tmp some no
+    // reboot e a emissao pararia. GEBDFECERTDIR() completa com tenant/filial.
+    cCertBase := SF_CERTBASE()
+    lOk := SF_SET("DFE_CERT_DIR", cCertBase) .And. lOk
     aCert := GEBDFECERTLE()
-    If Len(aCert) == 0
+    // Reinstala quando nao ha certificado, quando o GDF2 aponta para fora da
+    // pasta estavel (migracao do /tmp antigo), quando os arquivos sumiram
+    // ou quando venceu — o pfx autoassinado e' regerado no scratch /tmp.
+    If Len(aCert) == 0 .Or. !(BOCOL(aCert[4]) $ cCertBase) .Or. !(BOCOL(aCert[5]) $ cCertBase) .Or. ;
+            !File(BOCOL(aCert[4])) .Or. !File(BOCOL(aCert[5])) .Or. BOCOL(aCert[3]) < BOHOJE()
         // Mesmo certificado autoassinado de teste usado por T_GEBDFE_DIST.
         If ProcRun("mkdir", {"-p", cDir}, {|c| c}) != 0
             Return .F.
@@ -1391,6 +1400,151 @@ Static Function SF_CTB()
     lOk := SF_CNT("GC2", "GC2_ORIGEM LIKE 'DEMLP:DEM-CTB-%'", 3) .And. lOk
     ConOut("SEED_FULL contabil " + IIf(lOk, "OK", "FAIL"))
 Return lOk
+
+/*/{Protheus.doc} SF_PDV
+    PDV pronto para demo: liga a NFC-e no caixa (GE4 DFE_NFCE=S, serie 99,
+    QR v3; CSC de demonstracao preenchido so' para o QR v2), confere a
+    pasta persistente do certificado (SF_CERTBASE, usada por SF_FIS),
+    cadastra codigo de barras EAN-13 dos 60 produtos DEM-P (GLJ8), wallets
+    BTC/USDT ativas (GCK1) e faz UMA venda regime FISCAL paga em dinheiro
+    com codigo de barras — prova ponta a ponta: GEBLOJVEN -> GEBDFENFCE ->
+    SEFAZ emuladora. Idempotente: barcode, wallet e a venda so' nascem
+    uma vez (a NFC-e do caixa e' reconhecida por GDF5_DOC 'CP%').
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-11-27
+    @return .T. se parametros, cadastros e a NFC-e autorizada forem comprovados
+/*/
+Static Function SF_PDV()
+    Local lOk := .T.
+    Local aR := {}
+    Local aH := {}
+    Local cSes := ""
+    Local cCup := ""
+    Local cNota := ""
+    Local cSt := ""
+    Local cEan := ""
+    Local cProd := ""
+    Local cFilQ := GEBDBQuote(FWxFilial("GDF5"))
+    Local dHoje := BOHOJE()
+    Local nI := 0
+    Local nTot := 0
+
+    // GE4 e' versionado: SF_SET so' grava quando o valor muda e BOPARM ja'
+    // devolve a linha ativa — o historico com valores antigos nao atrapalha.
+    lOk := SF_SET("DFE_NFCE", "S") .And. lOk
+    lOk := SF_SET("DFE_SERIE_65", "99") .And. lOk
+    lOk := SF_SET("DFE_QR_VERSAO", "3") .And. lOk
+    // CSC so' entra no QR Code v2; valores demo permitem trocar de versao
+    // sem novo cadastro no portal da SEFAZ.
+    lOk := SF_SET("DFE_CSC_ID", "1") .And. lOk
+    lOk := SF_SET("DFE_CSC", "geban-demo-csc-nao-usar-em-producao") .And. lOk
+    lOk := SF_SET("DFE_CERT_DIR", SF_CERTBASE()) .And. lOk
+
+    // TEF Cielo: a linha ativa do GE4 tem que ser o emulador :18765 (o
+    // historico versionado pode ter valores antigos; BOPARM ja' resolve).
+    If !(BOPARM("LOJ_CIELO_URL", "") == "http://127.0.0.1:18765")
+        ConOut("SEED_FULL PDV aviso LOJ_CIELO_URL=" + BOPARM("LOJ_CIELO_URL", "") + " vigente deveria ser http://127.0.0.1:18765")
+    EndIf
+
+    // Codigo de barras EAN-13 com digito verificado dos 60 produtos DEM-P.
+    For nI := 1 To 60
+        cProd := "DEM-P" + StrZero(nI, 2)
+        cEan := SF_EAN13(nI)
+        If !SF_HAS("GLJ8", "GLJ8_COD", cEan, " AND GLJ8_FILIAL = " + GEBDBQuote(FWxFilial("GLJ8")))
+            aR := GEBLOJBAR(cEan, cProd, 1)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL PDV barcode " + cEan + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    // Wallets crypto ativas com enderecos de demonstracao (GEBCRYWAL sempre
+    // regrava: so' chama quando a moeda nao tem wallet ativa).
+    If !SF_HAS("GCK1", "GCK1_MOEDA", "BTC", " AND GCK1_ATIVO = 'S' AND GCK1_FILIAL = " + GEBDBQuote(FWxFilial("GCK1")))
+        lOk := GEBCRYWAL("BTC", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "S")[1] .And. lOk
+    EndIf
+    If !SF_HAS("GCK1", "GCK1_MOEDA", "USDT", " AND GCK1_ATIVO = 'S' AND GCK1_FILIAL = " + GEBDBQuote(FWxFilial("GCK1")))
+        lOk := GEBCRYWAL("USDT", "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb", "S")[1] .And. lOk
+    EndIf
+
+    // Prova PDV: uma venda regime FISCAL paga em dinheiro com codigo de
+    // barras — GEBLOJVEN resolve o EAN via GLJ8 e emite a NFC-e (DFE_NFCE=S).
+    // NFC-e emitida pelo caixa tem GDF5_DOC = cupom ("CP..."); as DEM-65-*
+    // do SF_FIS tambem gravam origem LOJA, entao o discriminador e' o doc.
+    aH := TCSqlQuery("SELECT COUNT(*) AS N FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND GDF5_FILIAL = " + cFilQ + ;
+        " AND GDF5_MOD = '65' AND GDF5_DOC LIKE 'CP%'")
+    If BOVAL(aH[1]:N) == 0
+        aR := GEBLOJABRE("01", "DEM_CAIXA1", 200, dHoje)
+        lOk := aR[1] .And. lOk
+        If aR[1]
+            cSes := aR[3]
+            cProd := "DEM-P01"
+            cEan := SF_EAN13(1)
+            nTot := Round(2 * SF_PRC(cProd), 2)
+            aR := GEBLOJVEN(cSes, {{cEan, 2, 0}}, {{"DINHEIRO", nTot + 20}}, "", 0, "", "", "", "", "", "FISCAL")
+            If !aR[1]
+                ConOut("SEED_FULL PDV venda " + aR[2])
+                lOk := .F.
+            Else
+                cCup := aR[3][1]
+                cNota := BOCOL(aR[3][4])
+                cSt := BOCOL(aR[3][5])
+                ConOut("SEED_FULL PDV cupom " + cCup + " total=" + cValToChar(nTot) + " regime=FISCAL status=" + cSt)
+                aH := TCSqlQuery("SELECT GDF5_STATUS AS S, GDF5_PROT AS P, GDF5_QR AS Q FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND " + ;
+                    "GDF5_FILIAL = " + cFilQ + " AND GDF5_CHAVE = " + GEBDBQuote(cNota))
+                If Len(aH) == 1 .And. BOCOL(aH[1]:S) == "CONTINGENCIA"
+                    // SEFAZ fora do ar na hora: transmite as pendentes e rele.
+                    GEBDFETRANSMITE()
+                    aH := TCSqlQuery("SELECT GDF5_STATUS AS S, GDF5_PROT AS P, GDF5_QR AS Q FROM GDF5 WHERE D_E_L_E_T_ = ' ' AND " + ;
+                        "GDF5_FILIAL = " + cFilQ + " AND GDF5_CHAVE = " + GEBDBQuote(cNota))
+                EndIf
+                If Len(aH) != 1 .Or. !(BOCOL(aH[1]:S) == "AUTORIZADA")
+                    ConOut("SEED_FULL PDV FAIL NFC-e nao autorizada: " + cNota)
+                    lOk := .F.
+                Else
+                    ConOut("SEED_FULL PDV NFC-e autorizada chave=" + cNota + " protocolo=" + BOCOL(aH[1]:P) + ;
+                        " qr=" + IIf(BOCOL(aH[1]:Q) == "", "VAZIO", "ok"))
+                EndIf
+            EndIf
+            aR := GEBLOJFECHA(cSes, GEBLOJESP(cSes))
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL PDV fecha sessao " + cSes + " " + aR[2])
+            EndIf
+        EndIf
+    Else
+        ConOut("SEED_FULL PDV NFC-e de loja ja existe (" + cValToChar(BOVAL(aH[1]:N)) + "): venda PDV preservada")
+    EndIf
+
+    lOk := SF_CNT("GLJ8", "GLJ8_FILIAL = " + GEBDBQuote(FWxFilial("GLJ8")) + " AND LEFT(GLJ8_PROD, 5) = 'DEM-P'", 60) .And. lOk
+    lOk := SF_CNT("GCK1", "GCK1_FILIAL = " + GEBDBQuote(FWxFilial("GCK1")) + " AND GCK1_MOEDA IN ('BTC','USDT') AND GCK1_ATIVO = 'S'", 2) .And. lOk
+    ConOut("SEED_FULL pdv " + IIf(lOk, "OK", "FAIL"))
+Return lOk
+
+// Pasta persistente dos certificados do demo: ~/.geban-demo/cert
+// (sobrevive a reboot; o /tmp/geban-seed-full era efemero). GEBDFECERTDIR
+// completa o caminho com <tenant>/<filial> na hora de instalar/ler.
+Static Function SF_CERTBASE()
+    Local cHome := AllTrim(BOSTR(GetEnv("HOME")))
+    If cHome == ""
+        cHome := "/tmp"
+    EndIf
+Return cHome + "/.geban-demo/cert"
+
+// EAN-13 do item nI do seed: "789" + sequencial de 9 digitos + digito
+// verificador (modulo 10, pesos 3 e 1 — mesmo algoritmo de GEBLOJEANOK).
+Static Function SF_EAN13(nI)
+    Local cBase := "789" + StrZero(nI, 9)
+    Local nSoma := 0
+    Local nPeso := 3
+    Local nJ := 0
+    For nJ := Len(cBase) To 1 Step -1
+        nSoma := nSoma + Val(SubStr(cBase, nJ, 1)) * nPeso
+        nPeso := 4 - nPeso
+    Next nJ
+Return cBase + cValToChar(BOMOD(10 - BOMOD(nSoma, 10), 10))
 
 // Preco PADRAO do produto (GFT2); 0 se ausente.
 Static Function SF_PRC(cProd)
