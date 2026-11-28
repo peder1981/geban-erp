@@ -11,7 +11,7 @@
 #
 # Veredito: procura "T_NOME PASS"/"PASS" na saida; FAIL explicito ou
 # ausencia de veredito positivo conta como falha. Testes que precisam
-# dos emuladores (SEFAZ :18766, Cielo :18765) falham sem eles — suba
+# dos emuladores (SEFAZ :18766, Cielo :18765, Banco :18767) falham sem eles — suba
 # tests/emuladores/ antes se for o caso.
 #
 # Rode SEMPRE num banco de teste dedicado, nunca em producao.

@@ -1,0 +1,16 @@
+[Unit]
+Description=GEBAN demo — periferico WebSocket :9100 (impressora virtual de cupons)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__GEBAN_ROOT__/periferico
+ExecStart=__GEBAN_PYTHON__ __GEBAN_ROOT__/periferico/periferico_service.py --config __GEBAN_ROOT__/periferico/config/perifericos.json --port 9100
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-periferico
+
+[Install]
+WantedBy=default.target

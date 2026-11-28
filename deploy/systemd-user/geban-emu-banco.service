@@ -1,0 +1,16 @@
+[Unit]
+Description=GEBAN demo — emulador bancario CNAB (:18767)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__GEBAN_ROOT__
+ExecStart=__GEBAN_PYTHON__ __GEBAN_ROOT__/tests/emuladores/banco_emulador.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-emu-banco
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=GEBAN demo — emulador Cielo (cartao, :18765)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__GEBAN_ROOT__
+ExecStart=__GEBAN_PYTHON__ __GEBAN_ROOT__/tests/emuladores/cielo_emulador.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-emu-cielo
+
+[Install]
+WantedBy=default.target

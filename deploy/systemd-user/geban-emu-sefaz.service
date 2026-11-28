@@ -1,0 +1,17 @@
+[Unit]
+Description=GEBAN demo — emulador SEFAZ (NF-e/NFC-e 4.00, HTTPS :18766)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__GEBAN_ROOT__
+Environment=SEFAZ_SEED_NOTAS=9
+ExecStart=__GEBAN_PYTHON__ __GEBAN_ROOT__/tests/emuladores/sefaz_emulador.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geban-emu-sefaz
+
+[Install]
+WantedBy=default.target

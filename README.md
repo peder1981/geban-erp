@@ -33,6 +33,40 @@ Escrito em AdvPL/TLPP, roda no runtime advplc sobre PostgreSQL. Cada empresa tem
 
 ---
 
+## Ambiente de demonstração
+
+Os emuladores da empresa `99` ficam **sempre online** via units systemd de usuário (`Restart=always`, habilitadas no boot/login). `scripts/geban-demo.sh` é apenas um wrapper fino sobre elas:
+
+```bash
+scripts/geban-demo.sh up       # instala/atualiza as units e dá enable --now (idempotente)
+scripts/geban-demo.sh status   # saúde: estado das units + portas
+scripts/geban-demo.sh seed     # roda seed_full uma vez (manual; idempotente) — ambiente novo ou após reset
+scripts/geban-demo.sh down     # para as units, mas MANTÉM enabled (voltam no próximo login)
+scripts/geban-demo.sh reset    # down + DROP SCHEMA emp_99 CASCADE + rm periferico/saidas/cupom-*
+                                # pede confirmação "SIM" (ou use -y/--yes); depois rode up + seed
+```
+
+Units (modelos em `deploy/systemd-user/`, renderizadas com o caminho real do repo em `~/.config/systemd/user/` no `up`):
+
+| Unit | Serviço | Porta |
+|---|---|---|
+| `geban-emu-sefaz` | emulador SEFAZ (NF-e/NFC-e, `SEFAZ_SEED_NOTAS=9`) | HTTPS `:18766` |
+| `geban-emu-cielo` | emulador Cielo | `:18765` |
+| `geban-emu-banco` | emulador CNAB (`/health`) | `:18767` |
+| `geban-periferico` | periférico WebSocket / impressora virtual de cupons | `:9100` |
+
+Requer `advplc`, PostgreSQL de teste, Python 3 com `websockets`, `curl` e `systemctl --user` (Linux); `reset` também requer `psql`. Para um venv já preparado com `periferico/requirements.txt`, informe `GEBAN_DEMO_PYTHON=/caminho/venv/bin/python`. Não instala dependências automaticamente.
+
+Conexão via `GEBAN_PG_HOST/PORT/DB/USER/PASSWORD`, padrões `localhost/5432/geban_test/postgres/postgres`. O seed aceita apenas `geban_test`; nunca aponte para produção. Certificado local autoassinado: o seed exporta `ADVPP_HTTP_INSECURE=1` apenas para o subprocesso.
+
+**Semântica de `down`/`reset`:** `down` faz `systemctl --user stop` — as units continuam `enabled` e sobem de novo no próximo login ou boot. `reset` para as units, apaga `emp_99` e `periferico/saidas/cupom-*`, e orienta a recriar com `up` + `seed`. O script **não mata processos estranhos**: se algo externo ocupar uma porta, a unit falha ao dar bind e o `status` mostra o conflito honestamente — encerre o processo manualmente (`kill <pid>`) para a unit assumir.
+
+**Persistência:** units de usuário exigem sessão de login ou *lingering*. Nesta máquina `Linger=yes` já está ativo; em outra, rode `sudo loginctl enable-linger $USER` uma vez para os emuladores subirem sem login. Para desabilitar de vez: `systemctl --user disable geban-emu-sefaz geban-emu-cielo geban-emu-banco geban-periferico`. Logs: `journalctl --user -u geban-emu-sefaz -u geban-emu-cielo -u geban-emu-banco -u geban-periferico`.
+
+**Login:** empresa `99`, usuários `DEM_*` com senha `Demo#2026` (criados no primeiro `seed`; o seed não redefine senha de conta existente). Conta `super`: senha inicial `Geban#2026` (ou `GEBAN_SUPER_SENHA`), com troca obrigatória no primeiro login.
+
+A interface web (`advplc serve src/GEBTUI.prw`, `:8081`) **não** é gerenciada pelo `geban-demo`: o serve principal do ERP já roda em dev — suba a TUI por conta própria quando precisar.
+
 ## Telas
 
 Interface web em componentes PO-UI (`advplc serve src/GEBTUI.prw`): menu lateral com os módulos permitidos, tabelas ao vivo em abas e cada operação num formulário de tela única. Dados das imagens: empresa de demonstração fictícia.
