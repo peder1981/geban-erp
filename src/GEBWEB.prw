@@ -15,6 +15,7 @@
 #include "GEBWEB_API.prw"
 #include "GEBPDV_API.prw"
 #include "GEBPDV_HTML.prw"
+#include "GEBDEMO.prw"
 
 /*/{Protheus.doc} GEBWEB
     Servidor HTTP real (WSRestServer, AdvPP nativo): API REST do ERP
@@ -228,6 +229,13 @@ User Function GEBWEB_LOGINAPI(oReq)
         If !lOk
             ConOut("GEBWEB_LOGINAPI: GEBDBSetTenant falhou para " + cEmp)
         EndIf
+    EndIf
+
+    // Empresa 99 = demo local: acorda os emuladores sob demanda (watchdog).
+    // Aqui credencial + empresa ja' estao validadas; chamar agora cobre
+    // tambem o retorno antecipado "selecionar" filial mais abaixo.
+    If lOk .And. Upper(AllTrim(cEmp)) == "99"
+        GEBDEMOENSURE()
     EndIf
 
     // Super sem filial: entra em qualquer empresa provisionada, sem gravar vinculo
