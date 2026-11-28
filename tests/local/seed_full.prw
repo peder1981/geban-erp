@@ -94,7 +94,10 @@ User Function SEED_FULL()
     lOk := SF_FIS() .And. lOk
     lOk := SF_FIN() .And. lOk
     lOk := SF_COM() .And. lOk
-    // Proximas etapas: SF_CTB(), SF_LOJ().
+    lOk := SF_LOJ() .And. lOk
+    lOk := SF_SN() .And. lOk
+    lOk := SF_DER() .And. lOk
+    lOk := SF_CTB() .And. lOk
     ConOut("SEED_FULL " + IIf(lOk, "PASS", "FAIL"))
 Return lOk
 
@@ -776,6 +779,598 @@ Static Function SF_COM()
     lOk := SF_CNT("GES2", "GES2_DOC LIKE 'DEM-EST-%'", 3) .And. lOk
     ConOut("SEED_FULL compras " + IIf(lOk, "OK", "FAIL"))
 Return lOk
+
+/*/{Protheus.doc} SF_LOJ
+    Loja/faturamento do demo: estoque de reposicao DEM-ESL (60 produtos),
+    caixa 01 com sessao do dia (vendas multi-forma: dinheiro, PIX, TEF
+    debito/credito no emulador Cielo, fiado, vale-troca e crypto se o
+    CoinGecko responder), sangria/suprimento, devolucoes e fechamento sem
+    diferenca; 50 pedidos DEM-PV liberados e faturados (nota NS) e 5
+    devolucoes GEBFATDEV. Idempotente: sessao FECHADA do caixa 01 encerra o
+    bloco; pedido/devolucao/movimento so sao criados uma vez.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-11-02
+    @return .T. se todas as quantidades forem comprovadas
+/*/
+Static Function SF_LOJ()
+    Local lOk := .T.
+    Local lCrypto := .F.
+    Local aR := {}
+    Local aH := {}
+    Local aIt := {}
+    Local aPg := {}
+    Local aDev := {}
+    Local aVen := {}
+    Local cSes := ""
+    Local cSt := ""
+    Local cProd := ""
+    Local cProd2 := ""
+    Local cPed := ""
+    Local cCli := ""
+    Local cCup := ""
+    Local cVale := ""
+    Local cNota := ""
+    Local cFilQ := GEBDBQuote(FWxFilial("GLJ3"))
+    Local dHoje := BOHOJE()
+    Local nI := 0
+    Local nJ := 0
+    Local nTot := 0
+    Local nVale := 0
+    Local nEsp := 0
+    Local nCup := 0
+    Local nVen := 0
+    Local nFat := 0
+    Local nP1 := 0
+    Local nP2 := 0
+
+    // Parametros e carteira crypto (a venda crypto depende do CoinGecko).
+    lOk := SF_SET("CRY_CONTA", "CRYPTO") .And. lOk
+    lOk := SF_SET("LOJ_FIADO_DIAS", "30") .And. lOk
+    If !SF_HAS("GCK1", "GCK1_MOEDA", "BTC", " AND GCK1_ATIVO = 'S' AND GCK1_FILIAL = " + GEBDBQuote(FWxFilial("GCK1")))
+        lOk := GEBCRYWAL("BTC", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "S")[1] .And. lOk
+    EndIf
+
+    // Reposicao de estoque: 500 de cada produto DEM-P (custo ~55% do preco).
+    For nI := 1 To 60
+        cProd := "DEM-P" + StrZero(nI, 2)
+        If !SF_HAS("GES2", "GES2_DOC", "DEM-ESL-" + StrZero(nI, 2), " AND GES2_FILIAL = " + GEBDBQuote(FWxFilial("GES2")))
+            aR := GEBESTMOV(cProd, "01", "E", 500, Max(Round(SF_PRC(cProd) * 0.55, 2), 0.5), "SALDO_INI", ;
+                "DEM-ESL-" + StrZero(nI, 2), dHoje, {}, "", .F.)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL LOJ estoque " + cProd + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    // Caixa 01 da loja centro (conta CAIXA01, local 01, CC da loja).
+    aR := GEBLOJCX("01", "DEM Caixa Loja Centro", "", "01", "DEM-CC03")
+    lOk := aR[1] .And. lOk
+
+    // Sessao: FECHADA = bloco ja executado; ABERTA sem cupons = retomada.
+    aH := TCSqlQuery("SELECT GLJ2_SESSAO AS S, GLJ2_STATUS AS T FROM GLJ2 WHERE GLJ2_FILIAL = " + GEBDBQuote(FWxFilial("GLJ2")) + ;
+        " AND GLJ2_CAIXA = '01' AND D_E_L_E_T_ = ' ' ORDER BY R_E_C_N_O_ DESC LIMIT 1")
+    If Len(aH) > 0
+        cSes := BOCOL(aH[1]:S)
+        cSt := BOCOL(aH[1]:T)
+    EndIf
+    If cSt == "FECHADA"
+        nCup := BOVAL(TCSqlQuery("SELECT COUNT(*) AS N FROM GLJ3 WHERE GLJ3_FILIAL = " + cFilQ + ;
+            " AND GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND D_E_L_E_T_ = ' '")[1]:N)
+        aH := TCSqlQuery("SELECT GLJ5_CUPOM AS C FROM GLJ5 JOIN GLJ3 ON GLJ3_FILIAL = GLJ5_FILIAL AND GLJ3_CUPOM = GLJ5_CUPOM " + ;
+            "AND GLJ3.D_E_L_E_T_ = ' ' WHERE GLJ5_FILIAL = " + GEBDBQuote(FWxFilial("GLJ5")) + " AND GLJ5.D_E_L_E_T_ = ' ' AND " + ;
+            "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA = 'VALE' LIMIT 1")
+        If nCup < 19 .Or. Len(aH) == 0
+            // Sessao fechada incompleta (rodada parcial): abre outra do zero.
+            ConOut("SEED_FULL LOJ sessao " + cSes + " fechada incompleta (" + cValToChar(nCup) + " cupons): nova sessao")
+            cSes := ""
+            cSt := ""
+        Else
+            ConOut("SEED_FULL LOJ sessao " + cSes + " ja fechada com " + cValToChar(nCup) + " cupons")
+        EndIf
+    EndIf
+    If !(cSt == "FECHADA")
+        If cSt == "ABERTA"
+            nCup := BOVAL(TCSqlQuery("SELECT COUNT(*) AS N FROM GLJ3 WHERE GLJ3_FILIAL = " + cFilQ + ;
+                " AND GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND D_E_L_E_T_ = ' '")[1]:N)
+            If nCup > 0
+                // Sessao antiga com cupons: fecha sem diferenca e abre outra.
+                ConOut("SEED_FULL LOJ sessao " + cSes + " aberta com " + cValToChar(nCup) + " cupons: fechando")
+                aR := GEBLOJFECHA(cSes, GEBLOJESP(cSes))
+                lOk := aR[1] .And. lOk
+                cSes := ""
+                cSt := ""
+            EndIf
+        EndIf
+        If cSt == ""
+            aR := GEBLOJABRE("01", "DEM_CAIXA1", 200, dHoje)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL LOJ abre caixa " + aR[2])
+                Return .F.
+            EndIf
+            cSes := aR[3]
+        EndIf
+
+        // 8 dinheiro + 3 PIX + 2 debito + 2 credito + 2 fiado = 15 genericas;
+        // depois vale-troca (devolucao VALE), cancelamento e crypto.
+        aVen := {;
+            {{"DEM-P01", 2, "DEM-P05", 1}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P06", 3, "", 0}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P11", 2, "", 0}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P16", 4, "", 0}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P21", 4, "", 0}, "PIX", 0, ""}, ;
+            {{"DEM-P22", 6, "", 0}, "PIX", 0, ""}, ;
+            {{"DEM-P23", 2, "", 0}, "PIX", 0, ""}, ;
+            {{"DEM-P33", 2, "", 0}, "DEBITO", 1, ""}, ;
+            {{"DEM-P36", 2, "", 0}, "CREDITO", 1, ""}, ;
+            {{"DEM-P41", 2, "", 0}, "CREDITO", 3, ""}, ;
+            {{"DEM-P46", 1, "", 0}, "DEBITO", 1, ""}, ;
+            {{"DEM-P51", 2, "", 0}, "FIADO", 0, "DEM-C005"}, ;
+            {{"DEM-P56", 2, "", 0}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P02", 5, "", 0}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P03", 2, "", 0}, "FIADO", 0, "DEM-C010"}, ;
+            {{"DEM-P12", 2, "", 0}, "DINHEIRO", 0, ""}, ;
+            {{"DEM-P07", 2, "", 0}, "DINHEIRO", 0, ""}}
+        For nI := 1 To Len(aVen)
+            aIt := {{aVen[nI][1][1], aVen[nI][1][2]}}
+            nTot := Round(aVen[nI][1][2] * SF_PRC(aVen[nI][1][1]), 2)
+            If !(aVen[nI][1][3] == "")
+                aAdd(aIt, {aVen[nI][1][3], aVen[nI][1][4]})
+                nTot := Round(nTot + aVen[nI][1][4] * SF_PRC(aVen[nI][1][3]), 2)
+            EndIf
+            cProd := aVen[nI][2]
+            If cProd == "DINHEIRO"
+                aPg := {{"DINHEIRO", Round(nTot + 50, 2)}}
+            ElseIf cProd == "PIX" .Or. cProd == "FIADO"
+                aPg := {{cProd, nTot}}
+            ElseIf cProd == "DEBITO"
+                aPg := {{"DEBITO", nTot, aVen[nI][3]}}
+            Else
+                aPg := {{"CREDITO", nTot, aVen[nI][3]}}
+            EndIf
+            aR := GEBLOJVEN(cSes, aIt, aPg, aVen[nI][4], 0)
+            If !aR[1]
+                ConOut("SEED_FULL LOJ venda " + cValToChar(nI) + " " + aR[2])
+                lOk := .F.
+                Loop
+            EndIf
+            nVen++
+            If nI == 14
+                // Devolucao em dinheiro de 1 item da venda 14.
+                cCup := aR[3][1]
+                aR := GEBLOJDEV(cSes, cCup, {{"DEM-P02", 1}}, "DINHEIRO", "defeito")
+                If !aR[1]
+                    ConOut("SEED_FULL LOJ devolucao dinheiro " + aR[2])
+                EndIf
+                lOk := aR[1] .And. lOk
+            EndIf
+            If nI == 15
+                // Devolucao em vale-troca de 1 item da venda 15.
+                cCup := aR[3][1]
+                aR := GEBLOJDEV(cSes, cCup, {{"DEM-P03", 1}}, "VALE", "trocou")
+                If !aR[1]
+                    ConOut("SEED_FULL LOJ devolucao vale " + aR[2])
+                EndIf
+                lOk := aR[1] .And. lOk
+                If aR[1]
+                    cVale := aR[3][4]
+                    nVale := Round(BOVAL(aR[3][2]), 2)
+                EndIf
+            EndIf
+            If nI == 16
+                // Cancelamento da venda 16 (sessao ainda aberta).
+                aR := GEBLOJCAN(aR[3][1], "desistencia no balcao")
+                lOk := aR[1] .And. lOk
+            EndIf
+        Next
+        // Venda com o vale-troca + complemento em dinheiro
+        // (o numero do vale vai na 4a posicao do pagamento).
+        If !(cVale == "")
+            nTot := SF_PRC("DEM-P04")
+            aPg := {{"VALE", Min(nVale, nTot), 0, cVale}, {"DINHEIRO", Round(Max(nTot - nVale, 0) + 20, 2)}}
+            aR := GEBLOJVEN(cSes, {{"DEM-P04", 1}}, aPg, "", 0)
+            If !aR[1]
+                ConOut("SEED_FULL LOJ venda vale " + aR[2])
+                lOk := .F.
+            Else
+                nVen++
+            EndIf
+        EndIf
+        // Venda crypto (BTC): so se o CoinGecko responder agora.
+        nTot := SF_PRC("DEM-P09")
+        aR := GEBCRYQRCODE("BTC", nTot)
+        If aR[1]
+            aR := GEBLOJVEN(cSes, {{"DEM-P09", 1}}, {{"CRYPTO", nTot, 0, "BTC|" + aR[3][2]}}, "", 0)
+            If aR[1]
+                nVen++
+                lCrypto := .T.
+            Else
+                ConOut("SEED_FULL LOJ aviso venda crypto recusada: " + aR[2])
+            EndIf
+        Else
+            ConOut("SEED_FULL LOJ aviso cotacao crypto indisponivel (CoinGecko): venda crypto pulada")
+        EndIf
+        // Gaveta: suprimento e sangria antes do fechamento sem diferenca.
+        lOk := GEBLOJSAN(cSes, "SUPRIMENTO", 150, "reforco de troco", "")[1] .And. lOk
+        lOk := GEBLOJSAN(cSes, "SANGRIA", 400, "sangria cofre", "")[1] .And. lOk
+        nEsp := GEBLOJESP(cSes)
+        aR := GEBLOJFECHA(cSes, nEsp)
+        lOk := aR[1] .And. lOk
+        If aR[1] .And. !(aR[3][3] == 0)
+            ConOut("SEED_FULL LOJ fechamento com diferenca " + cValToChar(aR[3][3]))
+            lOk := .F.
+        EndIf
+        nCup := BOVAL(TCSqlQuery("SELECT COUNT(*) AS N FROM GLJ3 WHERE GLJ3_FILIAL = " + cFilQ + ;
+            " AND GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND D_E_L_E_T_ = ' '")[1]:N)
+    EndIf
+
+    // Verificacao da sessao: 17 genericas + vale (18) + crypto.
+    If !(nCup == 18 + IIf(lCrypto, 1, 0)) .And. !(cSt == "FECHADA" .And. nCup >= 18)
+        ConOut("SEED_FULL LOJ FAIL cupons " + cValToChar(nCup) + " vendas " + cValToChar(nVen))
+        lOk := .F.
+    EndIf
+    lOk := SF_CNT("GLJ3", "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ3_STATUS = 'CANCELADO'", 1) .And. lOk
+    // Uma venda de cada forma obrigatoria na sessao.
+    For nI := 1 To 6
+        cProd := {"DINHEIRO", "PIX", "DEBITO", "CREDITO", "FIADO", "VALE"}[nI]
+        aH := TCSqlQuery("SELECT GLJ5_CUPOM AS C FROM GLJ5 JOIN GLJ3 ON GLJ3_FILIAL = GLJ5_FILIAL AND GLJ3_CUPOM = GLJ5_CUPOM " + ;
+            "AND GLJ3.D_E_L_E_T_ = ' ' WHERE GLJ5_FILIAL = " + GEBDBQuote(FWxFilial("GLJ5")) + " AND GLJ5.D_E_L_E_T_ = ' ' AND " + ;
+            "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA = " + GEBDBQuote(cProd) + " LIMIT 1")
+        If Len(aH) == 0
+            ConOut("SEED_FULL LOJ FAIL forma ausente " + cProd)
+            lOk := .F.
+        EndIf
+    Next
+    lOk := SF_CNT("GLJ6", "GLJ6_SESSAO = " + GEBDBQuote(cSes), 2) .And. lOk
+    // Crypto e' opcional (depende do CoinGecko), mas quando registrada tem que ter carteira.
+    If BOVAL(TCSqlQuery("SELECT COUNT(*) AS N FROM GLJ5 JOIN GLJ3 ON GLJ3_FILIAL = GLJ5_FILIAL AND GLJ3_CUPOM = GLJ5_CUPOM " + ;
+        "AND GLJ3.D_E_L_E_T_ = ' ' WHERE GLJ5_FILIAL = " + GEBDBQuote(FWxFilial("GLJ5")) + " AND GLJ5.D_E_L_E_T_ = ' ' AND " + ;
+        "GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND GLJ5_FORMA = 'CRYPTO'")[1]:N) > 0
+        lCrypto := .T.
+        If !SF_HAS("GCK1", "GCK1_MOEDA", "BTC", "")
+            ConOut("SEED_FULL LOJ FAIL pagamento crypto sem carteira GCK1")
+            lOk := .F.
+        EndIf
+    EndIf
+
+    // 50 pedidos DEM-PV (2 itens, produtos 21..60): libera e fatura.
+    For nI := 1 To 50
+        cPed := "DEM-PV-" + StrZero(nI, 3)
+        cCli := "DEM-C" + StrZero(((nI - 1) % 40) + 1, 3)
+        nP1 := 21 + ((nI - 1) % 40)
+        nP2 := 21 + ((nP1 - 21) * 3 + 1) % 40
+        If nP2 == nP1
+            nP2 := 21 + (nP1 - 20) % 40
+        EndIf
+        cProd := "DEM-P" + StrZero(nP1, 2)
+        cProd2 := "DEM-P" + StrZero(nP2, 2)
+        If !SF_HAS("GFT3", "GFT3_NUM", cPed, " AND GFT3_FILIAL = " + GEBDBQuote(FWxFilial("GFT3")))
+            aR := GEBFATPED(cPed, cCli, {{cProd, 1 + nI % 4}, {cProd2, 2 + nI % 3}}, "30", 0, "01", dHoje)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL LOJ pedido " + cPed + " " + aR[2])
+                Loop
+            EndIf
+        EndIf
+        aH := TCSqlQuery("SELECT GFT3_STATUS AS S FROM GFT3 WHERE GFT3_FILIAL = " + GEBDBQuote(FWxFilial("GFT3")) + ;
+            " AND GFT3_NUM = " + GEBDBQuote(cPed) + " AND D_E_L_E_T_ = ' '")
+        If Len(aH) == 1 .And. (BOCOL(aH[1]:S) == "ABERTO" .Or. BOCOL(aH[1]:S) == "BLOQUEADO")
+            aR := GEBFATLIB(cPed)
+            If aR[1] .And. aR[3] == "BLOQUEADO"
+                ConOut("SEED_FULL LOJ " + cPed + " " + aR[2] + " (liberacao forcada)")
+                aR := GEBFATLIB(cPed, .T.)
+            EndIf
+            lOk := aR[1] .And. lOk
+        EndIf
+        aH := TCSqlQuery("SELECT GFT3_STATUS AS S FROM GFT3 WHERE GFT3_FILIAL = " + GEBDBQuote(FWxFilial("GFT3")) + ;
+            " AND GFT3_NUM = " + GEBDBQuote(cPed) + " AND D_E_L_E_T_ = ' '")
+        If Len(aH) == 1 .And. BOCOL(aH[1]:S) == "LIBERADO"
+            aR := GEBFATFAT(cPed, {}, dHoje, "")
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL LOJ faturamento " + cPed + " " + aR[2])
+                Loop
+            EndIf
+            nFat++
+            If nFat <= 5
+                aAdd(aDev, {aR[3][1], cProd})
+            EndIf
+        EndIf
+    Next
+
+    // 5 devolucoes de venda (1 item de cada uma das 5 primeiras notas).
+    For nI := 1 To Len(aDev)
+        cNota := aDev[nI][1]
+        If !SF_HAS("GFT7", "GFT7_NOTA", cNota, " AND GFT7_FILIAL = " + GEBDBQuote(FWxFilial("GFT7")))
+            aR := GEBFATDEV(cNota, {{aDev[nI][2], 1}}, dHoje)
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL LOJ devolucao " + cNota + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    lOk := SF_CNT("GFT3", "GFT3_NUM LIKE 'DEM-PV-%' AND GFT3_STATUS = 'FATURADO'", 50) .And. lOk
+    lOk := SF_CNT("GFT5", "GFT5_PED LIKE 'DEM-PV-%'", 50) .And. lOk
+    // Devolucoes: 5 do faturamento + 2 da frente de loja (vale e dinheiro).
+    lOk := SF_CNT("GFT7", "GFT7_NOTA IN (SELECT GFT5_NOTA FROM GFT5 WHERE GFT5_PED LIKE 'DEM-PV-%' AND D_E_L_E_T_ = ' ')", 5) .And. lOk
+    lOk := SF_CNT("GFT7", "GFT7_NOTA IN (SELECT GLJ3_NOTA FROM GLJ3 WHERE GLJ3_SESSAO = " + GEBDBQuote(cSes) + " AND D_E_L_E_T_ = ' ')", 2) .And. lOk
+    ConOut("SEED_FULL loja " + IIf(lOk, "OK", "FAIL") + " cupons=" + cValToChar(nCup) + ;
+        " crypto=" + IIf(lCrypto, "S", "N") + " pedidos=50 devolucoes=5")
+Return lOk
+
+/*/{Protheus.doc} SF_SN
+    Simples Nacional do demo: configura o regime (Anexo I, comercio),
+    atividade COM ligada aos 60 produtos, folha/receita externa dos 12
+    meses anteriores (RBT12 e Fator R), apura a competencia corrente
+    (receita das GF3/GF4 emitidas no mes) e gera o DAS (guia DAS-AAAAMM na
+    GD1 + titulo no financeiro + provisao SN_DAS). Reexecutavel: GEBSNCFG,
+    ATV, PRD e FOL regravam; a apuracao refaz o mes.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-11-02
+    @return .T. se apuracao, DAS e contagens forem comprovadas
+/*/
+Static Function SF_SN()
+    Local lOk := .T.
+    Local aR := {}
+    Local aH := {}
+    Local cComp := Left(BOHOJE(), 6)
+    Local cCm := ""
+    Local cProd := ""
+    Local nI := 0
+
+    // Regime SIMPLES + atividade comercio (Anexo I) nos produtos DEM-P.
+    // GEBSNCFG regrava GE4: so' configura uma vez.
+    If !(GEBCFG("SN_ANEXO") == "I") .Or. !(GEBREGIME() == "SIMPLES")
+        aR := GEBSNCFG("I", "")
+        lOk := aR[1] .And. lOk
+    EndIf
+    aR := GEBSNATV("COM", "Comercio varejista", "I")
+    lOk := aR[1] .And. lOk
+    For nI := 1 To 60
+        cProd := "DEM-P" + StrZero(nI, 2)
+        If !SF_HAS("GSN7", "GSN7_PROD", cProd, " AND GSN7_FILIAL = " + GEBDBQuote(FWxFilial("GSN7")))
+            aR := GEBSNPRD(cProd, "COM", "N", "N")
+            lOk := aR[1] .And. lOk
+        EndIf
+    Next
+
+    // RBT12 e folha dos 12 meses anteriores (receita fora do GEBAN).
+    For nI := 1 To 12
+        cCm := SF_MESMENOS(cComp, nI)
+        aR := GEBSNFOL(cCm, 12500 + nI * 500, 38000 + nI * 1200, "")
+        lOk := aR[1] .And. lOk
+    Next
+    // Folha da competencia corrente (Fator R usa os 12 anteriores, mas o
+    // registro do mes compoe a base do proximo).
+    aR := GEBSNFOL(cComp, 13200, 0, "")
+    lOk := aR[1] .And. lOk
+
+    // Apuracao da competencia: receita = GF4 das notas AUTORIZADAS do mes.
+    aR := GEBSNAPU(cComp)
+    lOk := aR[1] .And. lOk
+    If aR[1]
+        ConOut("SEED_FULL SN " + cComp + " anexo " + aR[3][1] + " RBT12 " + cValToChar(aR[3][2]) + ;
+            " DAS " + cValToChar(aR[3][5]) + " venc " + aR[3][6])
+        If !(aR[3][5] > 0)
+            ConOut("SEED_FULL SN FAIL DAS zerado (receita do mes ausente)")
+            lOk := .F.
+        EndIf
+        aH := TCSqlQuery("SELECT GSN2_FATORR AS F FROM GSN2 WHERE GSN2_FILIAL = " + GEBDBQuote(FWxFilial("GSN2")) + ;
+            " AND GSN2_COMP = " + GEBDBQuote(cComp) + " AND D_E_L_E_T_ = ' '")
+        If Len(aH) == 1
+            ConOut("SEED_FULL SN fator_r=" + cValToChar(BOVAL(aH[1]:F)))
+        EndIf
+    Else
+        ConOut("SEED_FULL SN apuracao " + cComp + " " + aR[2])
+    EndIf
+
+    lOk := SF_CNT("GSN1", "GSN1_COMP <> ''", 13) .And. lOk
+    lOk := SF_CNT("GSN2", "GSN2_COMP = " + GEBDBQuote(cComp), 1) .And. lOk
+    lOk := SF_CNT("GSN3", "GSN3_COD = 'COM'", 1) .And. lOk
+    lOk := SF_CNT("GSN7", "LEFT(GSN7_PROD, 5) = 'DEM-P'", 60) .And. lOk
+    lOk := SF_CNT("GD1", "GD1_GUIA = 'DAS-" + cComp + "'", 1) .And. lOk
+    lOk := SF_CNT("GFN3", "GFN3_DOC = 'DAS-" + cComp + "'", 1) .And. lOk
+    ConOut("SEED_FULL simples " + IIf(lOk, "OK", "FAIL"))
+Return lOk
+
+/*/{Protheus.doc} SF_DER
+    Derrama do demo: cadastro de retencoes (ISS, IRRF, INSS, PIS, COFINS,
+    CSLL), retencao aplicada em 3 notas de entrada DEM-NF (abate os titulos
+    do fornecedor e acumula guias RET-<TRIB>-<comp> com titulo a pagar),
+    guia extra DEM-GD-ICMS vencida paga com juros, e pagamento do DAS da
+    competencia. Idempotente: retencao por documento e guia so nascem uma
+    vez; GEBDERPAGA reconhece guia ja baixada.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-11-02
+    @return .T. se retencoes, guias e baixas forem comprovadas
+/*/
+Static Function SF_DER()
+    Local lOk := .T.
+    Local aR := {}
+    Local aH := {}
+    Local aT := {}
+    Local aTit := {}
+    Local aRegs := {{"DEM-ISS", "ISS", 5, "ISS retido servico"}, {"DEM-IRRF", "IRRF", 1.5, "IRRF retido servico"}, ;
+        {"DEM-INSS", "INSS", 11, "INSS retido servico"}, {"DEM-PIS", "PIS", 0.65, "PIS retido"}, ;
+        {"DEM-COF", "COFINS", 3, "COFINS retida"}, {"DEM-CSLL", "CSLL", 1, "CSLL retida"}}
+    Local aCombo := {{"DEM-ISS", "DEM-IRRF"}, {"DEM-INSS", "DEM-IRRF"}, {"DEM-PIS", "DEM-COF", "DEM-CSLL"}}
+    Local cComp := Left(BOHOJE(), 6)
+    Local cDoc := ""
+    Local cForn := ""
+    Local cFilQ := GEBDBQuote(FWxFilial("GFN3"))
+    Local dHoje := BOHOJE()
+    Local nI := 0
+    Local nJ := 0
+    Local nBase := 0
+
+    // Regras de retencao DEM (regrava a mesma linha, sem historico).
+    For nI := 1 To Len(aRegs)
+        aR := GEBRETCAD(aRegs[nI][1], aRegs[nI][2], aRegs[nI][3], aRegs[nI][4])
+        lOk := aR[1] .And. lOk
+    Next
+
+    // Retencao sobre 3 notas de entrada com titulos a pagar abertos.
+    aH := TCSqlQuery("SELECT DISTINCT LEFT(GFN3_DOC, 10) AS D FROM GFN3 WHERE GFN3_FILIAL = " + cFilQ + ;
+        " AND GFN3_DOC LIKE 'DEM-NF-%' AND GFN3_STATUS = 'ABERTO' AND D_E_L_E_T_ = ' ' ORDER BY D LIMIT 3")
+    For nI := 1 To Len(aH)
+        cDoc := BOCOL(aH[nI]:D)
+        If nI > Len(aCombo) .Or. SF_HAS("GRT2", "GRT2_DOC", cDoc, " AND GRT2_FILIAL = " + cFilQ)
+            Loop
+        EndIf
+        aT := TCSqlQuery("SELECT GFN3_DOC AS D, GFN3_FORN AS F, GFN3_VENC AS V, GFN3_SALDO AS S FROM GFN3 WHERE GFN3_FILIAL = " + ;
+            cFilQ + " AND LEFT(GFN3_DOC, 10) = " + GEBDBQuote(cDoc) + " AND GFN3_STATUS = 'ABERTO' AND D_E_L_E_T_ = ' '")
+        If Len(aT) == 0
+            Loop
+        EndIf
+        aTit := {}
+        nBase := 0
+        cForn := BOCOL(aT[1]:F)
+        For nJ := 1 To Len(aT)
+            aAdd(aTit, {BOCOL(aT[nJ]:D), BOCOL(aT[nJ]:V), BOVAL(aT[nJ]:S)})
+            nBase := nBase + BOVAL(aT[nJ]:S)
+        Next
+        aR := GEBRETVAL(aCombo[nI])
+        lOk := aR[1] .And. lOk
+        If aR[1]
+            aR := GEBRETAPL(cDoc, cForn, nBase, aR[3], dHoje, aTit)
+            lOk := aR[1] .And. lOk
+            ConOut("SEED_FULL DER retencao " + cDoc + " " + aR[2])
+        EndIf
+    Next
+
+    // Guia vencida de tributo paga com juros (caminho GD1 + GFN3 + baixa).
+    aR := GEBDERGUIA("DEM-GD-ICMS", "ICMS", cComp, 1450, BODTADD(dHoje, -20), "2.01.006", "FISCO")
+    lOk := aR[1] .And. lOk
+    If aR[1]
+        aH := TCSqlQuery("SELECT GD1_JUROS AS J FROM GD1 WHERE GD1_FILIAL = " + GEBDBQuote(FWxFilial("GD1")) + ;
+            " AND GD1_GUIA = 'DEM-GD-ICMS' AND GD1_STATUS = 'ABERTA' AND D_E_L_E_T_ = ' '")
+        If Len(aH) == 1 .And. BOVAL(aH[1]:J) == 0
+            lOk := GEBDJUR("DEM-GD-ICMS", 20) > 1450 .And. lOk
+        EndIf
+        aR := GEBDERPAGA("DEM-GD-ICMS", "BANCO", dHoje)
+        lOk := aR[1] .And. lOk
+        If !aR[1]
+            ConOut("SEED_FULL DER paga DEM-GD-ICMS " + aR[2])
+        EndIf
+    EndIf
+
+    // Pagamento do DAS da competencia (o titulo sai do BANCO).
+    aR := GEBDERPAGA("DAS-" + cComp, "BANCO", dHoje)
+    lOk := aR[1] .And. lOk
+    If !aR[1]
+        ConOut("SEED_FULL DER paga DAS " + aR[2])
+    EndIf
+
+    lOk := SF_CNT("GRT1", "LEFT(GRT1_COD, 4) = 'DEM-'", 6) .And. lOk
+    lOk := SF_CNT("GRT2", "LEFT(GRT2_DOC, 6) = 'DEM-NF'", 7) .And. lOk
+    lOk := SF_CNT("GD1", "GD1_COMP = " + GEBDBQuote(cComp) + " AND (GD1_GUIA LIKE 'RET-%' OR GD1_GUIA IN ('DAS-" + cComp + "', 'DEM-GD-ICMS'))", 8) .And. lOk
+    lOk := SF_CNT("GD1", "GD1_STATUS = 'BAIXADA' AND GD1_GUIA IN ('DAS-" + cComp + "', 'DEM-GD-ICMS')", 2) .And. lOk
+    ConOut("SEED_FULL derrama " + IIf(lOk, "OK", "FAIL"))
+Return lOk
+
+/*/{Protheus.doc} SF_CTB
+    Fechamento contabil do demo: 3 lancamentos manuais DEM-CTB (despesas e
+    receita financeira com centro de custo; os lancamentos das vendas,
+    compras, financeiro e DAS ja foram gerados pelos modulos via GEBCTXLP)
+    e prova do balancete (debitos = creditos) e da DRE (receita bruta > 0)
+    na competencia corrente com GEBCTXBALAN/GEBCTXDRE.
+    @type Seed de demonstracao
+    @author Peder Munksgaard
+    @since 2026-11-02
+    @return .T. se os lancamentos e o fechamento forem comprovados
+/*/
+Static Function SF_CTB()
+    Local lOk := .T.
+    Local lFech := .F.
+    Local aR := {}
+    Local aPar := {}
+    Local aLanc := {{"DEM-CTB-001", 2500, "4.02.006", "1.01.002", "DEM-CC01"}, ;
+        {"DEM-CTB-002", 380, "1.01.002", "3.01.002", "DEM-CC05"}, ;
+        {"DEM-CTB-003", 720, "4.02.006", "1.01.002", "DEM-CC02"}}
+    Local cComp := Left(BOHOJE(), 6)
+    Local dHoje := BOHOJE()
+    Local nI := 0
+    Local nRB := 0
+    Local nRes := 0
+
+    // Lancamentos manuais (um so; GC2_ORIGEM marca o documento).
+    For nI := 1 To Len(aLanc)
+        If !SF_HAS("GC2", "GC2_ORIGEM", "DEMLP:" + aLanc[nI][1], " AND GC2_FILIAL = " + GEBDBQuote(FWxFilial("GC2")))
+            aR := GEBCTXLP("DEMLP", aLanc[nI][2], aLanc[nI][1], dHoje, aLanc[nI][3], aLanc[nI][4], aLanc[nI][5])
+            lOk := aR[1] .And. lOk
+            If !aR[1]
+                ConOut("SEED_FULL CTB " + aLanc[nI][1] + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    // Balancete do mes: fechado exige debitos = creditos no periodo.
+    aR := GEBCTXBALAN(cComp + "01", dHoje, "")
+    lOk := aR[1] .And. lOk
+    If aR[1]
+        aPar := aR[3][2]
+        For nI := 1 To Len(aPar)
+            If aPar[nI][1] == "fechado" .And. aPar[nI][2] == "S"
+                lFech := .T.
+            EndIf
+        Next nI
+        ConOut("SEED_FULL CTB balancete " + cComp + " debitos=" + cValToChar(aPar[2][2]) + ;
+            " creditos=" + cValToChar(aPar[3][2]) + " fechado=" + IIf(lFech, "S", "N"))
+        If !lFech
+            lOk := .F.
+        EndIf
+    Else
+        ConOut("SEED_FULL CTB balancete " + aR[2])
+    EndIf
+
+    // DRE do mes: receita bruta das vendas/notas > 0 e resultado numerico.
+    aR := GEBCTXDRE(cComp + "01", dHoje, "")
+    lOk := aR[1] .And. lOk
+    If aR[1]
+        For nI := 1 To Len(aR[3])
+            If aR[3][nI][1] == "receita_bruta"
+                nRB := aR[3][nI][2]
+            EndIf
+            If aR[3][nI][1] == "resultado"
+                nRes := aR[3][nI][2]
+            EndIf
+        Next nI
+        ConOut("SEED_FULL CTB dre " + cComp + " receita_bruta=" + cValToChar(nRB) + " resultado=" + cValToChar(nRes))
+        If !(nRB > 0)
+            ConOut("SEED_FULL CTB FAIL DRE sem receita bruta no mes")
+            lOk := .F.
+        EndIf
+    Else
+        ConOut("SEED_FULL CTB dre " + aR[2])
+    EndIf
+
+    lOk := SF_CNT("GC2", "GC2_ORIGEM LIKE 'DEMLP:DEM-CTB-%'", 3) .And. lOk
+    ConOut("SEED_FULL contabil " + IIf(lOk, "OK", "FAIL"))
+Return lOk
+
+// Preco PADRAO do produto (GFT2); 0 se ausente.
+Static Function SF_PRC(cProd)
+    Local aH := TCSqlQuery("SELECT GFT2_PRECO AS P FROM GFT2 WHERE GFT2_FILIAL = " + GEBDBQuote(FWxFilial("GFT2")) + ;
+        " AND GFT2_PROD = " + GEBDBQuote(cProd) + " AND GFT2_TAB = 'PADRAO' AND D_E_L_E_T_ = ' ' LIMIT 1")
+    If Len(aH) == 0
+        Return 0
+    EndIf
+Return Round(BOVAL(aH[1]:P), 2)
+
+// Competencia AAAAMM menos nMeses meses.
+Static Function SF_MESMENOS(cComp, nMeses)
+    Local nA := Val(Left(cComp, 4))
+    Local nM := Val(SubStr(cComp, 5, 2)) - nMeses
+    While nM <= 0
+        nM := nM + 12
+        nA := nA - 1
+    EndDo
+Return StrZero(nA, 4) + StrZero(nM, 2)
 
 // Configuracao fiscal DEM: compara os parametros antes de versionar GE4.
 Static Function SF_CFGDEMO()
