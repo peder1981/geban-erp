@@ -693,6 +693,114 @@ class CashDrawerUSB(PerifericoDriver):
 
 
 # =============================================================================
+# Drivers virtuais de demonstração (sem hardware, nunca falham)
+# =============================================================================
+
+class PesoVirtual(PerifericoDriver):
+    """Balança emulada para demo.
+
+    Configuração: {"peso": 1.250} fixa o valor; sem config devolve um peso
+    plausível de produto de mercearia (0,250 a 3,000 kg) com leve variação.
+    """
+
+    name = "peso_virtual"
+    tipo = "PESADORA"
+
+    async def connect(self) -> bool:
+        self.connected = True
+        return True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def read_weight(self) -> Optional[float]:
+        import random
+        try:
+            fixo = float(self.config.get("peso", 0))
+        except (TypeError, ValueError):
+            fixo = 0
+        if fixo > 0:
+            return round(fixo, 3)
+        return round(random.uniform(0.250, 3.000), 3)
+
+
+class GavetaVirtual(PerifericoDriver):
+    """Gaveta de dinheiro emulada: o pulso de abertura é só registrado."""
+
+    name = "gaveta_virtual"
+    tipo = "GAVETA"
+
+    async def connect(self) -> bool:
+        self.connected = True
+        return True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def open_cash_drawer(self) -> bool:
+        logger.info("Gaveta virtual: pulso de abertura registrado")
+        return True
+
+
+class BarcodeVirtual(PerifericoDriver):
+    """Leitor de código de barras emulado.
+
+    Configuração: {"codigo": "7890000000017"} fixa a leitura; sem config
+    alterna entre os EAN-13 demo do seed (7890000000017..0078).
+    """
+
+    name = "barcode_virtual"
+    tipo = "LEITOR"
+
+    async def connect(self) -> bool:
+        self.connected = True
+        self._idx = 0
+        return True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def read_barcode(self, timeout_ms: int = 5000) -> Optional[str]:
+        codigo = str(self.config.get("codigo", "") or "").strip()
+        if codigo:
+            return codigo
+        base = "78900000000"
+        sufixo = 17 + self._idx
+        self._idx += 1
+        # EAN-13 simples e determinístico para a demo (dígito não verificado,
+        # mas o GEBLOJRESOLVE aceita por prefixo/plu em modo demo).
+        return base + f"{sufixo:02d}"
+
+
+class TEFVirtual(TEFBase):
+    """TEF emulado: sempre aprova com NSU/número de autorização demo.
+
+    Configuração: {"recusar": true} simula recusa para testar o fluxo.
+    """
+
+    name = "tef_virtual"
+
+    async def connect(self) -> bool:
+        self.connected = True
+        return True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def authorize_transaction(self, amount: float, type: str = "CREDIT") -> Dict[str, Any]:
+        import random
+        if str(self.config.get("recusar", "")).lower() in ("1", "true", "s", "sim"):
+            return {"success": False, "error": "transacao_recusada", "response_code": "05"}
+        return {
+            "success": True,
+            "approval_code": f"{random.randint(100000, 999999)}",
+            "transaction_id": f"TEF{datetime.now().strftime('%H%M%S')}{random.randint(100, 999)}",
+            "response_code": "00",
+            "raw": {"autorizado": True, "valor": round(float(amount), 2), "tipo": type.upper()},
+        }
+
+
+# =============================================================================
 # Plugin System e Registry
 # =============================================================================
 
@@ -715,6 +823,10 @@ class DriverRegistry:
             BarcodeReaderSerial,
             ScaleSerial,
             CashDrawerUSB,
+            PesoVirtual,
+            GavetaVirtual,
+            BarcodeVirtual,
+            TEFVirtual,
         ]
         for driver_class in builtins:
             self.register(driver_class)
@@ -930,7 +1042,7 @@ class PerifericoWebSocketHandler:
                 if driver and hasattr(driver, 'authorize_transaction'):
                     result = await driver.authorize_transaction(
                         data.get("amount", 0),
-                        data.get("type", "CREDIT")
+                        data.get("transaction_type", "CREDIT")
                     )
                     await websocket.send(json.dumps({"type": "transaction_result", "id": pid, **result}))
             

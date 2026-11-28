@@ -8,6 +8,30 @@
         "out_dir": "saidas",
         "colunas": 48
       }
+    },
+    {
+      "tipo": "LEITOR",
+      "driver": "barcode_virtual",
+      "nome": "Leitor Demo",
+      "config": {}
+    },
+    {
+      "tipo": "PESADORA",
+      "driver": "peso_virtual",
+      "nome": "Balanca Demo",
+      "config": {}
+    },
+    {
+      "tipo": "GAVETA",
+      "driver": "gaveta_virtual",
+      "nome": "Gaveta Demo",
+      "config": {}
+    },
+    {
+      "tipo": "TEF",
+      "driver": "tef_virtual",
+      "nome": "TEF Demo",
+      "config": {}
     }
   ]
 }
