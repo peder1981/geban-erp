@@ -1289,9 +1289,9 @@ Static Function SF_CTB()
     Local lFech := .F.
     Local aR := {}
     Local aPar := {}
-    Local aLanc := {{"DEM-CTB-001", 2500, "4.02.006", "1.01.002", "DEM-CC01"}, ;
+    Local aLanc := {{"DEM-CTB-001", 250, "4.02.006", "1.01.002", "DEM-CC01"}, ;
         {"DEM-CTB-002", 380, "1.01.002", "3.01.002", "DEM-CC05"}, ;
-        {"DEM-CTB-003", 720, "4.02.006", "1.01.002", "DEM-CC02"}}
+        {"DEM-CTB-003", 72, "4.02.006", "1.01.002", "DEM-CC02"}}
     Local cComp := Left(BOHOJE(), 6)
     Local dHoje := BOHOJE()
     Local nI := 0
@@ -1305,6 +1305,26 @@ Static Function SF_CTB()
             lOk := aR[1] .And. lOk
             If !aR[1]
                 ConOut("SEED_FULL CTB " + aLanc[nI][1] + " " + aR[2])
+            EndIf
+        EndIf
+    Next
+
+    // Despesas proporcionais ao volume do demo (250 administrativo + 72 loja).
+    // Bases antigas: corrige o excesso por contrapartida, sem alterar o historico.
+    // As 50 receitas/CMVs do faturamento ja sao lancadas pelo GEBFATFAT.
+    For nI := 1 To Len(aLanc)
+        If aLanc[nI][3] == "4.02.006"
+            aPar := TCSqlQuery("SELECT GC2_VALOR AS V, GC2_DATA AS DT FROM GC2 WHERE D_E_L_E_T_ = ' ' AND GC2_FILIAL = " + ;
+                GEBDBQuote(FWxFilial("GC2")) + " AND GC2_ORIGEM = " + GEBDBQuote("DEMLP:" + aLanc[nI][1]))
+            If Len(aPar) == 1 .And. BOVAL(aPar[1]:V) > aLanc[nI][2]
+                If !SF_HAS("GC2", "GC2_ORIGEM", "DEMAJUSTE:" + aLanc[nI][1], " AND GC2_FILIAL = " + GEBDBQuote(FWxFilial("GC2")))
+                    aR := GEBCTXLP("DEMAJUSTE", Round(BOVAL(aPar[1]:V) - aLanc[nI][2], 2), aLanc[nI][1], ;
+                        BOCOL(aPar[1]:DT), aLanc[nI][4], aLanc[nI][3], aLanc[nI][5])
+                    lOk := aR[1] .And. lOk
+                    If !aR[1]
+                        ConOut("SEED_FULL CTB ajuste despesa " + aR[2])
+                    EndIf
+                EndIf
             EndIf
         EndIf
     Next
@@ -1328,7 +1348,7 @@ Static Function SF_CTB()
         ConOut("SEED_FULL CTB balancete " + aR[2])
     EndIf
 
-    // DRE do mes: receita bruta das vendas/notas > 0 e resultado numerico.
+    // DRE do mes: receita bruta e resultado positivos para a demonstracao.
     aR := GEBCTXDRE(cComp + "01", dHoje, "")
     lOk := aR[1] .And. lOk
     If aR[1]
@@ -1341,8 +1361,8 @@ Static Function SF_CTB()
             EndIf
         Next nI
         ConOut("SEED_FULL CTB dre " + cComp + " receita_bruta=" + cValToChar(nRB) + " resultado=" + cValToChar(nRes))
-        If !(nRB > 0)
-            ConOut("SEED_FULL CTB FAIL DRE sem receita bruta no mes")
+        If !(nRB > 0) .Or. !(nRes > 0)
+            ConOut("SEED_FULL CTB FAIL DRE exige receita e resultado positivos no mes")
             lOk := .F.
         EndIf
     Else
