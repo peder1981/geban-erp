@@ -27,7 +27,7 @@ import json
 import sys
 import threading
 from datetime import date, datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -108,6 +108,8 @@ def gerar_retorno(boletos):
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30  # limite de inatividade por conexao, inclusive durante a leitura do corpo
+
     def _responde(self, codigo, corpo, tipo='application/json'):
         dados = json.dumps(corpo).encode() if tipo == 'application/json' else corpo.encode('latin-1')
         self.send_response(codigo)
@@ -117,6 +119,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(dados)
 
     def do_POST(self):
+        try:
+            self._post()
+        except Exception as erro:
+            self._responde(500, {'ok': False, 'erro': '%s: %s' % (type(erro).__name__, erro)})
+
+    def _post(self):
         if urlparse(self.path).path != '/cnab/remessa':
             return self._responde(404, {'ok': False, 'erro': 'recurso inexistente'})
         try:
@@ -126,11 +134,19 @@ class Handler(BaseHTTPRequestHandler):
             boletos = ler_remessa(self.rfile.read(tamanho).decode('latin-1'))
         except ValueError as erro:
             return self._responde(400, {'ok': False, 'erro': str(erro)})
-        for boleto in boletos:
-            self.server.boletos.setdefault(boleto['nn'], boleto)
+        with self.server.lock:
+            for boleto in boletos:
+                self.server.boletos.setdefault(boleto['nn'], boleto)
         self._responde(200, {'ok': True, 'boletos': len(boletos)})
 
     def do_GET(self):
+        try:
+            with self.server.lock:
+                self._get()
+        except Exception as erro:
+            self._responde(500, {'ok': False, 'erro': '%s: %s' % (type(erro).__name__, erro)})
+
+    def _get(self):
         caminho = urlparse(self.path).path
         if caminho == '/health':
             return self._responde(200, {'ok': True, 'boletos': len(self.server.boletos)})
@@ -153,8 +169,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def servidor(porta):
-    httpd = HTTPServer(('127.0.0.1', porta), Handler)
+    httpd = ThreadingHTTPServer(('127.0.0.1', porta), Handler)
     httpd.boletos = {}
+    httpd.lock = threading.Lock()
     return httpd
 
 
