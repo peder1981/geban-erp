@@ -135,12 +135,15 @@ User Function GEBDFEEFD(cComp, cFin)
         Next nN
     Next nI
 
-    // Entradas de terceiros com a nota completa recebida.
-    aH := TCSqlQuery("SELECT V.GDF8_CHAVE AS C, V.GDF8_PART AS P, E.GCQ4_DATA AS D, N.GDFE_XML AS X, N.GDFE_SIT AS S FROM GDF8 V " + ;
+    // Entradas de terceiros com a nota completa recebida. Dedup por chave:
+    // a mesma NF-e pode vincular mais de uma entrada (GCQ4) e emitiria dois
+    // C100 com a mesma chave de acesso, duplicando credito no arquivo.
+    aH := TCSqlQuery("SELECT DISTINCT ON (V.GDF8_CHAVE) V.GDF8_CHAVE AS C, V.GDF8_PART AS P, E.GCQ4_DATA AS D, N.GDFE_XML AS X, " + ;
+        "N.GDFE_SIT AS S FROM GDF8 V " + ;
         "JOIN GCQ4 E ON E.GCQ4_FILIAL = V.GDF8_FILIAL AND E.GCQ4_NF = V.GDF8_DOC AND E.GCQ4_FORN = V.GDF8_PART AND E.D_E_L_E_T_ = ' ' " + ;
         "LEFT JOIN GDFE N ON N.GDFE_FILIAL = V.GDF8_FILIAL AND N.GDFE_CHAVE = V.GDF8_CHAVE AND N.D_E_L_E_T_ = ' ' " + ;
         "WHERE V.GDF8_FILIAL = " + cFil + " AND V.GDF8_TIPO = 'ENT' AND V.D_E_L_E_T_ = ' ' AND E.GCQ4_DATA BETWEEN " + GEBDBQuote(cIni) + ;
-        " AND " + GEBDBQuote(cFim) + " ORDER BY E.GCQ4_DATA, V.GDF8_CHAVE")
+        " AND " + GEBDBQuote(cFim) + " ORDER BY V.GDF8_CHAVE, E.GCQ4_DATA")
     For nI := 1 To Len(aH)
         cX := BOSTR(aH[nI]:X)
         If !("<det " $ cX) .Or. BOCOL(aH[nI]:S) == "CANCELADA"
